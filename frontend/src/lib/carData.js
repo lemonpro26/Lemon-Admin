@@ -10,10 +10,9 @@ export const makeLogo = (slug) => `${LOGO_BASE}/${slug}.png`;
 // 2026 → 2000, then a catch-all bucket for anything older.
 export const CAR_YEARS = (() => {
   const start = 2026;
-  const end = 2000;
+  const end = 2021;
   const years = [];
   for (let y = start; y >= end; y -= 1) years.push(String(y));
-  years.push('1999 or older');
   return years;
 })();
 
@@ -54,6 +53,16 @@ export const CAR_MAKES = [
   { name: 'Rivian', slug: 'rivian' },
   { name: 'Lucid', slug: 'lucid' },
   { name: 'Polestar', slug: 'polestar' },
+  // Luxury / exotic brands
+  { name: 'Jaguar', slug: 'jaguar' },
+  { name: 'Alfa Romeo', slug: 'alfa-romeo' },
+  { name: 'Maserati', slug: 'maserati' },
+  { name: 'Bentley', slug: 'bentley' },
+  { name: 'Rolls-Royce', slug: 'rolls-royce' },
+  { name: 'Aston Martin', slug: 'aston-martin' },
+  { name: 'Ferrari', slug: 'ferrari' },
+  { name: 'Lamborghini', slug: 'lamborghini' },
+  { name: 'McLaren', slug: 'mclaren' },
 ]
   .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }))
   // "Other" is always pinned to the end so it never sorts into the brand list.
@@ -96,6 +105,17 @@ export const CAR_MODELS = {
   Rivian: ['R1T', 'R1S', 'R2', 'R3', 'EDV'],
   Lucid: ['Air', 'Gravity'],
   Polestar: ['Polestar 2', 'Polestar 3', 'Polestar 4'],
+  Jaguar: ['F-PACE', 'E-PACE', 'I-PACE', 'XF', 'F-TYPE'],
+  'Alfa Romeo': ['Giulia', 'Stelvio', 'Tonale'],
+  Maserati: ['Ghibli', 'Levante', 'Quattroporte', 'Grecale', 'MC20'],
+  Bentley: ['Bentayga', 'Continental GT', 'Flying Spur'],
+  'Rolls-Royce': ['Ghost', 'Cullinan', 'Phantom', 'Spectre'],
+  'Aston Martin': ['DB11', 'DB12', 'Vantage', 'DBX'],
+  Ferrari: ['Roma', 'Portofino', 'SF90', '296 GTB', 'Purosangue'],
+  Lamborghini: ['Urus', 'Huracán', 'Revuelto'],
+  McLaren: ['720S', 'Artura', 'GT', '750S'],
+  // "Other" make — RV and similar non-listed vehicle types.
+  Other: ['RV', 'Motorhome', 'Camper Van'],
 };
 
 export function getModels(makeName) {
