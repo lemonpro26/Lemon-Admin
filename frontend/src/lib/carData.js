@@ -51,7 +51,13 @@ export const CAR_MAKES = [
   { name: 'MINI', slug: 'mini' },
   { name: 'Genesis', slug: 'genesis' },
   { name: 'Fiat', slug: 'fiat' },
-].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+  { name: 'Rivian', slug: 'rivian' },
+  { name: 'Lucid', slug: 'lucid' },
+  { name: 'Polestar', slug: 'polestar' },
+]
+  .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }))
+  // "Other" is always pinned to the end so it never sorts into the brand list.
+  .concat([{ name: 'Other', slug: null }]);
 
 // Common models per make. "Other / Not listed" is appended automatically.
 export const CAR_MODELS = {
@@ -87,6 +93,9 @@ export const CAR_MODELS = {
   MINI: ['Cooper', 'Countryman', 'Clubman'],
   Genesis: ['G70', 'G80', 'G90', 'GV70', 'GV80'],
   Fiat: ['500X', '500', '500e'],
+  Rivian: ['R1T', 'R1S', 'R2', 'R3', 'EDV'],
+  Lucid: ['Air', 'Gravity'],
+  Polestar: ['Polestar 2', 'Polestar 3', 'Polestar 4'],
 };
 
 export function getModels(makeName) {

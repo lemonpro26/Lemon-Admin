@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { CarFront } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { FUNNEL_STEPS, STEP_IDS, getStep, getStepIndex } from '@/lib/funnel';
@@ -44,21 +45,27 @@ function MakeStep({ onSelect }) {
     >
       {CAR_MAKES.map((m) => (
         <button
-          key={m.slug}
+          key={m.slug || m.name}
           type="button"
           onClick={() => onSelect(m.name)}
           className="group flex flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:border-[#FACC15] hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(15,23,42,0.12)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300"
-          data-testid={`make-option-${m.slug}`}
+          data-testid={`make-option-${m.slug || 'other'}`}
         >
-          <img
-            src={makeLogo(m.slug)}
-            alt={`${m.name} logo`}
-            loading="lazy"
-            className="h-10 w-10 object-contain"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
+          {m.slug ? (
+            <img
+              src={makeLogo(m.slug)}
+              alt={`${m.name} logo`}
+              loading="lazy"
+              className="h-10 w-10 object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            <span className="h-10 w-10 flex items-center justify-center rounded-full bg-yellow-50 border border-yellow-200">
+              <CarFront className="h-5 w-5 text-yellow-600" />
+            </span>
+          )}
           <span className="text-sm font-semibold text-slate-800 text-center leading-tight">{m.name}</span>
         </button>
       ))}
