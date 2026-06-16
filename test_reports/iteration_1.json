@@ -1,0 +1,40 @@
+{
+  "summary": "Tested Lemon Pros backend (12 pytest cases) and full frontend funnel (Landing -> year -> make -> model -> name -> address -> phone -> email -> thank-you). 11/12 backend tests pass and 12/12 frontend flow checks pass. ONE CRITICAL BACKEND BUG found: the LeadCreate Pydantic model in /app/backend/server.py is missing car_year/car_make/car_model fields and uses extra='ignore', so vehicle info sent by the funnel is silently dropped before insertion into MongoDB. /api/leads still returns success and the funnel reaches the thank-you page, but admin leads list has no vehicle data, breaking the core MVP requirement.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/leads (+ GET /api/admin/leads)",
+        "issue": "LeadCreate Pydantic model is missing car_year, car_make, car_model fields. With model_config = ConfigDict(extra='ignore') Pydantic strips these incoming values, so the lead document saved to MongoDB never contains vehicle information. Verified: posted {car_year:'2023', car_make:'Toyota', car_model:'RAV4', ...} -> admin/leads returns the lead with car_year=None/missing. The /admin/leads/test endpoint works because it builds the dict directly and bypasses the Pydantic model.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Add car_year: Optional[str] = '', car_make: Optional[str] = '', car_model: Optional[str] = '' fields to the LeadCreate model in /app/backend/server.py so vehicle info from the funnel is persisted and shows up in admin/leads. After fix, re-run backend_test.py::test_lead_persists_with_car_fields to confirm."
+  ],
+  "critical_code_review_comments": [
+    "LeadCreate uses extra='ignore' which silently drops fields the frontend sends — recommend either declaring every funnel field explicitly or switching to extra='allow' for new lead schemas.",
+    "server.py is ~1100 lines; consider splitting into routers (auth, leads, hooks, analytics, ads) for maintainability.",
+    "CRM webhook + email dispatch are unconfigured (SMTP_HOST/CRM_WEBHOOK_URL blank). They no-op correctly without erroring, which is good, but lead persistence happens before background tasks fire so failures wouldn't block the funnel."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "92% (11/12)", "frontend": "100% (12/12 funnel checks)"},
+  "test_credentials": "Admin owner: username blank, password 'LemonPros2026!' (from /app/backend/.env ADMIN_PASSWORD). Verified.",
+  "seed_data_creation": "Created one real lead via POST /api/leads (id returned) and one test lead via POST /api/admin/leads/test during the run. Click rows tagged with TEST_ session ids were inserted via /track/click dedup test.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent adds car_year/car_make/car_model to LeadCreate, run `pytest /app/backend/tests/backend_test.py::test_lead_persists_with_car_fields -v` to verify. Frontend funnel E2E already passes end-to-end; no UI changes needed. Public hook1 already mentions Lemon as expected. /api/geo-zip and /api/verify-address depend on Nominatim and fail-open gracefully.",
+  "rca of the issue": "Root cause: LeadCreate model was carried over from the garage-sales repo where car fields didn't exist, but the funnel and lead-email templates were updated to include car_year/car_make/car_model. Because the Pydantic config is extra='ignore', the extra car_* fields posted by /app/frontend/src/pages/FunnelStep.jsx submitLead() are dropped before model_dump(). Reproduction: POST /api/leads with car_year='2023', car_make='Toyota', car_model='RAV4' + name/email -> GET /api/admin/leads shows the lead with no car_* keys. Mitigation: declare the three fields on LeadCreate (Optional[str] = '') so they are kept in the model_dump and written to MongoDB."
+}
