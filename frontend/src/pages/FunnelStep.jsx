@@ -212,22 +212,40 @@ function NameStep({ answers, setAnswer, onNext }) {
 function PhoneStep({ answers, setAnswer, onNext }) {
   const [phone, setPhone] = useState(answers.phone || '');
   const [error, setError] = useState('');
+  const [checking, setChecking] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!/^[0-9+()\-\s]{7,}$/.test(phone.trim())) {
       setError('Please enter a valid phone number.');
       return;
     }
-    setAnswer('phone', phone.trim());
-    onNext();
+    setError('');
+    setChecking(true);
+    try {
+      const res = await api.post('/verify-phone', { phone: phone.trim(), region: 'US' });
+      if (res.data.valid) {
+        setAnswer('phone', res.data.formatted || phone.trim());
+        onNext();
+      } else {
+        setError("That doesn't look like a real phone number. Please enter a valid number.");
+      }
+    } catch (err) {
+      // Network/validator error — don't block a genuine user.
+      setAnswer('phone', phone.trim());
+      onNext();
+    } finally {
+      setChecking(false);
+    }
   };
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-xl w-full">
       <NotchedField label="Phone Number" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
         placeholder="(555) 123-4567" error={error} data-testid="phone-input" autoFocus />
-      <Button type="submit" className={`mt-7 ${RED_BTN}`} data-testid="phone-continue-button">Continue</Button>
+      <Button type="submit" disabled={checking} className={`mt-7 ${RED_BTN}`} data-testid="phone-continue-button">
+        {checking ? 'Checking\u2026' : 'Continue'}
+      </Button>
     </form>
   );
 }
@@ -236,23 +254,44 @@ function PhoneStep({ answers, setAnswer, onNext }) {
 function EmailStep({ answers, setAnswer, onSubmit, submitting }) {
   const [email, setEmail] = useState(answers.email || '');
   const [error, setError] = useState('');
+  const [checking, setChecking] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
       setError('Please enter a valid email address.');
       return;
     }
-    setAnswer('email', email.trim());
-    onSubmit(email.trim());
+    setError('');
+    setChecking(true);
+    try {
+      const res = await api.post('/verify-email', { email: email.trim() });
+      if (!res.data.valid) {
+        setError(
+          res.data.reason === 'undeliverable'
+            ? "That email domain doesn't accept mail. Please check for typos."
+            : 'Please enter a valid email address.'
+        );
+        setChecking(false);
+        return;
+      }
+      const clean = res.data.normalized || email.trim();
+      setEmail(clean);
+      setAnswer('email', clean);
+      onSubmit(clean);
+    } catch (err) {
+      // Network/validator error — don't block a genuine user.
+      setAnswer('email', email.trim());
+      onSubmit(email.trim());
+    }
   };
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-xl w-full">
       <NotchedField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
         placeholder="you@email.com" error={error} data-testid="email-input" autoFocus />
-      <Button type="submit" disabled={submitting} className={`mt-7 ${RED_BTN}`} data-testid="email-submit-button">
-        {submitting ? 'Submitting\u2026' : 'See If I Qualify'}
+      <Button type="submit" disabled={submitting || checking} className={`mt-7 ${RED_BTN}`} data-testid="email-submit-button">
+        {submitting || checking ? 'Submitting\u2026' : 'See If I Qualify'}
       </Button>
       <p className="mt-6 text-[11px] leading-relaxed text-slate-400 text-center">
         By clicking the button above, I provide my electronic signature authorizing Lemon Pros and its

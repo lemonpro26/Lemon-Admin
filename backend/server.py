@@ -165,6 +165,15 @@ class AddressVerify(BaseModel):
     zip: Optional[str] = ""
 
 
+class PhoneVerify(BaseModel):
+    phone: str
+    region: Optional[str] = "US"
+
+
+class EmailVerify(BaseModel):
+    email: str
+
+
 class SaleBody(BaseModel):
     """Marks a lead as sold and triggers the offline conversion upload."""
     value: float
@@ -462,7 +471,7 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
     return {"success": True, "id": lead["id"]}
 
 
-NOMINATIM_HEADERS = {"User-Agent": "OpenSesameGarageDoors/1.0 (lead-funnel verification)"}
+NOMINATIM_HEADERS = {"User-Agent": "LemonPros-LeadFunnel/1.0 (info@lemonpros.com)"}
 
 
 def _nominatim(params: dict):
@@ -492,34 +501,116 @@ async def geo_from_zip(zip: str = Query(..., min_length=3, max_length=10)):
 
 @api_router.post("/verify-address")
 async def verify_address(body: AddressVerify):
-    """Verify a real address using Nominatim (OpenStreetMap). Fails open on
-    network errors so genuine users are never hard-blocked."""
+    """Verify that a submitted address is a REAL street address using the free,
+    open-source Nominatim / OpenStreetMap geocoder. Rejects random text and a
+    real street typed under the wrong ZIP. Fails open only on network errors so
+    genuine users are never blocked by API downtime."""
     if not body.address or not body.address.strip():
         return {"valid": False, "reason": "empty"}
 
     street = body.address.strip()
-    candidates = []
-    if body.zip:
-        candidates.append(f"{street}, {body.zip}")
-    if body.city and body.state:
-        candidates.append(f"{street}, {body.city}, {body.state} {body.zip}".strip())
-    candidates.append(street)
+    zip5 = (body.zip or "").strip()[:5]
+    state = (body.state or "").strip()
+    city = (body.city or "").strip()
+
+    def evaluate(data):
+        """Accept only when OSM resolves an actual road (not a city/ZIP centroid)
+        and, when a ZIP was provided, the matched ZIP agrees with it."""
+        if not data:
+            return None
+        top = data[0]
+        addr = top.get("address", {})
+        road = addr.get("road") or ""
+        if not road:
+            return None  # only matched a town/postcode area, not a street
+        result_zip = (addr.get("postcode") or "")[:5]
+        if zip5 and result_zip and zip5 != result_zip:
+            return None  # real street, but not in the ZIP the user entered
+        return {
+            "valid": True,
+            "matched_street_level": bool(addr.get("house_number")),
+            "formatted": top.get("display_name", ""),
+            "normalized": {
+                "house_number": addr.get("house_number", ""),
+                "road": road,
+                "city": addr.get("city") or addr.get("town") or addr.get("village") or "",
+                "state": addr.get("state", ""),
+                "zip": result_zip,
+            },
+        }
 
     try:
-        for q in candidates:
-            data = _nominatim({"q": q})
-            if data:
-                top = data[0]
-                addr = top.get("address", {})
-                has_street = bool(addr.get("house_number") or addr.get("road"))
-                return {
-                    "valid": True,
-                    "matched_street_level": has_street,
-                    "formatted": top.get("display_name", ""),
-                }
+        # 1) Structured query — most precise (street + city/state/postalcode).
+        structured = {"street": street}
+        if city:
+            structured["city"] = city
+        if state:
+            structured["state"] = state
+        if zip5:
+            structured["postalcode"] = zip5
+        res = evaluate(_nominatim(structured))
+        if res:
+            return res
+        # 2) Free-form fallback for less common formatting.
+        q = ", ".join(p for p in [street, city, f"{state} {zip5}".strip()] if p)
+        res = evaluate(_nominatim({"q": q}))
+        if res:
+            return res
         return {"valid": False, "reason": "not_found"}
     except Exception:
-        return {"valid": True, "matched_street_level": False, "formatted": "", "soft": True}
+        return {"valid": True, "soft": True, "matched_street_level": False, "formatted": ""}
+
+
+@api_router.post("/verify-phone")
+async def verify_phone(body: PhoneVerify):
+    """Validate a phone number against real numbering plans using the free,
+    open-source `phonenumbers` library (Google's libphonenumber). Blocks random
+    digits / impossible numbers. Local check (no network), so it never fails open."""
+    raw = (body.phone or "").strip()
+    if not raw:
+        return {"valid": False, "reason": "empty"}
+    try:
+        import phonenumbers
+        num = phonenumbers.parse(raw, (body.region or "US"))
+        if not phonenumbers.is_valid_number(num):
+            return {"valid": False, "reason": "invalid"}
+        return {
+            "valid": True,
+            "formatted": phonenumbers.format_number(num, phonenumbers.PhoneNumberFormat.NATIONAL),
+            "e164": phonenumbers.format_number(num, phonenumbers.PhoneNumberFormat.E164),
+        }
+    except Exception:
+        return {"valid": False, "reason": "unparseable"}
+
+
+@api_router.post("/verify-email")
+async def verify_email_address(body: EmailVerify):
+    """Validate an email's syntax AND that its domain can actually receive mail
+    (live DNS/MX lookup) using the free, open-source `email-validator` library.
+    Rejects random text and dead domains; fails open only on transient DNS errors."""
+    raw = (body.email or "").strip()
+    if not raw:
+        return {"valid": False, "reason": "empty"}
+    try:
+        from email_validator import validate_email, EmailNotValidError
+        try:
+            info = validate_email(raw, check_deliverability=True)
+            return {"valid": True, "normalized": getattr(info, "normalized", None) or getattr(info, "email", raw)}
+        except EmailNotValidError as e:
+            msg = str(e).lower()
+            try:
+                validate_email(raw, check_deliverability=False)
+                syntax_ok = True
+            except EmailNotValidError:
+                syntax_ok = False
+            if not syntax_ok:
+                return {"valid": False, "reason": "syntax"}
+            if any(k in msg for k in ("try again", "timeout", "temporar", "error while", "nameserver", "timed out")):
+                return {"valid": True, "soft": True}
+            return {"valid": False, "reason": "undeliverable"}
+    except Exception:
+        return {"valid": True, "soft": True}
+
 
 
 @api_router.post("/contact")
