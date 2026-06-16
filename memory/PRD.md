@@ -38,6 +38,10 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - Admin dashboard, JWT auth, geo hooks all carried over.
 - Mobile optimized for iOS + Android: safe-area (notch/home-indicator) insets, tap-highlight removal, overscroll lock; verified on 390px viewport.
 - Removed the "Made with Emergent" badge from index.html (desktop + mobile).
+- Vehicle data expanded: luxury/exotic brands (Bentley, Ferrari, Lamborghini, Rolls-Royce, Maserati, Aston Martin, McLaren, Jaguar, Alfa Romeo) + EVs (Rivian, Lucid, Polestar); "Other" make pinned last with RV/Motorhome/Camper Van models; makes sorted alphabetically; years reduced to 2026–2021.
+- Company NAP updated: 9025 Wilshire Blvd #500, Beverly Hills, CA 90211; email info@lemonpros.com (contact, legal, notifications).
+- Admin Hooks rebuilt as A/B testing manager: per-variant "% of serving" weight, target = Home page or a specific ad group, weighted serving seeded by session id (stable per visitor for clean attribution), per-hook stats (clicks, conversions, conv %). Grouped by target with normalized serving %.
+- Lead-detail (and all) dialogs now scroll internally (max-h-90dvh / overflow-y-auto).
 
 ## Backlog / Next
 - P1: User to provide CRM API endpoint → set `CRM_WEBHOOK_URL` in backend/.env.

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Megaphone, Plus, Pencil, Trash2, Save, Sparkles, MousePointerClick, Target,
+  Megaphone, Plus, Pencil, Trash2, Save, Sparkles, MousePointerClick, Target, FlaskConical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -14,9 +14,11 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from '@/components/ui/select';
+import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { useSortable, SortLabel } from '@/lib/useSortable';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 // Client-side mirror of the backend macro stripping (for live preview).
@@ -30,34 +32,36 @@ function renderPreview(text, city, state) {
   return res.replace(/^[,\s]+|[,\s]+$/g, '').trim();
 }
 
-const EMPTY = { label: '', match_campaign: '', match_adgroup: '', match_ad: '', hook1: '', hook2: '', enabled: true };
+const SAMPLE = { city: 'Los Angeles', state: 'California' };
+const HOME = 'home';
+
+// Bucket = the set of variants that compete for the same traffic.
+const bucketKey = (r) => `${r.match_campaign || ''}|${r.match_adgroup || ''}|${r.match_ad || ''}`;
+
+const targetLabel = (r) => {
+  if (r.match_adgroup) return `Ad group: ${r.match_adgroup}`;
+  if (r.match_campaign) return `Campaign: ${r.match_campaign}`;
+  return 'Home page (all traffic)';
+};
+
+const newCreateForm = () => ({ hook1: '', hook2: '', target: HOME, weight: 50, label: '' });
+const EMPTY_EDIT = {
+  label: '', match_campaign: '', match_adgroup: '', match_ad: '', hook1: '', hook2: '', weight: 50, enabled: true,
+};
 
 export const AdminHooks = ({ canEdit }) => {
-  const [config, setConfig] = useState(null);
-  const [hook1, setHook1] = useState('');
-  const [hook2, setHook2] = useState('');
-  const [savingCfg, setSavingCfg] = useState(false);
-
   const [rules, setRules] = useState([]);
   const [defaultHook, setDefaultHook] = useState(null);
   const [entities, setEntities] = useState({ campaigns: [], adgroups: [] });
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState(todayRange());
 
-  const [dialog, setDialog] = useState(null); // {mode:'create'|'edit', rule}
-  const [form, setForm] = useState(EMPTY);
+  const [cForm, setCForm] = useState(newCreateForm());
+  const [creating, setCreating] = useState(false);
+
+  const [dialog, setDialog] = useState(null); // {rule}
+  const [form, setForm] = useState(EMPTY_EDIT);
   const [busy, setBusy] = useState(false);
-
-  const { sorted, sortKey, sortDir, toggle } = useSortable(rules, 'leads', 'desc');
-
-  const loadConfig = useCallback(async () => {
-    try {
-      const res = await api.get('/admin/config');
-      setConfig(res.data);
-      setHook1(res.data.hook1 || '');
-      setHook2(res.data.hook2 || '');
-    } catch (e) { /* handled globally */ }
-  }, []);
 
   const loadEntities = useCallback(async () => {
     try {
@@ -79,46 +83,69 @@ export const AdminHooks = ({ canEdit }) => {
     }
   }, [range]);
 
-  useEffect(() => { loadConfig(); loadEntities(); }, [loadConfig, loadEntities]);
+  useEffect(() => { loadEntities(); }, [loadEntities]);
   useEffect(() => { loadRules(); }, [loadRules]);
 
-  const saveConfig = async () => {
-    setSavingCfg(true);
+  // Serving share within a variant's competing bucket (enabled variants only).
+  const servingPct = (r) => {
+    const key = bucketKey(r);
+    const peers = rules.filter((x) => x.enabled !== false && bucketKey(x) === key);
+    const denom = peers.reduce((s, x) => s + (Number(x.weight) || 0), 0);
+    if (!denom) return 0;
+    return Math.round(((Number(r.weight) || 0) / denom) * 100);
+  };
+
+  const targetFromForm = (target) => {
+    if (target === HOME) return { match_campaign: '', match_adgroup: '', match_ad: '' };
+    const ag = entities.adgroups.find((a) => a.adgroup_id === target);
+    return { match_campaign: '', match_adgroup: target, match_ad: '' };
+  };
+
+  const create = async () => {
+    if (!cForm.hook1.trim() || !cForm.hook2.trim()) {
+      toast.error('Hook 1 and Hook 2 are required.');
+      return;
+    }
+    const w = Math.max(1, Math.min(100, Number(cForm.weight) || 0));
+    const tgt = targetFromForm(cForm.target);
+    const label = cForm.label.trim()
+      || `${cForm.target === HOME ? 'Home' : cForm.target} — ${cForm.hook1.slice(0, 40)}`;
+    setCreating(true);
     try {
-      await api.put('/admin/config', { hook1, hook2 });
-      toast.success('Home page hook saved.');
-      await loadConfig();
+      await api.post('/admin/hook-rules', { label, hook1: cForm.hook1, hook2: cForm.hook2, weight: w, enabled: true, ...tgt });
+      toast.success('Hook saved to A/B variants.');
+      setCForm(newCreateForm());
       await loadRules();
+      await loadEntities();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Could not save.');
+      toast.error(e?.response?.data?.detail || 'Save failed.');
     } finally {
-      setSavingCfg(false);
+      setCreating(false);
     }
   };
 
-  const openCreate = () => { setForm(EMPTY); setDialog({ mode: 'create' }); };
   const openEdit = (r) => {
     setForm({
       label: r.label || '', match_campaign: r.match_campaign || '', match_adgroup: r.match_adgroup || '',
-      match_ad: r.match_ad || '', hook1: r.hook1 || '', hook2: r.hook2 || '', enabled: r.enabled !== false,
+      match_ad: r.match_ad || '', hook1: r.hook1 || '', hook2: r.hook2 || '',
+      weight: r.weight ?? 50, enabled: r.enabled !== false,
     });
-    setDialog({ mode: 'edit', rule: r });
+    setDialog({ rule: r });
   };
 
-  const saveRule = async () => {
-    if (!form.label.trim() || !form.hook1.trim() || !form.hook2.trim()) {
-      toast.error('Label, Hook 1 and Hook 2 are required.');
+  const saveEdit = async () => {
+    if (!form.hook1.trim() || !form.hook2.trim()) {
+      toast.error('Hook 1 and Hook 2 are required.');
       return;
     }
     setBusy(true);
     try {
-      if (dialog.mode === 'create') {
-        await api.post('/admin/hook-rules', form);
-        toast.success('Hook created.');
-      } else {
-        await api.put(`/admin/hook-rules/${dialog.rule.id}`, form);
-        toast.success('Hook updated.');
-      }
+      await api.put(`/admin/hook-rules/${dialog.rule.id}`, {
+        ...form,
+        label: form.label.trim() || form.hook1.slice(0, 40),
+        weight: Math.max(1, Math.min(100, Number(form.weight) || 0)),
+      });
+      toast.success('Hook updated.');
       setDialog(null);
       await loadRules();
     } catch (e) {
@@ -132,7 +159,7 @@ export const AdminHooks = ({ canEdit }) => {
     try {
       await api.put(`/admin/hook-rules/${r.id}`, {
         label: r.label, match_campaign: r.match_campaign || '', match_adgroup: r.match_adgroup || '',
-        match_ad: r.match_ad || '', hook1: r.hook1, hook2: r.hook2, enabled: !r.enabled,
+        match_ad: r.match_ad || '', hook1: r.hook1, hook2: r.hook2, weight: r.weight ?? 50, enabled: !r.enabled,
       });
       toast.success(!r.enabled ? 'Hook activated.' : 'Hook paused.');
       await loadRules();
@@ -152,170 +179,204 @@ export const AdminHooks = ({ canEdit }) => {
     }
   };
 
-  const SAMPLE = { city: 'Los Angeles', state: 'California' };
+  // Group variants by bucket so competing A/B variants sit together.
+  const groups = {};
+  rules.forEach((r) => {
+    const k = bucketKey(r);
+    (groups[k] = groups[k] || { target: targetLabel(r), rows: [] }).rows.push(r);
+  });
+  const groupList = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
 
   return (
     <div className="grid gap-6" data-testid="admin-hooks">
-      {/* Per-tab date range (affects hook traffic stats) */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-slate-500 flex items-center gap-2">
-          <Megaphone className="h-4 w-4" /> Dynamic hooks &amp; per-hook traffic.
+          <FlaskConical className="h-4 w-4" /> A/B test hooks — each variant serves a % of its matching traffic.
         </p>
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
 
-      {/* Home page (default) hook */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="flex items-center justify-between flex-wrap gap-2">
+      {/* Create / save a hook variant */}
+      {canEdit && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <h2 className="font-slab font-bold text-lg text-slate-900 flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-[#EF4444]" /> Home Page Hook (default)
+            <Sparkles className="h-5 w-5 text-[#EF4444]" /> Create a Hook
           </h2>
-          {defaultHook && (
-            <div className="flex items-center gap-4 text-sm text-slate-500">
-              <span className="flex items-center gap-1"><MousePointerClick className="h-4 w-4" /> {defaultHook.clicks} clicks</span>
-              <span className="flex items-center gap-1"><Target className="h-4 w-4" /> {defaultHook.leads} leads</span>
-            </div>
-          )}
-        </div>
-        <p className="text-sm text-slate-500 mt-1 mb-4">
-          Shown when no targeted hook matches. Use <code className="px-1 bg-slate-100 rounded">{'{!city}'}</code> and{' '}
-          <code className="px-1 bg-slate-100 rounded">{'{!state}'}</code> — when a visitor's location is unknown, those macros are removed automatically.
-        </p>
-        <div className="grid gap-4">
-          <div>
-            <Label className="text-xs text-slate-600">Hook 1 (headline)</Label>
-            <Textarea value={hook1} onChange={(e) => setHook1(e.target.value)} disabled={!canEdit} rows={2} className="mt-1 rounded-xl border-slate-200" data-testid="hooks-default-hook1" />
-          </div>
-          <div>
-            <Label className="text-xs text-slate-600">Hook 2 (subtext)</Label>
-            <Textarea value={hook2} onChange={(e) => setHook2(e.target.value)} disabled={!canEdit} rows={2} className="mt-1 rounded-xl border-slate-200" data-testid="hooks-default-hook2" />
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3" data-testid="hooks-preview-located">
-              <p className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide mb-1">Preview — location known</p>
-              <p className="text-sm font-semibold text-slate-900">{renderPreview(hook1, SAMPLE.city, SAMPLE.state) || '\u2014'}</p>
-              <p className="text-sm text-slate-600">{renderPreview(hook2, SAMPLE.city, SAMPLE.state)}</p>
-            </div>
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3" data-testid="hooks-preview-unknown">
-              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Preview — location unknown</p>
-              <p className="text-sm font-semibold text-slate-900">{renderPreview(hook1, '', '') || '\u2014'}</p>
-              <p className="text-sm text-slate-600">{renderPreview(hook2, '', '')}</p>
-            </div>
-          </div>
-          {canEdit && (
+          <p className="text-sm text-slate-500 mt-1 mb-4">
+            Save a hook for the home page or a specific ad group, and set how much of that traffic should see it.
+            Add more variants to the same target to split-test. Use{' '}
+            <code className="px-1 bg-slate-100 rounded">{'{!city}'}</code> /{' '}
+            <code className="px-1 bg-slate-100 rounded">{'{!state}'}</code> for live location text.
+          </p>
+          <div className="grid gap-4">
             <div>
-              <Button onClick={saveConfig} disabled={savingCfg} className="h-11 rounded-xl bg-[#EF4444] hover:bg-[#DC2626] text-white" data-testid="hooks-save-default">
-                <Save className="h-4 w-4 mr-2" /> {savingCfg ? 'Saving\u2026' : 'Save Home Page Hook'}
+              <Label className="text-xs text-slate-600">Hook 1 (headline)</Label>
+              <Textarea value={cForm.hook1} onChange={(e) => setCForm({ ...cForm, hook1: e.target.value })} rows={2} placeholder="Stuck With a Lemon? You May Be Owed Money." className="mt-1 rounded-xl border-slate-200" data-testid="hooks-create-hook1" />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-600">Hook 2 (subtext)</Label>
+              <Textarea value={cForm.hook2} onChange={(e) => setCForm({ ...cForm, hook2: e.target.value })} rows={2} placeholder="Find out in 60 seconds if your {!state} vehicle qualifies." className="mt-1 rounded-xl border-slate-200" data-testid="hooks-create-hook2" />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs text-slate-600">Show this hook on</Label>
+                <Select value={cForm.target} onValueChange={(v) => setCForm({ ...cForm, target: v })}>
+                  <SelectTrigger className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hooks-create-target">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={HOME}>Home page (all traffic)</SelectItem>
+                    {entities.adgroups.map((a) => (
+                      <SelectItem key={`${a.campaign_id}-${a.adgroup_id}`} value={a.adgroup_id}>
+                        Ad group: {a.adgroup_id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-600">% of serving (share of traffic)</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <Input
+                    type="number" min={1} max={100}
+                    value={cForm.weight}
+                    onChange={(e) => setCForm({ ...cForm, weight: e.target.value })}
+                    className="h-10 rounded-lg border-slate-200"
+                    data-testid="hooks-create-weight"
+                  />
+                  <span className="text-slate-500 font-medium">%</span>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm" data-testid="hooks-create-preview">
+              <span className="text-slate-900 font-semibold">{renderPreview(cForm.hook1, SAMPLE.city, SAMPLE.state) || 'Preview\u2026'}</span><br />
+              <span className="text-slate-600">{renderPreview(cForm.hook2, SAMPLE.city, SAMPLE.state)}</span>
+            </div>
+            <div>
+              <Button onClick={create} disabled={creating} className="h-11 rounded-xl bg-[#EF4444] hover:bg-[#DC2626] text-white" data-testid="hooks-create-save">
+                <Save className="h-4 w-4 mr-2" /> {creating ? 'Saving\u2026' : 'Save Hook'}
               </Button>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Targeted hooks */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
-          <div className="font-slab font-bold text-slate-900 flex items-center gap-2">
-            <Megaphone className="h-5 w-5 text-[#EF4444]" /> Targeted Hooks
-            <span className="text-sm font-normal text-slate-400">— dynamically swap by campaign / ad group</span>
           </div>
-          {canEdit && (
-            <Button onClick={openCreate} size="sm" className="rounded-lg bg-[#EF4444] hover:bg-[#DC2626] text-white" data-testid="hooks-create-button">
-              <Plus className="h-4 w-4 mr-1" /> New Hook
-            </Button>
-          )}
+        </div>
+      )}
+
+      {/* Variants + per-hook stats */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2">
+          <Megaphone className="h-5 w-5 text-[#EF4444]" /> Hook Variants &amp; Performance
         </div>
 
         {loading ? (
           <div className="p-8 text-center text-slate-500">Loading hooks\u2026</div>
         ) : rules.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">No targeted hooks yet. Create one to override the home page hook for a specific campaign or ad group.</div>
+          <div className="p-8 text-center text-slate-500 text-sm">
+            No hook variants yet. Create one above — set it to the home page or an ad group with a serving %.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead><SortLabel label="Hook" k="label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                  <TableHead className="hidden md:table-cell"><SortLabel label="Campaign" k="match_campaign" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                  <TableHead className="hidden md:table-cell"><SortLabel label="Ad Group" k="match_adgroup" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                  <TableHead className="text-right"><SortLabel label="Clicks" k="clicks" sortKey={sortKey} sortDir={sortDir} onClick={toggle} align="right" /></TableHead>
-                  <TableHead className="text-right"><SortLabel label="Leads" k="leads" sortKey={sortKey} sortDir={sortDir} onClick={toggle} align="right" /></TableHead>
-                  <TableHead className="text-right hidden sm:table-cell"><SortLabel label="Conv%" k="conversion_rate" sortKey={sortKey} sortDir={sortDir} onClick={toggle} align="right" /></TableHead>
+                  <TableHead>Hook</TableHead>
+                  <TableHead className="hidden md:table-cell">Target</TableHead>
+                  <TableHead className="text-right">Serving %</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">Conversions</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Conv %</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sorted.map((r) => (
-                  <TableRow key={r.id} data-testid={`hook-row-${r.id}`}>
-                    <TableCell>
-                      <div className="font-medium text-slate-900">{r.label}</div>
-                      <div className="text-xs text-slate-400 max-w-[260px] truncate">{r.hook1}</div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-slate-600">{r.match_campaign || <span className="text-slate-300">any</span>}</TableCell>
-                    <TableCell className="hidden md:table-cell text-slate-600">{r.match_adgroup || <span className="text-slate-300">any</span>}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.clicks}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{r.leads}</TableCell>
-                    <TableCell className="text-right tabular-nums hidden sm:table-cell">{r.conversion_rate}%</TableCell>
-                    <TableCell className="text-center">
-                      {canEdit ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <Switch checked={r.enabled !== false} onCheckedChange={() => togglePause(r)} data-testid={`hook-toggle-${r.id}`} />
-                        </div>
-                      ) : (
-                        <Badge variant="outline" className={r.enabled !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500'}>
-                          {r.enabled !== false ? 'Live' : 'Paused'}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {canEdit && (
-                        <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-slate-800 transition-colors" data-testid={`hook-edit-${r.id}`} aria-label="Edit"><Pencil className="h-4 w-4" /></button>
-                          <button onClick={() => remove(r)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors" data-testid={`hook-delete-${r.id}`} aria-label="Delete"><Trash2 className="h-4 w-4" /></button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
+                {groupList.map(([key, grp]) => (
+                  <React.Fragment key={key}>
+                    <TableRow className="bg-slate-50/70 hover:bg-slate-50/70">
+                      <TableCell colSpan={8} className="py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {grp.target} · {grp.rows.length} variant{grp.rows.length > 1 ? 's' : ''}
+                      </TableCell>
+                    </TableRow>
+                    {grp.rows.map((r) => (
+                      <TableRow key={r.id} data-testid={`hook-row-${r.id}`}>
+                        <TableCell>
+                          <div className="font-medium text-slate-900">{r.label}</div>
+                          <div className="text-xs text-slate-400 max-w-[260px] truncate">{r.hook1}</div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-slate-600 text-sm">{targetLabel(r)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="font-semibold tabular-nums text-slate-900" data-testid={`hook-serving-${r.id}`}>{servingPct(r)}%</div>
+                          <div className="text-[11px] text-slate-400">weight {r.weight}</div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums" data-testid={`hook-clicks-${r.id}`}>{r.clicks}</TableCell>
+                        <TableCell className="text-right tabular-nums font-medium" data-testid={`hook-conversions-${r.id}`}>{r.leads}</TableCell>
+                        <TableCell className="text-right tabular-nums hidden sm:table-cell" data-testid={`hook-convrate-${r.id}`}>{r.conversion_rate}%</TableCell>
+                        <TableCell className="text-center">
+                          {canEdit ? (
+                            <Switch checked={r.enabled !== false} onCheckedChange={() => togglePause(r)} data-testid={`hook-toggle-${r.id}`} />
+                          ) : (
+                            <Badge variant="outline" className={r.enabled !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500'}>
+                              {r.enabled !== false ? 'Live' : 'Paused'}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {canEdit && (
+                            <div className="flex items-center gap-1 justify-end">
+                              <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-slate-800 transition-colors" data-testid={`hook-edit-${r.id}`} aria-label="Edit"><Pencil className="h-4 w-4" /></button>
+                              <button onClick={() => remove(r)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors" data-testid={`hook-delete-${r.id}`} aria-label="Delete"><Trash2 className="h-4 w-4" /></button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>
           </div>
         )}
+
+        {/* Fallback (shown only when no home-page variant is live) */}
+        {defaultHook && (
+          <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-500 flex items-center gap-x-4 gap-y-1 flex-wrap" data-testid="hooks-default-fallback">
+            <span className="font-semibold text-slate-600">Default fallback:</span>
+            <span className="truncate max-w-[360px]">{defaultHook.hook1}</span>
+            <span className="flex items-center gap-1"><MousePointerClick className="h-3.5 w-3.5" /> {defaultHook.clicks}</span>
+            <span className="flex items-center gap-1"><Target className="h-3.5 w-3.5" /> {defaultHook.leads}</span>
+            <span className="text-slate-400">(shown only when no home-page variant is live)</span>
+          </div>
+        )}
       </div>
 
-      {/* Create / edit dialog */}
+      {/* Edit dialog */}
       <Dialog open={!!dialog} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent className="max-w-lg" data-testid="hook-dialog">
-          <DialogHeader><DialogTitle>{dialog?.mode === 'create' ? 'New Targeted Hook' : 'Edit Hook'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit Hook</DialogTitle></DialogHeader>
           <div className="grid gap-4">
             <div>
               <Label className="text-xs text-slate-600">Label (internal name)</Label>
-              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="e.g. Emergency Repair — West" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-form-label" />
+              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="e.g. Cash Offer — Variant B" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-form-label" />
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-slate-600">Assign to Campaign</Label>
-                <Input list="campaign-options" value={form.match_campaign} onChange={(e) => setForm({ ...form, match_campaign: e.target.value })} placeholder="campaign id (blank = any)" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-form-campaign" />
-                <datalist id="campaign-options">
-                  {entities.campaigns.map((c) => <option key={c} value={c} />)}
-                </datalist>
-              </div>
-              <div>
-                <Label className="text-xs text-slate-600">Assign to Ad Group</Label>
-                <Input list="adgroup-options" value={form.match_adgroup} onChange={(e) => setForm({ ...form, match_adgroup: e.target.value })} placeholder="ad group id (blank = any)" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-form-adgroup" />
+                <Label className="text-xs text-slate-600">Ad Group (blank = home page)</Label>
+                <Input list="adgroup-options" value={form.match_adgroup} onChange={(e) => setForm({ ...form, match_adgroup: e.target.value })} placeholder="ad group id (blank = home)" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-form-adgroup" />
                 <datalist id="adgroup-options">
                   {entities.adgroups.map((a) => <option key={`${a.campaign_id}-${a.adgroup_id}`} value={a.adgroup_id} />)}
                 </datalist>
               </div>
+              <div>
+                <Label className="text-xs text-slate-600">% of serving</Label>
+                <Input type="number" min={1} max={100} value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-form-weight" />
+              </div>
             </div>
             <div>
               <Label className="text-xs text-slate-600">Hook 1 (headline)</Label>
-              <Textarea value={form.hook1} onChange={(e) => setForm({ ...form, hook1: e.target.value })} rows={2} placeholder="Did Your {!city} Car Turn Out to Be a Lemon?" className="mt-1 rounded-lg border-slate-200" data-testid="hook-form-hook1" />
+              <Textarea value={form.hook1} onChange={(e) => setForm({ ...form, hook1: e.target.value })} rows={2} className="mt-1 rounded-lg border-slate-200" data-testid="hook-form-hook1" />
             </div>
             <div>
               <Label className="text-xs text-slate-600">Hook 2 (subtext)</Label>
-              <Textarea value={form.hook2} onChange={(e) => setForm({ ...form, hook2: e.target.value })} rows={2} placeholder="24/7 service across {!state}." className="mt-1 rounded-lg border-slate-200" data-testid="hook-form-hook2" />
+              <Textarea value={form.hook2} onChange={(e) => setForm({ ...form, hook2: e.target.value })} rows={2} className="mt-1 rounded-lg border-slate-200" data-testid="hook-form-hook2" />
             </div>
             <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm">
               <span className="text-slate-900 font-semibold">{renderPreview(form.hook1, SAMPLE.city, SAMPLE.state) || 'Preview\u2026'}</span><br />
@@ -328,7 +389,7 @@ export const AdminHooks = ({ canEdit }) => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(null)} className="rounded-lg">Cancel</Button>
-            <Button onClick={saveRule} disabled={busy} className="rounded-lg bg-[#EF4444] hover:bg-[#DC2626] text-white" data-testid="hook-form-save">
+            <Button onClick={saveEdit} disabled={busy} className="rounded-lg bg-[#EF4444] hover:bg-[#DC2626] text-white" data-testid="hook-form-save">
               {busy ? 'Saving\u2026' : 'Save Hook'}
             </Button>
           </DialogFooter>

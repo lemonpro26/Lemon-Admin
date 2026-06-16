@@ -35,6 +35,7 @@ export default function Landing() {
       campaign: tracking.campaign_id || '',
       adgroup: tracking.adgroup_id || '',
       ad: tracking.ad_id || '',
+      session: sessionId || '',
     }).toString();
     api
       .get(`/config/public?${qs}`)

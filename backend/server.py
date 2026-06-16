@@ -42,7 +42,7 @@ JWT_ALG = "HS256"
 JWT_EXP_HOURS = 24
 
 # Where the website Contact form is forwarded.
-CONTACT_FORWARD_EMAIL = os.environ.get('CONTACT_FORWARD_EMAIL', 'help@lemonpros.com')
+CONTACT_FORWARD_EMAIL = os.environ.get('CONTACT_FORWARD_EMAIL', 'info@lemonpros.com')
 
 # Optional CRM webhook — leads are POSTed here as JSON when a URL is configured.
 CRM_WEBHOOK_URL = os.environ.get('CRM_WEBHOOK_URL', '')
@@ -54,7 +54,7 @@ DEFAULT_CONFIG = {
     "hook1": "Stuck With a Lemon? You May Be Owed Money.",
     "hook2": "Find out in 60 seconds if your defective vehicle qualifies for a refund, replacement, or cash compensation under {!state} Lemon Law — at no cost to you.",
     # Email notification settings
-    "notification_emails": ["help@lemonpros.com"],
+    "notification_emails": ["info@lemonpros.com"],
     "notify_team": True,
     "send_thank_you": True,
     # Editable customer thank-you email
@@ -136,6 +136,7 @@ class HookRuleBody(BaseModel):
     match_ad: Optional[str] = ""
     hook1: str
     hook2: str
+    weight: int = 50
     enabled: bool = True
 
 
@@ -237,35 +238,57 @@ async def get_or_create_config() -> dict:
     return {k: v for k, v in cfg.items() if k != "_id"}
 
 
-async def resolve_hooks(cfg: dict, campaign: str, adgroup: str, ad: str) -> dict:
-    """Pick the most specific enabled hook-targeting rule that matches the
-    incoming campaign / ad group / ad. Falls back to the default site config."""
+def _weighted_pick(rules: list, seed: str):
+    """Deterministically pick one rule from a bucket using each rule's weight as
+    its share of serving. Seeded by the visitor's session so they see a stable
+    hook across the recorded click, the displayed hook, and the resulting lead
+    (this keeps the A/B attribution clean)."""
+    rules = sorted(rules, key=lambda r: r.get("id", ""))
+    weights = [max(0.0, float(r.get("weight", 50) or 0)) for r in rules]
+    rng = random.Random(f"{seed}|" + "|".join(r.get("id", "") for r in rules))
+    total = sum(weights)
+    if total <= 0:
+        return rng.choice(rules)
+    pick = rng.uniform(0, total)
+    upto = 0.0
+    for r, w in zip(rules, weights):
+        upto += w
+        if pick <= upto:
+            return r
+    return rules[-1]
+
+
+async def resolve_hooks(cfg: dict, campaign: str, adgroup: str, ad: str, seed: str = "") -> dict:
+    """A/B-aware hook resolution. Among the enabled rules that match the incoming
+    campaign / ad group / ad, take the most specific bucket and choose one variant
+    weighted by its serving %. Falls back to the default site config."""
     rules = await db.hook_rules.find({"enabled": True}).to_list(length=500)
-    best, best_score = None, 0
-    incoming = {
+    inc = {
         "match_campaign": (campaign or "").strip(),
         "match_adgroup": (adgroup or "").strip(),
         "match_ad": (ad or "").strip(),
     }
-    for r in rules:
-        score = 0
-        ok = True
-        for field, val in incoming.items():
-            rule_val = (r.get(field) or "").strip()
-            if rule_val:
-                if rule_val == val and val != "":
-                    score += 1
-                else:
-                    ok = False
-                    break
-        if ok and score > best_score:
-            best, best_score = r, score
-    if best:
+
+    def matches(r):
+        for field, val in inc.items():
+            rv = (r.get(field) or "").strip()
+            if rv and rv != val:
+                return False
+        return True
+
+    def specificity(r):
+        return sum(1 for f in inc if (r.get(f) or "").strip())
+
+    applicable = [r for r in rules if matches(r)]
+    if applicable:
+        max_spec = max(specificity(r) for r in applicable)
+        bucket = [r for r in applicable if specificity(r) == max_spec]
+        chosen = _weighted_pick(bucket, seed)
         return {
-            "hook1": best["hook1"],
-            "hook2": best["hook2"],
-            "matched_rule": best.get("id"),
-            "matched_rule_label": best.get("label"),
+            "hook1": chosen["hook1"],
+            "hook2": chosen["hook2"],
+            "matched_rule": chosen.get("id"),
+            "matched_rule_label": chosen.get("label"),
         }
     return {
         "hook1": cfg["hook1"],
@@ -316,14 +339,15 @@ async def get_public_config(
     campaign: str = Query("", description="campaign id (tg_ref)"),
     adgroup: str = Query("", description="ad group id"),
     ad: str = Query("", description="ad / creative id (sub2)"),
+    session: str = Query("", description="visitor session id (A/B serving seed)"),
 ):
     """Return hooks with {!city}/{!state} resolved from visitor IP geolocation.
-    When location is unknown the macros are stripped. If campaign/adgroup/ad
-    params are present, the most specific matching hook rule overrides defaults."""
+    When location is unknown the macros are stripped. The serving hook is chosen
+    by weighted A/B among matching variants, seeded by the session id."""
     cfg = await get_or_create_config()
     ip = resolve_client_ip(request.headers)
     geo = lookup_geo(ip, "", "")
-    resolved = await resolve_hooks(cfg, campaign, adgroup, ad)
+    resolved = await resolve_hooks(cfg, campaign, adgroup, ad, seed=session)
     return {
         "hook1": render_tokens(resolved["hook1"], geo["city"], geo["state"]),
         "hook2": render_tokens(resolved["hook2"], geo["city"], geo["state"]),
@@ -352,7 +376,7 @@ async def track_click(body: ClickTrack, request: Request):
         )
         return {"success": True, "deduped": True}
 
-    resolved = await resolve_hooks(cfg, body.campaign_id, body.adgroup_id, body.ad_id)
+    resolved = await resolve_hooks(cfg, body.campaign_id, body.adgroup_id, body.ad_id, seed=body.session_id)
     doc = body.model_dump()
     doc["ip"] = ip or ""
     doc["user_agent"] = request.headers.get("user-agent", "")
@@ -413,7 +437,7 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
     cfg = await get_or_create_config()
     ip = resolve_client_ip(request.headers)
     geo = lookup_geo(ip, "", "")
-    resolved = await resolve_hooks(cfg, payload.campaign_id, payload.adgroup_id, payload.ad_id)
+    resolved = await resolve_hooks(cfg, payload.campaign_id, payload.adgroup_id, payload.ad_id, seed=payload.session_id)
 
     lead = payload.model_dump()
     lead["id"] = str(uuid.uuid4())
@@ -863,6 +887,7 @@ async def list_hook_rules(_: dict = Depends(require_admin), start: str = Query("
 
     def _attach(r, key):
         t = traffic.get(key, {})
+        r["weight"] = r.get("weight", 50)
         r["clicks"] = t.get("clicks", 0)
         r["leads"] = t.get("leads", 0)
         r["sold"] = t.get("sold", 0)

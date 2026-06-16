@@ -1,14 +1,14 @@
 // Company NAP (Name, Address, Phone) + legal contact details — single source of truth.
 export const COMPANY = {
   name: 'Lemon Pros',
-  address: '8383 Wilshire Blvd, Beverly Hills, CA 90211, USA',
-  addressLine1: '8383 Wilshire Blvd, Suite 800',
-  addressLine2: 'Beverly Hills, CA 90211, USA',
+  address: '9025 Wilshire Blvd #500, Beverly Hills, CA 90211',
+  addressLine1: '9025 Wilshire Blvd #500',
+  addressLine2: 'Beverly Hills, CA 90211',
   phone: '(800) 555-0199',
   phoneHref: 'tel:+18005550199',
-  contactEmail: 'help@lemonpros.com',
-  legalEmail: 'admin@lemonpros.com',
-  mapsUrl: 'https://www.google.com/maps/search/?api=1&query=8383+Wilshire+Blvd+Beverly+Hills+CA+90211',
+  contactEmail: 'info@lemonpros.com',
+  legalEmail: 'info@lemonpros.com',
+  mapsUrl: 'https://www.google.com/maps/search/?api=1&query=9025+Wilshire+Blvd+%23500+Beverly+Hills+CA+90211',
 };
 
 // Legal documents rendered on /terms, /privacy, /do-not-sell.
@@ -34,7 +34,7 @@ export const LEGAL_DOCS = {
       { type: 'p', text: 'We reserve the right to revise these terms at any time without notice. By using this website, you agree to be bound by the then-current version of these Terms.' },
       { type: 'h', text: '1.7 Contact Information' },
       { type: 'p', text: 'Please address all inquiries regarding these terms to:' },
-      { type: 'email', text: 'admin@lemonpros.com' },
+      { type: 'email', text: 'info@lemonpros.com' },
     ],
   },
   privacy: {
@@ -63,7 +63,7 @@ export const LEGAL_DOCS = {
       { type: 'p', text: 'We employ standard commercial security practices to safeguard your information. No transmission method over the internet is completely secure, but we take every reasonable measure to protect your data.' },
       { type: 'h', text: '2.5 Contact Information' },
       { type: 'p', text: 'For data updates, deletion requests, or privacy inquiries, email us at:' },
-      { type: 'email', text: 'admin@lemonpros.com' },
+      { type: 'email', text: 'info@lemonpros.com' },
     ],
   },
   'do-not-sell': {
@@ -84,7 +84,7 @@ export const LEGAL_DOCS = {
       ] },
       { type: 'h', text: '3.4 Exercise Your Data Rights' },
       { type: 'p', text: 'To request access to or removal of your data, contact us at:' },
-      { type: 'email', text: 'admin@lemonpros.com' },
+      { type: 'email', text: 'info@lemonpros.com' },
     ],
   },
 };
