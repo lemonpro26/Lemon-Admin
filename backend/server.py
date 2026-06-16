@@ -97,9 +97,9 @@ class UserUpdate(BaseModel):
 class LeadCreate(BaseModel):
     model_config = ConfigDict(extra="ignore")
     zip: Optional[str] = ""
-    homeowner: Optional[str] = ""
-    issue: Optional[str] = ""
-    service_type: Optional[str] = ""
+    car_year: Optional[str] = ""
+    car_make: Optional[str] = ""
+    car_model: Optional[str] = ""
     address: Optional[str] = ""
     city: Optional[str] = ""
     state: Optional[str] = ""
