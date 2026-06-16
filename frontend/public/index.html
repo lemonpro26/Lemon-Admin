@@ -22,6 +22,19 @@
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
         <title>Lemon Pros — Free Lemon Law Case Review</title>
+
+        <!-- Google tag (gtag.js) — GA4 (G-PBB3G61CXB) + Google Ads (AW-318021992).
+             GA4 page views are sent manually from the SPA (send_page_view:false).
+             The Ads tag is loaded for auto-tagging / GCLID only — conversions are
+             uploaded server-to-server, so no client-side Ads conversion is fired. -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-PBB3G61CXB"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-PBB3G61CXB', { send_page_view: false });
+          gtag('config', 'AW-318021992');
+        </script>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
     </head>

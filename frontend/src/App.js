@@ -1,5 +1,6 @@
 import '@/App.css';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { FunnelProvider } from '@/context/FunnelContext';
 import PublicShell from '@/components/PublicShell';
@@ -10,11 +11,22 @@ import AdminLogin from '@/pages/AdminLogin';
 import AdminDashboard from '@/pages/AdminDashboard';
 import LegalPage from '@/pages/LegalPage';
 import Contact from '@/pages/Contact';
+import { trackPageView } from '@/lib/analytics';
+
+// Sends a GA4 page_view on every client-side route change (SPA tracking).
+function AnalyticsTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    trackPageView(location.pathname + location.search);
+  }, [location]);
+  return null;
+}
 
 function App() {
   return (
     <FunnelProvider>
       <BrowserRouter>
+        <AnalyticsTracker />
         <Routes>
           {/* Public funnel pages share a persistent shell (fixed houses + tiny footer). */}
           <Route element={<PublicShell />}>
