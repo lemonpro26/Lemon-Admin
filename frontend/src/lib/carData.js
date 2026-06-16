@@ -51,7 +51,7 @@ export const CAR_MAKES = [
   { name: 'MINI', slug: 'mini' },
   { name: 'Genesis', slug: 'genesis' },
   { name: 'Fiat', slug: 'fiat' },
-];
+].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
 
 // Common models per make. "Other / Not listed" is appended automatically.
 export const CAR_MODELS = {
