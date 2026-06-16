@@ -36,6 +36,8 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - "100% Free Consultation" trust badge (replaces Licensed/Insured).
 - Backend lead model extended with car_year/car_make/car_model; CRM webhook forwarding added.
 - Admin dashboard, JWT auth, geo hooks all carried over.
+- Mobile optimized for iOS + Android: safe-area (notch/home-indicator) insets, tap-highlight removal, overscroll lock; verified on 390px viewport.
+- Removed the "Made with Emergent" badge from index.html (desktop + mobile).
 
 ## Backlog / Next
 - P1: User to provide CRM API endpoint → set `CRM_WEBHOOK_URL` in backend/.env.

@@ -19,6 +19,27 @@ html {
     text-size-adjust: 100%;
 }
 
+/* Remove the "Made with Emergent" badge on desktop and mobile. */
+#emergent-badge {
+    display: none !important;
+}
+
+/* Nicer touch behavior on phones: no blue tap flash, no rubber-band scroll. */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+body {
+    overscroll-behavior-y: none;
+}
+
+/* iOS safe-area helpers (used by the funnel shell with viewport-fit=cover). */
+.safe-top {
+    padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
 html,
 body,
 #root {

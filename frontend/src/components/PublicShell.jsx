@@ -17,7 +17,7 @@ import { SuburbanBand } from '@/components/SuburbanBand';
 export default function PublicShell() {
   return (
     <div
-      className="h-[100dvh] flex flex-col overflow-hidden bg-white"
+      className="h-[100dvh] flex flex-col overflow-hidden bg-white safe-top safe-bottom"
       data-testid="public-shell"
     >
       <SiteHeader />
