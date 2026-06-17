@@ -64,20 +64,14 @@ export default function Landing() {
 
   return (
     <div
-      className="min-h-full flex flex-col items-center justify-center text-center px-4 pt-[clamp(12px,3vh,40px)] pb-[clamp(88px,15vh,170px)]"
+      className="min-h-full flex flex-col items-center justify-start text-center px-4 pt-[clamp(24px,6vh,72px)] pb-[clamp(88px,15vh,170px)]"
       data-testid="page-landing"
     >
       <div
         className={`w-full max-w-3xl mx-auto transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
       >
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full bg-yellow-50 border border-yellow-200 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-700"
-          data-testid="hero-eyebrow"
-        >
-          <Scale className="h-3.5 w-3.5" /> Lemon Law Specialists
-        </span>
         <h1
-          className="mt-4 font-slab font-bold tracking-tight text-slate-900 leading-[1.07] text-[clamp(1.9rem,5.2vw,3.6rem)]"
+          className="font-slab font-bold tracking-tight text-slate-900 leading-[1.07] text-[clamp(1.9rem,5.2vw,3.6rem)]"
           data-testid="hero-hook1"
         >
           {hooks.hook1 || '\u00a0'}
