@@ -30,16 +30,44 @@ def _smtp_cfg():
     }
 
 
+def _send_via_resend(api_key: str, to_emails, subject: str, html: str, reply_to: str | None) -> dict:
+    """Send via the Resend API (preferred when RESEND_API_KEY is set)."""
+    try:
+        import resend
+        resend.api_key = api_key
+        sender_name = os.environ.get("SENDER_NAME", "Lemon Pros")
+        sender_email = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+        params = {
+            "from": f"{sender_name} <{sender_email}>",
+            "to": to_emails,
+            "subject": subject,
+            "html": html,
+        }
+        if reply_to:
+            params["reply_to"] = reply_to
+        res = resend.Emails.send(params)
+        return {"ok": True, "error": None, "id": (res or {}).get("id")}
+    except Exception as e:
+        logger.error("Resend send failed: %s: %s", type(e).__name__, e)
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
 def send_email(to_emails, subject: str, html: str, reply_to: str | None = None) -> dict:
-    """Send one HTML email to one or more recipients. Returns {ok, error}."""
-    cfg = _smtp_cfg()
+    """Send one HTML email to one or more recipients. Prefers Resend (managed API)
+    when RESEND_API_KEY is configured; otherwise falls back to SMTP. Returns {ok, error}."""
     if isinstance(to_emails, str):
         to_emails = [to_emails]
     to_emails = [e.strip() for e in to_emails if e and e.strip()]
     if not to_emails:
         return {"ok": False, "error": "no recipients"}
+
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if resend_key:
+        return _send_via_resend(resend_key, to_emails, subject, html, reply_to)
+
+    cfg = _smtp_cfg()
     if not (cfg["host"] and cfg["user"] and cfg["pwd"]):
-        return {"ok": False, "error": "SMTP not configured"}
+        return {"ok": False, "error": "Email not configured"}
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject

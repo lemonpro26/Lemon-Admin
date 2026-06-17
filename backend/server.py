@@ -56,7 +56,7 @@ DEFAULT_CONFIG = {
     # Email notification settings
     "notification_emails": ["info@lemonpros.com"],
     "notify_team": True,
-    "send_thank_you": True,
+    "send_thank_you": False,
     # Editable customer thank-you email
     "thank_you_subject": "Thanks for your request — Lemon Pros",
     "thank_you_body": DEFAULT_THANK_YOU_BODY,
@@ -824,6 +824,9 @@ async def get_integrations(_: dict = Depends(require_admin)):
     smtp_host = os.environ.get("SMTP_HOST", "")
     smtp_user = os.environ.get("SMTP_USER", "")
     smtp_pass = os.environ.get("SMTP_PASS", "")
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    email_live = bool(resend_key) or bool(smtp_host and smtp_user and smtp_pass)
+    email_provider = "Resend" if resend_key else ("SMTP" if (smtp_host and smtp_user and smtp_pass) else None)
     leads_total = await db.leads.count_documents({})
     return {
         "lead_posting": {
@@ -842,12 +845,15 @@ async def get_integrations(_: dict = Depends(require_admin)):
             "total_leads": leads_total,
         },
         "email": {
-            "configured": bool(smtp_host and smtp_user and smtp_pass),
-            "live": bool(smtp_host and smtp_user and smtp_pass),
+            "configured": email_live,
+            "live": email_live,
+            "provider": email_provider,
+            "purpose": "Lead notifications only (no customer thank-you email)",
             "host": smtp_host,
             "port": os.environ.get("SMTP_PORT", "465"),
             "sender_email": os.environ.get("SENDER_EMAIL", "") or smtp_user,
             "sender_name": os.environ.get("SENDER_NAME", "Lemon Pros"),
+            "recipients": (await get_or_create_config()).get("notification_emails", []),
         },
     }
 
