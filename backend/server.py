@@ -800,6 +800,59 @@ async def get_notifications(_: dict = Depends(require_admin)):
     }
 
 
+def _mask_webhook(url: str) -> str:
+    """Mask the secret token in a webhook URL for safe display in the admin UI."""
+    if not url:
+        return ""
+    try:
+        head, _, _ = url.partition("://")
+        rest = url.split("://", 1)[1]
+        host = rest.split("/", 1)[0]
+        parts = rest.split("/")
+        # Keep the host + first path segment, mask the rest (the secret).
+        visible = "/".join(parts[:3])
+        return f"{head}://{visible}/" + ("\u2022" * 6) if len(parts) > 3 else url
+    except Exception:
+        return url[:24] + "\u2022" * 6
+
+
+@api_router.get("/admin/integrations")
+async def get_integrations(_: dict = Depends(require_admin)):
+    """Live status of outbound integrations shown in Admin → Settings."""
+    crm_url = os.environ.get("CRM_WEBHOOK_URL", "") or CRM_WEBHOOK_URL
+    is_zapier = "zapier.com" in crm_url
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    leads_total = await db.leads.count_documents({})
+    return {
+        "lead_posting": {
+            "configured": bool(crm_url),
+            "live": bool(crm_url),
+            "provider": "Zapier" if is_zapier else ("Webhook" if crm_url else None),
+            "url_masked": _mask_webhook(crm_url),
+            "method": "POST (JSON)",
+            "source_tag": "google ppc form",
+            "fields": [
+                "first_name", "last_name", "full_name", "email", "phone",
+                "car_year", "car_make", "car_model",
+                "address", "city", "state", "zip",
+                "source", "id", "created_at",
+            ],
+            "total_leads": leads_total,
+        },
+        "email": {
+            "configured": bool(smtp_host and smtp_user and smtp_pass),
+            "live": bool(smtp_host and smtp_user and smtp_pass),
+            "host": smtp_host,
+            "port": os.environ.get("SMTP_PORT", "465"),
+            "sender_email": os.environ.get("SENDER_EMAIL", "") or smtp_user,
+            "sender_name": os.environ.get("SENDER_NAME", "Lemon Pros"),
+        },
+    }
+
+
+
 @api_router.put("/admin/notifications")
 async def update_notifications(body: NotificationSettings, _: dict = Depends(require_editor)):
     update = {

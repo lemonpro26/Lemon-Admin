@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Bell, Users as UsersIcon, Mail } from 'lucide-react';
+import { Bell, Users as UsersIcon, Mail, Plug } from 'lucide-react';
 import { AdminNotifications } from '@/components/admin/AdminNotifications';
 import { AdminUsers } from '@/components/admin/AdminUsers';
 import { AdminEmailTemplate } from '@/components/admin/AdminEmailTemplate';
+import { AdminIntegrations } from '@/components/admin/AdminIntegrations';
 
 const TABS = [
+  { key: 'integrations', label: 'Integrations', icon: Plug },
   { key: 'notifications', label: 'Notifications', icon: Bell },
   { key: 'users', label: 'Users', icon: UsersIcon },
   { key: 'email', label: 'Thank-You Email', icon: Mail },
 ];
 
 export const AdminSettings = ({ canEdit }) => {
-  const [tab, setTab] = useState('notifications');
+  const [tab, setTab] = useState('integrations');
   return (
     <div className="grid gap-5" data-testid="admin-settings">
       <div className="flex flex-wrap gap-2">
@@ -30,6 +32,7 @@ export const AdminSettings = ({ canEdit }) => {
           );
         })}
       </div>
+      {tab === 'integrations' && <AdminIntegrations />}
       {tab === 'notifications' && <AdminNotifications canEdit={canEdit} />}
       {tab === 'users' && <AdminUsers canEdit={canEdit} />}
       {tab === 'email' && <AdminEmailTemplate canEdit={canEdit} />}
