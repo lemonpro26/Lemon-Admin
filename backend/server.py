@@ -427,12 +427,16 @@ def _dispatch_lead_emails(cfg: dict, lead: dict):
 
 
 def _post_lead_to_crm(lead: dict):
-    """Runs in a BackgroundTask. Forwards the lead to an external CRM webhook
-    when CRM_WEBHOOK_URL is configured. No-op (logged) when not set."""
+    """Runs in a BackgroundTask. Forwards the lead to an external CRM/Zapier
+    webhook when CRM_WEBHOOK_URL is configured. No-op (logged) when not set.
+    Strips internal marketing-tracking fields and tags the lead source."""
     if not CRM_WEBHOOK_URL:
         return
+    drop = {"campaign_id", "adgroup_id", "ad_id", "keyword", "gclid", "params", "matched_rule_id"}
+    payload = {k: v for k, v in lead.items() if k not in drop}
+    payload["source"] = "google ppc form"
     try:
-        resp = requests.post(CRM_WEBHOOK_URL, json=lead, timeout=10)
+        resp = requests.post(CRM_WEBHOOK_URL, json=payload, timeout=10)
         if resp.status_code >= 400:
             logger.error("CRM webhook returned %s: %s", resp.status_code, resp.text[:300])
         else:

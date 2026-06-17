@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Phone } from 'lucide-react';
 import { Logo } from '@/components/Logo';
+import { COMPANY } from '@/lib/siteContent';
 import { STEP_IDS } from '@/lib/funnel';
 
 /**
@@ -27,7 +28,7 @@ export const SiteHeader = () => {
   };
 
   return (
-    <header className="shrink-0 h-[clamp(52px,7.5vh,68px)] bg-white border-b border-slate-200 relative flex items-center justify-center px-4 z-40">
+    <header className={`shrink-0 h-[clamp(52px,7.5vh,68px)] bg-white border-b border-slate-200 relative flex items-center px-4 z-40 ${inFunnel ? 'justify-center' : 'justify-start sm:justify-center'}`}>
       {/* Left: back arrow (funnel only) */}
       {inFunnel && (
         <button
@@ -69,6 +70,19 @@ export const SiteHeader = () => {
             {index + 1}/{total}
           </span>
         </div>
+      )}
+
+      {/* Right: click-to-call (landing / non-funnel pages) */}
+      {!inFunnel && (
+        <a
+          href={COMPANY.phoneHref}
+          className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-full bg-[#EF4444] hover:bg-[#DC2626] text-white font-bold px-3 py-2 text-xs sm:text-sm shadow-[0_6px_16px_rgba(239,68,68,0.30)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+          data-testid="header-call-button"
+          aria-label={`Call Lemon Pros at ${COMPANY.phone}`}
+        >
+          <Phone className="h-4 w-4" />
+          <span className="whitespace-nowrap">{COMPANY.phone}</span>
+        </a>
       )}
     </header>
   );
