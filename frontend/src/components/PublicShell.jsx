@@ -1,8 +1,11 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { Phone } from 'lucide-react';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SuburbanBand } from '@/components/SuburbanBand';
+import { COMPANY } from '@/lib/siteContent';
+import { STEP_IDS } from '@/lib/funnel';
 
 /**
  * Persistent public layout. The SuburbanBand (houses illustration) lives here
@@ -15,12 +18,30 @@ import { SuburbanBand } from '@/components/SuburbanBand';
  * separate the decorative footer scene from the content area.
  */
 export default function PublicShell() {
+  const location = useLocation();
+  const m = location.pathname.match(/^\/flow\/(.+)$/);
+  const inFunnel = !!(m && STEP_IDS.includes(m[1]));
+
   return (
     <div
       className="h-[100dvh] flex flex-col overflow-hidden bg-white safe-top safe-bottom"
       data-testid="public-shell"
     >
       <SiteHeader />
+
+      {/* Click-to-call strip — sits just under the header divider line during the funnel. */}
+      {inFunnel && (
+        <div className="shrink-0 flex justify-end items-center px-4 sm:px-5 py-1.5 bg-white border-b border-slate-100">
+          <a
+            href={COMPANY.phoneHref}
+            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#EF4444] hover:text-[#DC2626] transition-colors focus:outline-none"
+            data-testid="flow-call-link"
+            aria-label={`Call Lemon Pros at ${COMPANY.phone}`}
+          >
+            <Phone className="h-3.5 w-3.5" /> Call {COMPANY.phone}
+          </a>
+        </div>
+      )}
 
       {/* Stage: holds the fixed houses band and the scrollable page content. */}
       <div className="relative flex-1 overflow-hidden bg-white">

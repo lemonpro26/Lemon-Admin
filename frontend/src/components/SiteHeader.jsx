@@ -53,29 +53,22 @@ export const SiteHeader = () => {
         <Logo size="md" />
       </button>
 
-      {/* Right: progress bar + click-to-call underneath (funnel only) */}
+      {/* Right: progress bar (funnel only) */}
       {inFunnel && (
-        <div className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2" data-testid="header-progress">
-            <div className="h-2 w-[clamp(72px,18vw,160px)] rounded-full bg-slate-200 overflow-hidden">
-              <div
-                className="h-full bg-[#EF4444] rounded-full transition-[width] duration-300 ease-out"
-                style={{ width: `${pct}%` }}
-                data-testid="header-progress-fill"
-              />
-            </div>
-            <span className="text-xs font-medium text-slate-400 hidden sm:inline" data-testid="header-progress-label">
-              {index + 1}/{total}
-            </span>
+        <div
+          className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 flex items-center gap-2"
+          data-testid="header-progress"
+        >
+          <div className="h-2 w-[clamp(72px,18vw,160px)] rounded-full bg-slate-200 overflow-hidden">
+            <div
+              className="h-full bg-[#EF4444] rounded-full transition-[width] duration-300 ease-out"
+              style={{ width: `${pct}%` }}
+              data-testid="header-progress-fill"
+            />
           </div>
-          <a
-            href={COMPANY.phoneHref}
-            className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold text-[#EF4444] hover:text-[#DC2626] transition-colors focus:outline-none"
-            data-testid="header-flow-call"
-            aria-label={`Call Lemon Pros at ${COMPANY.phone}`}
-          >
-            <Phone className="h-3 w-3" /> {COMPANY.phone}
-          </a>
+          <span className="text-xs font-medium text-slate-400 hidden sm:inline" data-testid="header-progress-label">
+            {index + 1}/{total}
+          </span>
         </div>
       )}
 
