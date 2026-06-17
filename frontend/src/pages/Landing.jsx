@@ -101,14 +101,14 @@ export default function Landing() {
       </div>
 
       <div
-        className="mt-[clamp(10px,1.8vh,20px)] flex items-center justify-center gap-2 text-sm font-medium text-blue-600"
+        className="mt-[clamp(20px,4vh,40px)] flex items-center justify-center gap-2 text-sm font-medium text-blue-600"
         data-testid="hero-trust-line"
       >
         <Clock className="h-4 w-4" />
         <span>Takes 60 seconds — no obligation</span>
       </div>
 
-      <div className="mt-[clamp(10px,1.8vh,24px)] flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs sm:text-sm text-slate-500">
+      <div className="mt-[clamp(16px,3vh,30px)] flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs sm:text-sm text-slate-500">
         <span className="flex items-center gap-1.5">
           <Star className="h-4 w-4 text-amber-400 fill-amber-400" /> 5-Star Rated
         </span>
