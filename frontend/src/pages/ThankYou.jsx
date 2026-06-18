@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Phone, Clock } from 'lucide-react';
 import { useFunnel } from '@/context/FunnelContext';
-import { trackGenerateLead } from '@/lib/analytics';
+import { trackGenerateLead, trackAdsConversion } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 
 export default function ThankYou() {
@@ -12,6 +12,8 @@ export default function ThankYou() {
   useEffect(() => {
     // GA4 lead conversion (reaching Thank-You = a completed lead). No PII sent.
     trackGenerateLead({ lead_type: 'lemon_law_case_review' });
+    // Google Ads conversion ("Lead Form Submit") — credits the originating ad click.
+    trackAdsConversion({ value: 1.0, currency: 'USD' });
     resetAnswers();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

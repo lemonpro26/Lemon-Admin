@@ -43,6 +43,17 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - Admin Hooks rebuilt as A/B testing manager: per-variant "% of serving" weight, target = Home page or a specific ad group, weighted serving seeded by session id (stable per visitor for clean attribution), per-hook stats (clicks, conversions, conv %). Grouped by target with normalized serving %.
 - Lead-detail (and all) dialogs now scroll internally (max-h-90dvh / overflow-y-auto).
 
+## Implemented (2026-06-18)
+- Custom domain `apply.thelemonpros.com` linked (Entri CNAME → lemon-checker.emergent.host) — live.
+- Verified end-to-end lead capture (all funnel fields) + Zapier CRM forwarding (HTTP 200, source="google ppc form").
+- **Google Ads form-fill conversion (client-side tag)**: added `trackAdsConversion()` in `analytics.js`
+  firing `gtag('event','conversion',{send_to:'AW-318021992/QndSCIqez8EcEOjC0pcB', value:1.0, currency:'USD'})`,
+  called on the Thank-You page. Conversion action name in Google Ads: `LEMONPROS_CONV_SERVER`.
+  (Replaces the prior GA4-only setup that sent NO conversion to Google Ads.)
+- NOTE on offline/revenue upload: Google blocked legacy Google Ads API offline conversion upload for
+  NEW developer tokens as of 2026-06-15 (token `w63ZtfmQuX8f3x0698fRjA` not allowlisted). Server-side
+  revenue passback must use the new **Data Manager API** (not yet built). Customer ID: 962-766-5639.
+
 ## Backlog / Next
 - P1: User to provide CRM API endpoint → set `CRM_WEBHOOK_URL` in backend/.env.
 - P1: User to provide SMTP creds for live email notifications.

@@ -1,9 +1,10 @@
 // Google Analytics 4 (gtag.js) helpers for the Lemon Pros SPA.
 // The base Google tag is loaded once in public/index.html with:
 //   - GA4 G-PBB3G61CXB   (send_page_view:false — page views are sent manually here)
-//   - Google Ads AW-318021992 (loaded for auto-tagging / GCLID only; conversions
-//     are uploaded server-to-server, so NO client-side Ads conversion is fired)
+//   - Google Ads AW-318021992 (auto-tagging / GCLID + the form-submit conversion below)
 const GA4_ID = 'G-PBB3G61CXB';
+// Google Ads "Lead Form Submit" conversion label (Event snippet send_to value).
+const ADS_LEAD_CONVERSION = 'AW-318021992/QndSCIqez8EcEOjC0pcB';
 
 function gtagSafe(...args) {
   if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
@@ -29,4 +30,19 @@ export function trackGenerateLead(params = {}) {
   if (now - _lastLeadAt < 3000) return;
   _lastLeadAt = now;
   gtagSafe('event', 'generate_lead', { ...params, send_to: GA4_ID });
+}
+
+// Google Ads conversion — fired on the Thank-You page after a real submit.
+// Tells Google Ads "this ad click converted" (uses the GCLID from auto-tagging).
+// Guarded against duplicate fires (React StrictMode double-mount / re-render).
+let _lastAdsConvAt = 0;
+export function trackAdsConversion({ value, currency = 'USD', transactionId } = {}) {
+  const now = Date.now();
+  if (now - _lastAdsConvAt < 3000) return;
+  _lastAdsConvAt = now;
+  const payload = { send_to: ADS_LEAD_CONVERSION };
+  if (typeof value === 'number') payload.value = value;
+  if (currency) payload.currency = currency;
+  if (transactionId) payload.transaction_id = transactionId;
+  gtagSafe('event', 'conversion', payload);
 }
