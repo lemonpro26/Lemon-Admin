@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, LineChart, Settings as SettingsIcon,
-  DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical,
+  DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, TOKEN_KEY, clearSession, canEdit as canEditFn, getRole, getUsername } from '@/lib/api';
@@ -196,6 +196,19 @@ export default function AdminDashboard() {
       toast.error(e?.response?.data?.detail || 'Could not create test lead.');
     } finally {
       setCreatingTest(false);
+    }
+  };
+
+  const deleteLead = async (lead) => {
+    if (!lead) return;
+    if (!window.confirm(`Delete lead "${lead.full_name}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/admin/leads/${lead.id}`);
+      toast.success('Lead deleted.');
+      setSelected(null);
+      await loadLeads();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Could not delete lead.');
     }
   };
 
@@ -468,6 +481,17 @@ export default function AdminDashboard() {
                   </p>
                 )}
               </div>
+
+              {editable && (
+                <Button
+                  onClick={() => deleteLead(selected)}
+                  variant="outline"
+                  className="w-full rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  data-testid="lead-delete-button"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete Lead
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>

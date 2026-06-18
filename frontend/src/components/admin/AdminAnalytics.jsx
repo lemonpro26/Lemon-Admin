@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { BarChart3, RefreshCw } from 'lucide-react';
+import { BarChart3, RefreshCw, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -71,6 +71,7 @@ export const AdminAnalytics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState(todayRange());
+  const editable = canEditFn();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +84,19 @@ export const AdminAnalytics = () => {
       setLoading(false);
     }
   }, [range]);
+
+  const editLabel = async (type, id) => {
+    const current = (data?.ad_labels?.[type] || {})[String(id)] || '';
+    const name = window.prompt(`Friendly name for this ${type} (ID ${id}):`, current);
+    if (name === null) return;
+    try {
+      await api.post('/admin/ad-labels', { type, id: String(id), name });
+      toast.success(name.trim() ? 'Name saved.' : 'Name cleared.');
+      load();
+    } catch (e) {
+      toast.error('Could not save name.');
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -109,6 +123,30 @@ export const AdminAnalytics = () => {
     );
   }
 
+  const labels = data.ad_labels || {};
+  const nameCell = (type, idKey) => (r) => {
+    const id = r[idKey];
+    if (id === '' || id == null) return NONE;
+    const name = (labels[type] || {})[String(id)];
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span className={name ? 'font-medium text-slate-900' : 'text-slate-700'}>{name || id}</span>
+        {name && <span className="text-[10px] text-slate-400">#{id}</span>}
+        {editable && (
+          <button
+            type="button"
+            onClick={() => editLabel(type, id)}
+            className="text-slate-300 hover:text-slate-600 transition-colors"
+            title="Set a friendly name"
+            data-testid={`label-edit-${type}-${id}`}
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+        )}
+      </span>
+    );
+  };
+
   return (
     <div className="grid gap-6" data-testid="admin-analytics">
       {header}
@@ -118,7 +156,7 @@ export const AdminAnalytics = () => {
         testid="analytics-by-campaign"
         rows={data.by_campaign}
         columns={[
-          { key: 'campaign_id', label: 'Campaign ID' },
+          { key: 'campaign_id', label: 'Campaign', render: nameCell('campaign', 'campaign_id') },
           { key: 'clicks', label: 'Clicks', num: true },
           { key: 'leads', label: 'Leads', num: true },
           { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },
@@ -131,8 +169,8 @@ export const AdminAnalytics = () => {
         testid="analytics-by-adgroup"
         rows={data.by_adgroup}
         columns={[
-          { key: 'campaign_id', label: 'Campaign ID' },
-          { key: 'adgroup_id', label: 'Ad Group ID' },
+          { key: 'campaign_id', label: 'Campaign', render: nameCell('campaign', 'campaign_id') },
+          { key: 'adgroup_id', label: 'Ad Group', render: nameCell('adgroup', 'adgroup_id') },
           { key: 'clicks', label: 'Clicks', num: true },
           { key: 'leads', label: 'Leads', num: true },
           { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },
@@ -145,9 +183,9 @@ export const AdminAnalytics = () => {
         testid="analytics-by-ad"
         rows={data.by_ad}
         columns={[
-          { key: 'campaign_id', label: 'Campaign ID' },
-          { key: 'adgroup_id', label: 'Ad Group ID' },
-          { key: 'ad_id', label: 'Ad ID' },
+          { key: 'campaign_id', label: 'Campaign', render: nameCell('campaign', 'campaign_id') },
+          { key: 'adgroup_id', label: 'Ad Group', render: nameCell('adgroup', 'adgroup_id') },
+          { key: 'ad_id', label: 'Ad', render: nameCell('ad', 'ad_id') },
           { key: 'clicks', label: 'Clicks', num: true },
           { key: 'leads', label: 'Leads', num: true },
           { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },

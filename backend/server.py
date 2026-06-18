@@ -946,6 +946,40 @@ async def create_test_lead(_: dict = Depends(require_editor)):
     return {"success": True, "lead": {k: v for k, v in lead.items() if k != "_id"}}
 
 
+@api_router.delete("/admin/leads/{lead_id}")
+async def delete_lead(lead_id: str, _: dict = Depends(require_editor)):
+    """Permanently delete a lead from the database."""
+    res = await db.leads.delete_one({"id": lead_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return {"success": True}
+
+
+class AdLabelBody(BaseModel):
+    type: str  # "campaign" | "adgroup" | "ad"
+    id: str
+    name: str = ""
+
+
+@api_router.post("/admin/ad-labels")
+async def set_ad_label(body: AdLabelBody, _: dict = Depends(require_editor)):
+    """Set (or clear) a friendly name for a campaign / ad group / ad ID, used to
+    display names instead of raw numeric IDs in the analytics dashboard."""
+    if body.type not in ("campaign", "adgroup", "ad"):
+        raise HTTPException(status_code=400, detail="type must be campaign, adgroup or ad")
+    cfg = await get_or_create_config()
+    labels = cfg.get("ad_labels") or {}
+    sub = dict(labels.get(body.type) or {})
+    name = (body.name or "").strip()
+    if name:
+        sub[str(body.id)] = name
+    else:
+        sub.pop(str(body.id), None)
+    labels[body.type] = sub
+    await db.site_config.update_one({"_id": "singleton"}, {"$set": {"ad_labels": labels}}, upsert=True)
+    return {"success": True, "ad_labels": labels}
+
+
 async def _upload_lead_conversion(lead: dict, sale: SaleBody) -> dict:
     return gads.upload_offline_conversion(
         lead=lead, value=sale.value, currency=(sale.currency or "USD"),
@@ -1177,6 +1211,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         "by_adgroup": await breakdown(["campaign_id", "adgroup_id"]),
         "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
         "by_keyword": await breakdown(["keyword"]),
+        "ad_labels": (await get_or_create_config()).get("ad_labels") or {},
         "range": {"start": s_iso, "end": e_iso},
     }
 
