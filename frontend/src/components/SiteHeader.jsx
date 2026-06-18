@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, Phone } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { COMPANY } from '@/lib/siteContent';
+import { trackPhoneCallConversion } from '@/lib/analytics';
 import { STEP_IDS } from '@/lib/funnel';
 
 /**
@@ -76,6 +77,7 @@ export const SiteHeader = () => {
       {!inFunnel && (
         <a
           href={COMPANY.phoneHref}
+          onClick={trackPhoneCallConversion}
           className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-full bg-[#EF4444] hover:bg-[#DC2626] text-white font-bold px-3 py-2 text-xs sm:text-sm shadow-[0_6px_16px_rgba(239,68,68,0.30)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
           data-testid="header-call-button"
           aria-label={`Call Lemon Pros at ${COMPANY.phone}`}

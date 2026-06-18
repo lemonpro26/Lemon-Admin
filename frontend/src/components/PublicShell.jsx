@@ -5,6 +5,7 @@ import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SuburbanBand } from '@/components/SuburbanBand';
 import { COMPANY } from '@/lib/siteContent';
+import { trackPhoneCallConversion } from '@/lib/analytics';
 import { STEP_IDS } from '@/lib/funnel';
 
 /**
@@ -34,6 +35,7 @@ export default function PublicShell() {
         <div className="shrink-0 flex justify-end items-center px-4 sm:px-5 py-1.5 bg-white border-b border-slate-100">
           <a
             href={COMPANY.phoneHref}
+            onClick={trackPhoneCallConversion}
             className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#EF4444] hover:text-[#DC2626] transition-colors focus:outline-none"
             data-testid="flow-call-link"
             aria-label={`Call Lemon Pros at ${COMPANY.phone}`}

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { COMPANY } from '@/lib/siteContent';
+import { trackPhoneCallConversion } from '@/lib/analytics';
 
 export default function Contact() {
   const navigate = useNavigate();
@@ -115,7 +116,7 @@ export default function Contact() {
                     <span className="text-sm text-white group-hover:underline">{COMPANY.addressLine1}<br />{COMPANY.addressLine2}</span>
                   </span>
                 </a>
-                <a href={COMPANY.phoneHref} className="flex items-start gap-3 group" data-testid="contact-phone-link">
+                <a href={COMPANY.phoneHref} onClick={trackPhoneCallConversion} className="flex items-start gap-3 group" data-testid="contact-phone-link">
                   <span className="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0"><Phone className="h-5 w-5 text-[#FACC15]" /></span>
                   <span>
                     <span className="block text-xs uppercase tracking-wide text-slate-400">Phone</span>

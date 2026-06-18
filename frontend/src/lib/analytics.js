@@ -5,6 +5,8 @@
 const GA4_ID = 'G-PBB3G61CXB';
 // Google Ads "Lead Form Submit" conversion label (Event snippet send_to value).
 const ADS_LEAD_CONVERSION = 'AW-318021992/QndSCIqez8EcEOjC0pcB';
+// Google Ads "Click to call" conversion label (fires when a phone link is tapped).
+const ADS_CALL_CONVERSION = 'AW-318021992/I_x1CMbE2cEcEOjC0pcB';
 
 function gtagSafe(...args) {
   if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
@@ -45,4 +47,13 @@ export function trackAdsConversion({ value, currency = 'USD', transactionId } = 
   if (currency) payload.currency = currency;
   if (transactionId) payload.transaction_id = transactionId;
   gtagSafe('event', 'conversion', payload);
+}
+
+// Google Ads "Click to call" conversion — fired when a visitor taps a phone link.
+let _lastCallConvAt = 0;
+export function trackPhoneCallConversion() {
+  const now = Date.now();
+  if (now - _lastCallConvAt < 1500) return;
+  _lastCallConvAt = now;
+  gtagSafe('event', 'conversion', { send_to: ADS_CALL_CONVERSION, value: 1.0, currency: 'USD' });
 }
