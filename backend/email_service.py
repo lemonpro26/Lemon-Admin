@@ -80,9 +80,17 @@ def send_email(to_emails, subject: str, html: str, reply_to: str | None = None) 
 
     try:
         ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=ctx, timeout=20) as server:
-            server.login(cfg["user"], cfg["pwd"])
-            server.sendmail(cfg["sender_email"], to_emails, msg.as_string())
+        if cfg["port"] == 465:
+            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=ctx, timeout=20) as server:
+                server.login(cfg["user"], cfg["pwd"])
+                server.sendmail(cfg["sender_email"], to_emails, msg.as_string())
+        else:
+            # STARTTLS (e.g. port 587) — common for self-hosted / provider mail servers.
+            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=20) as server:
+                server.ehlo()
+                server.starttls(context=ctx)
+                server.login(cfg["user"], cfg["pwd"])
+                server.sendmail(cfg["sender_email"], to_emails, msg.as_string())
         return {"ok": True, "error": None}
     except Exception as e:
         logger.error("SMTP send failed: %s: %s", type(e).__name__, e)

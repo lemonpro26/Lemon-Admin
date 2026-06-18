@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LogOut, Users, Megaphone, BarChart3, LineChart, Settings as SettingsIcon,
+  LogOut, Users, Megaphone, BarChart3, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,7 +21,6 @@ import { Logo } from '@/components/Logo';
 import { useSortable, SortLabel } from '@/lib/useSortable';
 import { AdminHooks } from '@/components/admin/AdminHooks';
 import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
-import { AdminMetrics } from '@/components/admin/AdminMetrics';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
@@ -237,7 +236,6 @@ export default function AdminDashboard() {
         <Tabs defaultValue="hooks">
           <TabsList className="mb-6 flex-wrap h-auto">
             <TabsTrigger value="hooks" data-testid="admin-tab-hooks"><Megaphone className="h-4 w-4 mr-2" /> Hooks</TabsTrigger>
-            <TabsTrigger value="metrics" data-testid="admin-tab-metrics"><LineChart className="h-4 w-4 mr-2" /> Metrics</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="admin-tab-analytics"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
@@ -248,10 +246,7 @@ export default function AdminDashboard() {
             <AdminHooks canEdit={editable} />
           </TabsContent>
 
-          {/* METRICS */}
-          <TabsContent value="metrics">
-            <AdminMetrics />
-          </TabsContent>
+          {/* METRICS tab removed — admin now shows only real data */}
 
           {/* ANALYTICS */}
           <TabsContent value="analytics">
@@ -333,15 +328,29 @@ export default function AdminDashboard() {
                           <TableCell className="hidden lg:table-cell text-slate-600">{lead.city}, {lead.state}</TableCell>
                           <TableCell className="hidden sm:table-cell text-slate-500 text-sm">{fmtDate(lead.created_at)}</TableCell>
                           <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-lg border-slate-200"
-                              onClick={() => openLead(lead)}
-                              data-testid={`admin-lead-open-${lead.id}`}
-                            >
-                              View
-                            </Button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg border-slate-200"
+                                onClick={() => openLead(lead)}
+                                data-testid={`admin-lead-open-${lead.id}`}
+                              >
+                                View
+                              </Button>
+                              {editable && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 px-2"
+                                  onClick={() => deleteLead(lead)}
+                                  data-testid={`admin-lead-delete-${lead.id}`}
+                                  title="Delete lead"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

@@ -1254,14 +1254,6 @@ async def admin_metrics(
         "csid": _csid("default-config"), "punch1": cfg.get("hook1", ""),
         "punch2": cfg.get("hook2", ""), "source": "Default (catch-all)",
     })
-    if len(hook_variants) < 4:
-        demo = [
-            ("{!city} Garage Door Repair — Same Day", "Licensed pros in {!state}. Free quote in 2 minutes."),
-            ("Emergency {!city} Garage Door Service", "24/7 broken spring & off-track repair across {!state}."),
-            ("{!state} Homeowners: Garage Door Tune-Up Special", "Book today and see if you qualify."),
-        ]
-        for p1, p2 in demo[: 4 - len(hook_variants)]:
-            hook_variants.append({"csid": _csid(p1), "punch1": p1, "punch2": p2, "source": "Demo variant"})
 
     # Real leads-by-(state,city) folded into GEO.
     real_geo = {}
