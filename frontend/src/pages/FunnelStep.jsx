@@ -358,6 +358,8 @@ export default function FunnelStep() {
         ad_id: tracking.ad_id,
         keyword: tracking.keyword,
         gclid: tracking.gclid,
+        gbraid: tracking.gbraid,
+        wbraid: tracking.wbraid,
         params: tracking.params,
       };
       await api.post('/leads', payload);

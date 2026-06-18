@@ -114,6 +114,8 @@ class LeadCreate(BaseModel):
     ad_id: Optional[str] = ""
     keyword: Optional[str] = ""
     gclid: Optional[str] = ""
+    gbraid: Optional[str] = ""
+    wbraid: Optional[str] = ""
     params: Optional[dict] = None
 
 
@@ -125,6 +127,8 @@ class ClickTrack(BaseModel):
     ad_id: Optional[str] = ""
     keyword: Optional[str] = ""
     gclid: Optional[str] = ""
+    gbraid: Optional[str] = ""
+    wbraid: Optional[str] = ""
     landing_path: Optional[str] = ""
     params: Optional[dict] = None
 
@@ -432,7 +436,7 @@ def _post_lead_to_crm(lead: dict):
     Strips internal marketing-tracking fields and tags the lead source."""
     if not CRM_WEBHOOK_URL:
         return
-    drop = {"campaign_id", "adgroup_id", "ad_id", "keyword", "gclid", "params", "matched_rule_id"}
+    drop = {"campaign_id", "adgroup_id", "ad_id", "keyword", "gclid", "gbraid", "wbraid", "params", "matched_rule_id"}
     payload = {k: v for k, v in lead.items() if k not in drop}
     payload["source"] = "google ppc form"
     try:

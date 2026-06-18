@@ -26,7 +26,7 @@ const PASSTHROUGH = [
   'network', 'device', 'devicemodel', 'placement', 'adposition', 'target',
 ];
 
-const EMPTY = { campaign_id: '', adgroup_id: '', ad_id: '', keyword: '', gclid: '', params: {} };
+const EMPTY = { campaign_id: '', adgroup_id: '', ad_id: '', keyword: '', gclid: '', gbraid: '', wbraid: '', params: {} };
 
 export function getTracking() {
   try {
@@ -48,6 +48,8 @@ export function captureTracking(search) {
     keyword: p.get('keyword') || '',
     ad_id: p.get('sub2') || '',
     gclid: p.get('gclid') || '',
+    gbraid: p.get('gbraid') || '',
+    wbraid: p.get('wbraid') || '',
     params: {},
   };
   PASSTHROUGH.forEach((k) => {
@@ -56,7 +58,8 @@ export function captureTracking(search) {
   });
 
   const hasTracking =
-    data.campaign_id || data.adgroup_id || data.ad_id || data.keyword || data.gclid ||
+    data.campaign_id || data.adgroup_id || data.ad_id || data.keyword ||
+    data.gclid || data.gbraid || data.wbraid ||
     Object.keys(data.params).length > 0;
 
   if (hasTracking) {
