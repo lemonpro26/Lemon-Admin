@@ -281,8 +281,8 @@ export default function AdminDashboard() {
                       <TableRow>
                         <TableHead><SortLabel label="Name" k="full_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
                         <TableHead><SortLabel label="Phone" k="phone" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                        <TableHead className="hidden md:table-cell"><SortLabel label="Issue" k="issue" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                        <TableHead className="hidden md:table-cell"><SortLabel label="Service" k="service_type" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+                        <TableHead className="hidden md:table-cell"><SortLabel label="Vehicle" k="car_make" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+                        <TableHead className="hidden md:table-cell"><SortLabel label="Email" k="email" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
                         <TableHead className="hidden sm:table-cell"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
                         <TableHead className="hidden lg:table-cell"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
                         <TableHead className="hidden sm:table-cell"><SortLabel label="Date" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
@@ -299,8 +299,8 @@ export default function AdminDashboard() {
                             )}
                           </TableCell>
                           <TableCell className="text-slate-600">{lead.phone}</TableCell>
-                          <TableCell className="hidden md:table-cell text-slate-600">{lead.issue}</TableCell>
-                          <TableCell className="hidden md:table-cell text-slate-600">{lead.service_type}</TableCell>
+                          <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>
+                          <TableCell className="hidden md:table-cell text-slate-600 break-all">{lead.email}</TableCell>
                           <TableCell className="hidden sm:table-cell">
                             {lead.sale_status === 'sold' ? (
                               <div className="flex flex-col gap-1">
@@ -356,13 +356,13 @@ export default function AdminDashboard() {
             <div className="grid gap-4">
               <div className="grid gap-2 text-sm">
                 {[
+                  ['Vehicle Year', selected.car_year, 'lead-detail-car-year'],
+                  ['Vehicle Make', selected.car_make, 'lead-detail-car-make'],
+                  ['Vehicle Model', selected.car_model, 'lead-detail-car-model'],
                   ['Phone', selected.phone, 'lead-detail-phone'],
                   ['Email', selected.email, 'lead-detail-email'],
                   ['Address', selected.address, 'lead-detail-address'],
                   ['Zip', selected.zip, 'lead-detail-zip'],
-                  ['Homeowner', selected.homeowner, 'lead-detail-homeowner'],
-                  ['Issue', selected.issue, 'lead-detail-issue'],
-                  ['Service', selected.service_type, 'lead-detail-service'],
                   ['Location', `${selected.city}, ${selected.state}`, 'lead-detail-location'],
                   ['Campaign ID', selected.campaign_id, 'lead-detail-campaign'],
                   ['Ad Group ID', selected.adgroup_id, 'lead-detail-adgroup'],
