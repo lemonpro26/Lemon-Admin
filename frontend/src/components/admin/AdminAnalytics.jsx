@@ -71,7 +71,9 @@ export const AdminAnalytics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState(todayRange());
+  const [syncing, setSyncing] = useState(false);
   const editable = canEditFn();
+  const autoSynced = React.useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,7 +100,37 @@ export const AdminAnalytics = () => {
     }
   };
 
+  const syncGoogle = useCallback(async (force) => {
+    setSyncing(true);
+    try {
+      const res = await api.post(`/admin/ad-labels/sync-google${force ? '?force=true' : ''}`);
+      if (res.data?.success) {
+        if (!res.data.skipped) {
+          const c = res.data.counts;
+          if (c) toast.success(`Synced ${c.campaign} campaigns & ${c.adgroup} ad groups from Google Ads.`);
+          load();
+        } else if (force) {
+          toast.success('Campaign names are already up to date.');
+        }
+      } else if (res.data?.error) {
+        toast.error('Google sync: ' + res.data.error);
+      }
+    } catch (e) {
+      toast.error('Could not sync names from Google Ads.');
+    } finally {
+      setSyncing(false);
+    }
+  }, [load]);
+
   useEffect(() => { load(); }, [load]);
+
+  // Auto-pull real campaign/ad-group names from Google Ads once when connected.
+  useEffect(() => {
+    if (data?.google_ads_connected && !autoSynced.current) {
+      autoSynced.current = true;
+      syncGoogle(false);
+    }
+  }, [data, syncGoogle]);
 
   const header = (
     <div className="flex items-center justify-between flex-wrap gap-3">
@@ -107,6 +139,11 @@ export const AdminAnalytics = () => {
       </p>
       <div className="flex items-center gap-2">
         <DateRangeFilter value={range} onChange={setRange} />
+        {data?.google_ads_connected && editable && (
+          <Button variant="outline" size="sm" onClick={() => syncGoogle(true)} disabled={syncing} className="rounded-xl border-slate-200" data-testid="analytics-sync-google">
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Syncing…' : 'Sync names'}
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={load} className="rounded-xl border-slate-200" data-testid="analytics-refresh">
           <RefreshCw className="h-4 w-4 mr-2" /> Refresh
         </Button>

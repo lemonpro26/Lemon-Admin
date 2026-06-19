@@ -8,6 +8,7 @@ import logging
 import hashlib
 import secrets
 import random
+import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
@@ -19,6 +20,7 @@ from datetime import datetime, timezone, timedelta
 from geo import resolve_client_ip, lookup_geo, render_tokens
 from metrics_mock import build_metrics
 import google_ads_service as gads
+import google_names_service as gnames
 from email_service import (
     send_email,
     build_internal_notification_html,
@@ -965,6 +967,25 @@ async def create_test_lead(_: dict = Depends(require_editor)):
     return {"success": True, "lead": {k: v for k, v in lead.items() if k != "_id"}}
 
 
+@api_router.post("/admin/data/purge-test")
+async def purge_test_data(_: dict = Depends(require_editor)):
+    """Delete test/mock leads AND clicks (so analytics stops showing fake campaigns
+    like TEST_CAMPAIGN / {campaignid}). Matches known test campaigns, test session
+    prefixes, is_test flag, and @example.com emails. Real ad traffic is untouched."""
+    TEST_CAMP = ["SHOULD_BE_REMOVED", "TESTCAMP", "TEST_CAMPAIGN", "HKTEST", "{campaignid}", "{campaignid}}"]
+    sess_regex = {"$regex": "^(TEST_|src-test|zapier-test|hooktest-|spam-|verify-|gbraid-|del-|ok-|hooktest)", "$options": "i"}
+    clicks_q = {"$or": [{"campaign_id": {"$in": TEST_CAMP}}, {"session_id": sess_regex}]}
+    leads_q = {"$or": [
+        {"campaign_id": {"$in": TEST_CAMP}},
+        {"session_id": sess_regex},
+        {"is_test": True},
+        {"email": {"$regex": r"@example\.com$", "$options": "i"}},
+    ]}
+    cr = await db.clicks.delete_many(clicks_q)
+    lr = await db.leads.delete_many(leads_q)
+    return {"success": True, "clicks_deleted": cr.deleted_count, "leads_deleted": lr.deleted_count}
+
+
 @api_router.post("/admin/leads/reattribute-hooks")
 async def reattribute_hooks(_: dict = Depends(require_editor)):
     """One-time backfill: align each existing lead's matched_rule_id with the hook
@@ -995,6 +1016,41 @@ class AdLabelBody(BaseModel):
     type: str  # "campaign" | "adgroup" | "ad"
     id: str
     name: str = ""
+
+
+@api_router.post("/admin/ad-labels/sync-google")
+async def sync_google_ad_labels(force: bool = False, _: dict = Depends(require_editor)):
+    """Pull real campaign / ad-group / ad names from the Google Ads API and store
+    them as labels. Cached for 6h unless force=true. Names from Google take
+    precedence; any manual labels for IDs not in Google are preserved."""
+    if not gnames.is_configured():
+        return {"success": False, "configured": False, "error": "Google Ads API not configured"}
+    cfg = await get_or_create_config()
+    last = cfg.get("ad_labels_synced_at")
+    if not force and last:
+        try:
+            last_dt = datetime.fromisoformat(last)
+            if (datetime.now(timezone.utc) - last_dt).total_seconds() < 6 * 3600:
+                return {"success": True, "skipped": True, "ad_labels": cfg.get("ad_labels") or {}}
+        except Exception:
+            pass
+    try:
+        fetched = await asyncio.to_thread(gnames.fetch_names)
+    except Exception as e:
+        logger.warning("Google Ads name sync failed: %s", e)
+        return {"success": False, "configured": True, "error": str(e)[:300]}
+    labels = cfg.get("ad_labels") or {}
+    for t in ("campaign", "adgroup", "ad"):
+        merged = dict(labels.get(t) or {})
+        merged.update({k: v for k, v in (fetched.get(t) or {}).items() if v})
+        labels[t] = merged
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {"ad_labels": labels, "ad_labels_synced_at": _now_iso()}},
+        upsert=True,
+    )
+    counts = {t: len(fetched.get(t) or {}) for t in ("campaign", "adgroup", "ad")}
+    return {"success": True, "counts": counts, "ad_labels": labels}
 
 
 @api_router.post("/admin/ad-labels")
@@ -1248,6 +1304,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
         "by_keyword": await breakdown(["keyword"]),
         "ad_labels": (await get_or_create_config()).get("ad_labels") or {},
+        "google_ads_connected": gnames.is_configured(),
         "range": {"start": s_iso, "end": e_iso},
     }
 
