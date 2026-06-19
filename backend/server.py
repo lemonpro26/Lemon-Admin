@@ -49,6 +49,8 @@ CONTACT_FORWARD_EMAIL = os.environ.get('CONTACT_FORWARD_EMAIL', 'info@lemonpros.
 # Optional CRM webhook — leads are POSTed here as JSON when a URL is configured.
 CRM_WEBHOOK_URL = os.environ.get('CRM_WEBHOOK_URL', '')
 
+CALLS_WEBHOOK_TOKEN = os.environ.get('CALLS_WEBHOOK_TOKEN', '')
+
 # Referrer substrings whose lead submissions are treated as bot/spam and silently
 # dropped (no DB save, no CRM forward, no email). googlesyndication = display-ad bots.
 BLOCKED_REFERRER_SUBSTRINGS = ("googlesyndication.com", "doubleclick.net")
@@ -1009,6 +1011,78 @@ async def delete_lead(lead_id: str, _: dict = Depends(require_editor)):
     res = await db.leads.delete_one({"id": lead_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Lead not found")
+    return {"success": True}
+
+
+# ---------------- Phone calls (CallTrackingMetrics webhook) ----------------
+@api_router.post("/calls/webhook")
+async def calls_webhook(request: Request, token: str = ""):
+    """Receive a completed-call payload pushed by CallTrackingMetrics. Accepts JSON
+    or form-urlencoded. Protected by a shared-secret ?token=. Stores a normalized
+    call record shown in the Admin 'Calls' tab."""
+    if not CALLS_WEBHOOK_TOKEN or token != CALLS_WEBHOOK_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    ctype = request.headers.get("content-type", "")
+    if "application/json" in ctype:
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+    else:
+        form = await request.form()
+        data = dict(form)
+    if not isinstance(data, dict):
+        data = {}
+
+    def g(*keys):
+        for k in keys:
+            v = data.get(k)
+            if v not in (None, ""):
+                return str(v)
+        return ""
+
+    try:
+        duration = int(float(g("duration", "talk_time", "call_duration") or 0))
+    except Exception:
+        duration = 0
+
+    now = _now_iso()
+    rec = {
+        "id": str(uuid.uuid4()),
+        "caller_number": g("caller_number", "caller_id", "from", "caller"),
+        "caller_name": g("caller_name", "name"),
+        "tracking_number": g("tracking_number", "called_number", "dialed_number", "to"),
+        "duration": duration,
+        "source": g("source"),
+        "keyword": g("keyword"),
+        "campaign": g("campaign", "campaign_name"),
+        "gclid": g("gclid"),
+        "city": g("city"),
+        "state": g("state"),
+        "recording_url": g("recording_url", "recording"),
+        "call_type": g("call_type", "direction", "type") or "inbound",
+        "called_at": g("called_at", "timestamp", "date", "call_date") or now,
+        "raw": data,
+        "created_at": now,
+    }
+    await db.calls.insert_one({**rec})
+    logger.info("Call webhook stored: %s (%ss) from %s", rec["caller_number"], duration, rec["source"])
+    return {"success": True, "id": rec["id"]}
+
+
+@api_router.get("/admin/calls")
+async def admin_get_calls(start: str = "", end: str = "", _: dict = Depends(require_admin)):
+    s_iso, e_iso, _d = _date_range(start, end)
+    docs = await db.calls.find({"created_at": {"$gte": s_iso, "$lte": e_iso}}).sort("created_at", -1).to_list(2000)
+    items = [{k: v for k, v in c.items() if k != "_id"} for c in docs]
+    return {"calls": items, "total": len(items)}
+
+
+@api_router.delete("/admin/calls/{call_id}")
+async def delete_call(call_id: str, _: dict = Depends(require_editor)):
+    res = await db.calls.delete_one({"id": call_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Call not found")
     return {"success": True}
 
 

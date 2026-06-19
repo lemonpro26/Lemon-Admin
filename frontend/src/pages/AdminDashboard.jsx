@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LogOut, Users, Megaphone, BarChart3, Settings as SettingsIcon,
+  LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ import { Logo } from '@/components/Logo';
 import { useSortable, SortLabel } from '@/lib/useSortable';
 import { AdminHooks } from '@/components/admin/AdminHooks';
 import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
+import { AdminCalls } from '@/components/admin/AdminCalls';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
@@ -237,6 +238,7 @@ export default function AdminDashboard() {
           <TabsList className="mb-6 flex-wrap h-auto">
             <TabsTrigger value="hooks" data-testid="admin-tab-hooks"><Megaphone className="h-4 w-4 mr-2" /> Hooks</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="admin-tab-analytics"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</TabsTrigger>
+            <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
           </TabsList>
@@ -251,6 +253,11 @@ export default function AdminDashboard() {
           {/* ANALYTICS */}
           <TabsContent value="analytics">
             <AdminAnalytics />
+          </TabsContent>
+
+          {/* CALLS */}
+          <TabsContent value="calls">
+            <AdminCalls />
           </TabsContent>
 
           {/* LEADS */}
