@@ -47,6 +47,10 @@ CONTACT_FORWARD_EMAIL = os.environ.get('CONTACT_FORWARD_EMAIL', 'info@lemonpros.
 # Optional CRM webhook — leads are POSTed here as JSON when a URL is configured.
 CRM_WEBHOOK_URL = os.environ.get('CRM_WEBHOOK_URL', '')
 
+# Referrer substrings whose lead submissions are treated as bot/spam and silently
+# dropped (no DB save, no CRM forward, no email). googlesyndication = display-ad bots.
+BLOCKED_REFERRER_SUBSTRINGS = ("googlesyndication.com", "doubleclick.net")
+
 # Defaults for the site config (seeded on first run).
 # NOTE: no default city/state — when a visitor's location is unknown the
 # {!city}/{!state} macros are stripped cleanly instead of showing a fallback.
@@ -116,6 +120,7 @@ class LeadCreate(BaseModel):
     gclid: Optional[str] = ""
     gbraid: Optional[str] = ""
     wbraid: Optional[str] = ""
+    referrer: Optional[str] = ""
     params: Optional[dict] = None
 
 
@@ -129,6 +134,7 @@ class ClickTrack(BaseModel):
     gclid: Optional[str] = ""
     gbraid: Optional[str] = ""
     wbraid: Optional[str] = ""
+    referrer: Optional[str] = ""
     landing_path: Optional[str] = ""
     params: Optional[dict] = None
 
@@ -451,6 +457,13 @@ def _post_lead_to_crm(lead: dict):
 
 @api_router.post("/leads")
 async def create_lead(payload: LeadCreate, request: Request, background_tasks: BackgroundTasks):
+    # Drop bot/spam submissions arriving from blocked ad-network referrers
+    # (e.g. googlesyndication.com). Return 200 so the bot stops retrying, but
+    # never persist, forward to CRM, or email.
+    ref = (payload.referrer or "").lower()
+    if any(b in ref for b in BLOCKED_REFERRER_SUBSTRINGS):
+        logger.info("Blocked spam lead from referrer: %s", payload.referrer)
+        return {"success": True, "blocked": True}
     cfg = await get_or_create_config()
     ip = resolve_client_ip(request.headers)
     geo = lookup_geo(ip, "", "")

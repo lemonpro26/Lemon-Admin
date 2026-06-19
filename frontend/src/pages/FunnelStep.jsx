@@ -360,6 +360,7 @@ export default function FunnelStep() {
         gclid: tracking.gclid,
         gbraid: tracking.gbraid,
         wbraid: tracking.wbraid,
+        referrer: tracking.referrer,
         params: tracking.params,
       };
       await api.post('/leads', payload);
