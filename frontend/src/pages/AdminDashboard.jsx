@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2,
+  FileText, Percent, Sigma,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, TOKEN_KEY, clearSession, canEdit as canEditFn, getRole, getUsername } from '@/lib/api';
@@ -85,6 +86,7 @@ export default function AdminDashboard() {
   const [saleCurrency, setSaleCurrency] = useState('USD');
   const [marking, setMarking] = useState(false);
   const [creatingTest, setCreatingTest] = useState(false);
+  const [stats, setStats] = useState(null);
 
   const { sorted: sortedLeads, sortKey, sortDir, toggle } = useSortable(leads, 'created_at', 'desc');
 
@@ -117,6 +119,13 @@ export default function AdminDashboard() {
     } catch (e) { /* non-blocking */ }
   }, []);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/stats', { params: { start: range.start, end: range.end } });
+      setStats(res.data);
+    } catch (e) { /* non-blocking */ }
+  }, [range]);
+
   useEffect(() => {
     if (!localStorage.getItem(TOKEN_KEY)) {
       navigate('/admin', { replace: true });
@@ -125,6 +134,7 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadGaStatus(); }, [loadGaStatus]);
   useEffect(() => { loadLeads(); }, [loadLeads]);
+  useEffect(() => { loadStats(); }, [loadStats]);
 
   const openLead = (lead) => {
     setSelected(lead);
@@ -280,6 +290,26 @@ export default function AdminDashboard() {
                   </Button>
                 )}
               </div>
+            </div>
+
+            {/* Calls vs Form Leads summary */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4" data-testid="admin-stats-summary">
+              {[
+                { key: 'form-leads', label: 'Form Leads', value: stats?.total_leads ?? 0, icon: FileText, cls: 'text-blue-600', bg: 'bg-blue-50' },
+                { key: 'calls', label: 'Phone Calls', value: stats?.total_calls ?? 0, icon: Phone, cls: 'text-emerald-600', bg: 'bg-emerald-50' },
+                { key: 'total-leads', label: 'Total Leads', value: (stats?.total_leads ?? 0) + (stats?.total_calls ?? 0), icon: Sigma, cls: 'text-slate-900', bg: 'bg-slate-100' },
+                { key: 'conv-rate', label: 'Form Conv. Rate', value: `${stats?.conversion_rate ?? 0}%`, icon: Percent, cls: 'text-amber-600', bg: 'bg-amber-50' },
+              ].map((s) => (
+                <div key={s.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3" data-testid={`stat-card-${s.key}`}>
+                  <div className={`h-10 w-10 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
+                    <s.icon className={`h-5 w-5 ${s.cls}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs text-slate-500 truncate">{s.label}</div>
+                    <div className={`text-xl font-bold ${s.cls}`} data-testid={`stat-value-${s.key}`}>{s.value}</div>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

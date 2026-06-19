@@ -54,6 +54,10 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
   NEW developer tokens as of 2026-06-15 (token `w63ZtfmQuX8f3x0698fRjA` not allowlisted). Server-side
   revenue passback must use the new **Data Manager API** (not yet built). Customer ID: 962-766-5639.
 
+## Implemented (2026-06-19)
+- Admin Leads tab now shows a "Calls vs Form Leads" summary card row: Form Leads, Phone Calls,
+  Total Leads (form + calls), and Form Conv. Rate — driven by `GET /api/admin/stats`, respects the date range.
+
 ## Backlog / Next
 - P1: User to provide CRM API endpoint → set `CRM_WEBHOOK_URL` in backend/.env.
 - P1: User to provide SMTP creds for live email notifications.
