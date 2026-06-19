@@ -463,7 +463,13 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
     lead["state"] = payload.state or geo["state"]
     lead["ip"] = ip or ""
     lead["user_agent"] = request.headers.get("user-agent", "")
-    lead["matched_rule_id"] = resolved["matched_rule"]
+    # Attribute the lead to the SAME hook the visitor actually saw at click time
+    # (recorded on the click doc), so per-hook click/lead stats stay consistent.
+    click_doc = await db.clicks.find_one({"session_id": payload.session_id}, {"matched_rule_id": 1})
+    if click_doc is not None and "matched_rule_id" in click_doc:
+        lead["matched_rule_id"] = click_doc.get("matched_rule_id")
+    else:
+        lead["matched_rule_id"] = resolved["matched_rule"]
     lead["created_at"] = _now_iso()
 
     await db.leads.insert_one({**lead})
@@ -944,6 +950,23 @@ async def create_test_lead(_: dict = Depends(require_editor)):
     }
     await db.leads.insert_one({**lead})
     return {"success": True, "lead": {k: v for k, v in lead.items() if k != "_id"}}
+
+
+@api_router.post("/admin/leads/reattribute-hooks")
+async def reattribute_hooks(_: dict = Depends(require_editor)):
+    """One-time backfill: align each existing lead's matched_rule_id with the hook
+    its click (same session_id) was actually assigned. Fixes historical leads that
+    were attributed to the wrong hook (or default) at submit time."""
+    updated = 0
+    async for lead in db.leads.find({}, {"id": 1, "session_id": 1, "matched_rule_id": 1}):
+        sid = lead.get("session_id")
+        if not sid:
+            continue
+        click = await db.clicks.find_one({"session_id": sid}, {"matched_rule_id": 1})
+        if click is not None and "matched_rule_id" in click and click.get("matched_rule_id") != lead.get("matched_rule_id"):
+            await db.leads.update_one({"id": lead["id"]}, {"$set": {"matched_rule_id": click.get("matched_rule_id")}})
+            updated += 1
+    return {"success": True, "updated": updated}
 
 
 @api_router.delete("/admin/leads/{lead_id}")
