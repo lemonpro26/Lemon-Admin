@@ -125,6 +125,8 @@ class LeadCreate(BaseModel):
     gbraid: Optional[str] = ""
     wbraid: Optional[str] = ""
     referrer: Optional[str] = ""
+    feeditemid: Optional[str] = ""
+    extensionid: Optional[str] = ""
     params: Optional[dict] = None
 
 
@@ -139,6 +141,8 @@ class ClickTrack(BaseModel):
     gbraid: Optional[str] = ""
     wbraid: Optional[str] = ""
     referrer: Optional[str] = ""
+    feeditemid: Optional[str] = ""
+    extensionid: Optional[str] = ""
     landing_path: Optional[str] = ""
     params: Optional[dict] = None
 
@@ -406,6 +410,7 @@ async def track_click(body: ClickTrack, request: Request):
     doc["city"] = geo["city"]
     doc["state"] = geo["state"]
     doc["matched_rule_id"] = resolved["matched_rule"]
+    doc["sitelink_id"] = doc.get("extensionid") or doc.get("feeditemid") or ""
     doc["id"] = str(uuid.uuid4())
     doc["first_seen"] = now
     doc["last_seen"] = now
@@ -487,6 +492,7 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
         lead["matched_rule_id"] = click_doc.get("matched_rule_id")
     else:
         lead["matched_rule_id"] = resolved["matched_rule"]
+    lead["sitelink_id"] = lead.get("extensionid") or lead.get("feeditemid") or ""
     lead["created_at"] = _now_iso()
 
     await db.leads.insert_one({**lead})
@@ -1114,16 +1120,18 @@ async def sync_google_ad_labels(force: bool = False, _: dict = Depends(require_e
         logger.warning("Google Ads name sync failed: %s", e)
         return {"success": False, "configured": True, "error": str(e)[:300]}
     labels = cfg.get("ad_labels") or {}
-    for t in ("campaign", "adgroup", "ad"):
+    for t in ("campaign", "adgroup", "ad", "sitelink"):
         merged = dict(labels.get(t) or {})
         merged.update({k: v for k, v in (fetched.get(t) or {}).items() if v})
         labels[t] = merged
     await db.site_config.update_one(
         {"_id": "singleton"},
-        {"$set": {"ad_labels": labels, "ad_labels_synced_at": _now_iso()}},
+        {"$set": {"ad_labels": labels,
+                  "campaign_types": fetched.get("campaign_type") or {},
+                  "ad_labels_synced_at": _now_iso()}},
         upsert=True,
     )
-    counts = {t: len(fetched.get(t) or {}) for t in ("campaign", "adgroup", "ad")}
+    counts = {t: len(fetched.get(t) or {}) for t in ("campaign", "adgroup", "ad", "sitelink")}
     return {"success": True, "counts": counts, "ad_labels": labels}
 
 
@@ -1377,7 +1385,9 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         "by_adgroup": await breakdown(["campaign_id", "adgroup_id"]),
         "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
         "by_keyword": await breakdown(["keyword"]),
+        "by_sitelink": await breakdown(["sitelink_id"]),
         "ad_labels": (await get_or_create_config()).get("ad_labels") or {},
+        "campaign_types": (await get_or_create_config()).get("campaign_types") or {},
         "google_ads_connected": gnames.is_configured(),
         "range": {"start": s_iso, "end": e_iso},
     }

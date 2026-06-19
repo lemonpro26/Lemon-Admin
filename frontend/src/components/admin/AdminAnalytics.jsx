@@ -161,6 +161,20 @@ export const AdminAnalytics = () => {
   }
 
   const labels = data.ad_labels || {};
+  const campaignTypes = data.campaign_types || {};
+  const prettyType = (t) => {
+    if (!t) return '';
+    const map = {
+      SEARCH: 'Search', PERFORMANCE_MAX: 'Performance Max', DEMAND_GEN: 'Demand Gen',
+      DISPLAY: 'Display', VIDEO: 'Video', SHOPPING: 'Shopping', MULTI_CHANNEL: 'Demand Gen',
+      DISCOVERY: 'Demand Gen', LOCAL: 'Local', SMART: 'Smart',
+    };
+    return map[t] || t.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+  const typeCell = (r) => {
+    const t = prettyType(campaignTypes[String(r.campaign_id)]);
+    return t ? <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{t}</span> : NONE;
+  };
   const nameCell = (type, idKey) => (r) => {
     const id = r[idKey];
     if (id === '' || id == null) return NONE;
@@ -194,6 +208,7 @@ export const AdminAnalytics = () => {
         rows={data.by_campaign}
         columns={[
           { key: 'campaign_id', label: 'Campaign', render: nameCell('campaign', 'campaign_id') },
+          { key: 'type', label: 'Type', render: typeCell },
           { key: 'clicks', label: 'Clicks', num: true },
           { key: 'leads', label: 'Leads', num: true },
           { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },
@@ -236,6 +251,19 @@ export const AdminAnalytics = () => {
         rows={data.by_keyword}
         columns={[
           { key: 'keyword', label: 'Keyword' },
+          { key: 'clicks', label: 'Clicks', num: true },
+          { key: 'leads', label: 'Leads', num: true },
+          { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },
+          { key: 'bounce_rate', label: 'Bounce Rate', num: true, render: bounceCell },
+        ]}
+      />
+
+      <Section
+        title="By Sitelink"
+        testid="analytics-by-sitelink"
+        rows={(data.by_sitelink || []).filter((r) => r.sitelink_id)}
+        columns={[
+          { key: 'sitelink_id', label: 'Sitelink', render: nameCell('sitelink', 'sitelink_id') },
           { key: 'clicks', label: 'Clicks', num: true },
           { key: 'leads', label: 'Leads', num: true },
           { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },

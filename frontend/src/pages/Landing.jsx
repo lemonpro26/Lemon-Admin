@@ -30,6 +30,8 @@ export default function Landing() {
         gbraid: tracking.gbraid,
         wbraid: tracking.wbraid,
         referrer: tracking.referrer,
+        feeditemid: tracking.feeditemid,
+        extensionid: tracking.extensionid,
         params: tracking.params,
       })
       .catch(() => {});

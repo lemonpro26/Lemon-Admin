@@ -67,18 +67,21 @@ def _search(c, token, query):
 
 
 def fetch_names() -> dict:
-    """Return {"campaign": {id: name}, "adgroup": {id: name}, "ad": {id: name}}.
-    Raises on auth/API errors so the caller can surface a clear message."""
+    """Return {"campaign": {id: name}, "adgroup": {id: name}, "ad": {id: name},
+    "sitelink": {id: link_text}, "campaign_type": {id: channel_type}}.
+    Covers ALL campaign types (Search, Performance Max, Demand Gen, Display, etc.)."""
     c = _cfg()
     if not is_configured():
         raise RuntimeError("Google Ads API is not configured")
     token = _access_token(c)
-    campaign, adgroup, ad = {}, {}, {}
+    campaign, adgroup, ad, sitelink, campaign_type = {}, {}, {}, {}, {}
 
-    for row in _search(c, token, "SELECT campaign.id, campaign.name FROM campaign"):
+    for row in _search(c, token,
+                       "SELECT campaign.id, campaign.name, campaign.advertising_channel_type FROM campaign"):
         camp = row.get("campaign", {})
         if camp.get("id"):
             campaign[str(camp["id"])] = camp.get("name", "")
+            campaign_type[str(camp["id"])] = camp.get("advertisingChannelType", "")
 
     for row in _search(c, token, "SELECT ad_group.id, ad_group.name FROM ad_group"):
         ag = row.get("adGroup", {})
@@ -95,4 +98,17 @@ def fetch_names() -> dict:
     except Exception as e:
         logger.info("Ad-name fetch skipped: %s", e)
 
-    return {"campaign": campaign, "adgroup": adgroup, "ad": ad}
+    # Sitelink assets — link text keyed by asset id (matches {extensionid}).
+    try:
+        for row in _search(c, token,
+                           "SELECT asset.id, asset.sitelink_asset.link_text FROM asset WHERE asset.type = 'SITELINK'"):
+            asset = row.get("asset", {})
+            if asset.get("id"):
+                txt = (asset.get("sitelinkAsset", {}) or {}).get("linkText", "")
+                sitelink[str(asset["id"])] = txt or f"Sitelink {asset['id']}"
+    except Exception as e:
+        logger.info("Sitelink-name fetch skipped: %s", e)
+
+    return {"campaign": campaign, "adgroup": adgroup, "ad": ad,
+            "sitelink": sitelink, "campaign_type": campaign_type}
+
