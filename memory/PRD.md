@@ -64,6 +64,13 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - DateRangeFilter now requires an explicit **Apply** click (no auto-apply on select); supports single-day picks.
 - Analytics now shows **live campaigns only**: Google Ads sync fetches only ENABLED campaigns/ad-groups/ads and stores `live_campaigns`/`live_adgroups`; `/admin/analytics` filters out non-live numeric campaign IDs (keeps untracked/direct). "Sync names" refreshes the live list.
 
+## Implemented (2026-06-20b)
+- **Analytics drill-down**: Campaign → Ad Group → Ad → Keyword with a clickable breadcrumb, default sort by Clicks desc, and a Campaign-Type filter on the campaign list. `by_keyword` now grouped by campaign/adgroup/ad/keyword so it nests under an Ad. By Sitelink kept as its own section (the "no data" was a date-range artifact; data shows with a wide range).
+- **Hooks upgrades**: search box; per-hook Hide (view-only, does NOT pause serving) with a Show-hidden toggle; "Move target" forks a brand-new hook on the new target (Home/Ad Group/Ad) and pauses the original (stats preserved); create-hook + move dropdowns show ad-group/ad NAMES. `/admin/ad-entities` returns campaigns/adgroups/ads with names; `HookRuleBody.hidden` added.
+- **Date filter**: ◀ ▶ single-day step arrows added beside the range picker.
+- **Unnamed campaigns**: confirmed none in current data after the live-campaign filter (leftover TEST_CAMPAIGN lead purged). Any unnamed rows the user still sees are on PRODUCTION until re-deploy.
+- Verified by testing agent: 12/12 frontend checks PASS, no bugs.
+
 ## Backlog / Next
 - P1: User to provide CRM API endpoint → set `CRM_WEBHOOK_URL` in backend/.env.
 - P1: User to provide SMTP creds for live email notifications.
