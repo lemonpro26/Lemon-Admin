@@ -50,10 +50,34 @@ export function trackAdsConversion({ value, currency = 'USD', transactionId } = 
 }
 
 // Google Ads "Click to call" conversion — fired when a visitor taps a phone link.
+// Uses Google's recommended event_callback pattern: we hold the tel: navigation
+// until the conversion ping is sent, then hand off to the dialer. Without this,
+// the mobile dialer backgrounds the page and cancels the in-flight ping, so the
+// call conversion silently under-reports / "doesn't fire".
 let _lastCallConvAt = 0;
-export function trackPhoneCallConversion() {
+export function trackPhoneCallConversion(e) {
   const now = Date.now();
-  if (now - _lastCallConvAt < 1500) return;
+  if (now - _lastCallConvAt < 1500) return; // let default tel: navigation proceed
   _lastCallConvAt = now;
-  gtagSafe('event', 'conversion', { send_to: ADS_CALL_CONVERSION, value: 1.0, currency: 'USD' });
+
+  // gtag unavailable → don't block the call, just let the link work.
+  if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
+
+  const anchor = e && e.currentTarget && e.currentTarget.getAttribute ? e.currentTarget : null;
+  const url = anchor ? anchor.getAttribute('href') : null;
+
+  if (url) {
+    e.preventDefault(); // must be synchronous
+    let navigated = false;
+    const go = () => { if (!navigated) { navigated = true; window.location = url; } };
+    setTimeout(go, 700); // fallback if event_callback never fires
+    window.gtag('event', 'conversion', {
+      send_to: ADS_CALL_CONVERSION,
+      value: 1.0,
+      currency: 'USD',
+      event_callback: go,
+    });
+  } else {
+    window.gtag('event', 'conversion', { send_to: ADS_CALL_CONVERSION, value: 1.0, currency: 'USD' });
+  }
 }
