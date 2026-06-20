@@ -198,6 +198,14 @@ export const AdminAnalytics = () => {
 
   // Editable name cell — clicking the pencil renames; row click handles drill.
   const nameCell = (type, idKey) => (r) => {
+    // Synthetic Organic / Google-Ads-untracked rows carry a display label.
+    if (type === 'campaign' && r.display) {
+      return (
+        <span className={`font-medium ${r.kind === 'organic' ? 'text-emerald-700' : 'text-slate-700'}`}>
+          {r.display}
+        </span>
+      );
+    }
     const id = r[idKey];
     if (id === '' || id == null) return NONE;
     const name = labelFor(type, id);
@@ -256,7 +264,7 @@ export const AdminAnalytics = () => {
       { key: 'type', label: 'Type', render: typeCell },
       ...metricCols,
     ];
-    onRowClick = (r) => setDrill({ campaign: r.campaign_id, adgroup: null, ad: null });
+    onRowClick = (r) => { if (r.kind) return; setDrill({ campaign: r.campaign_id, adgroup: null, ad: null }); };
     levelTestid = 'analytics-level-campaign';
   } else if (level === 'adgroup') {
     rows = (data.by_adgroup || []).filter((r) => r.campaign_id === drill.campaign);

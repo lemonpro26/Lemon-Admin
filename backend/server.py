@@ -1425,8 +1425,52 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         rows.sort(key=lambda r: (r["leads"], r["clicks"]), reverse=True)
         return rows
 
+    # Split the untracked/direct campaign row into "Organic" (no Google click id)
+    # vs "Google Ads (untracked)" (has gclid/wbraid/gbraid but no campaign id), so
+    # we only call traffic "Organic" when it truly is.
+    has_gid = {"$or": [
+        {"$ne": [{"$ifNull": ["$gclid", ""]}, ""]},
+        {"$ne": [{"$ifNull": ["$wbraid", ""]}, ""]},
+        {"$ne": [{"$ifNull": ["$gbraid", ""]}, ""]},
+    ]}
+
+    async def _untracked_split():
+        out = {"organic": {"clicks": 0, "bounced": 0, "leads": 0},
+               "paid": {"clicks": 0, "bounced": 0, "leads": 0}}
+        async for row in db.clicks.aggregate([
+            {"$match": {"first_seen": {"$gte": s_iso, "$lte": e_iso}, "campaign_id": {"$in": ["", None]}}},
+            {"$group": {"_id": {"$cond": [has_gid, "paid", "organic"]},
+                        "clicks": {"$sum": 1},
+                        "bounced": {"$sum": {"$cond": [{"$lte": [{"$ifNull": ["$visits", 1]}, 1]}, 1, 0]}}}},
+        ]):
+            b = out.get(row["_id"]) or out["organic"]
+            b["clicks"] = row["clicks"]; b["bounced"] = row["bounced"]
+        async for row in db.leads.aggregate([
+            {"$match": {"created_at": {"$gte": s_iso, "$lte": e_iso}, "campaign_id": {"$in": ["", None]}}},
+            {"$group": {"_id": {"$cond": [has_gid, "paid", "organic"]}, "leads": {"$sum": 1}}},
+        ]):
+            (out.get(row["_id"]) or out["organic"])["leads"] = row["leads"]
+        return out
+
+    by_campaign = await breakdown(["campaign_id"])
+    split = await _untracked_split()
+
+    def _split_row(kind, display):
+        b = split[kind]
+        c, lc, bounced = b["clicks"], b["leads"], b["bounced"]
+        return {"campaign_id": "", "kind": kind, "display": display,
+                "clicks": c, "leads": lc,
+                "conversion_rate": round((lc / c * 100), 1) if c else (100.0 if lc else 0.0),
+                "bounce_rate": round((bounced / c * 100), 1) if c else 0.0}
+
+    by_campaign = [r for r in by_campaign if (r.get("campaign_id") or "") != ""]
+    for kind, display in (("organic", "Organic"), ("paid", "Google Ads (untracked)")):
+        if split[kind]["clicks"] or split[kind]["leads"]:
+            by_campaign.append(_split_row(kind, display))
+    by_campaign.sort(key=lambda r: (r["leads"], r["clicks"]), reverse=True)
+
     return {
-        "by_campaign": await breakdown(["campaign_id"]),
+        "by_campaign": by_campaign,
         "by_adgroup": await breakdown(["campaign_id", "adgroup_id"]),
         "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
         "by_keyword": await breakdown(["campaign_id", "adgroup_id", "ad_id", "keyword"]),
