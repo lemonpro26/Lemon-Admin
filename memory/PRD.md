@@ -71,6 +71,9 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Unnamed campaigns**: confirmed none in current data after the live-campaign filter (leftover TEST_CAMPAIGN lead purged). Any unnamed rows the user still sees are on PRODUCTION until re-deploy.
 - Verified by testing agent: 12/12 frontend checks PASS, no bugs.
 
+## Implemented (2026-06-20c)
+- **Sitelinks live from Google Ads**: new `fetch_sitelink_metrics(start, end, campaign_ids)` (GAQL `FROM campaign_asset WHERE field_type='SITELINK'`, scoped to the live campaign IDs so only THIS landing page's campaigns are counted — not unrelated/historic ones) + `GET /admin/google-ads/sitelinks?start&end`. The Analytics "By Sitelink" section shows real Impressions / Clicks / CTR / Conversions with a "Live from Google Ads" badge.
+
 ## Backlog / Next
 - P1: User to provide CRM API endpoint → set `CRM_WEBHOOK_URL` in backend/.env.
 - P1: User to provide SMTP creds for live email notifications.

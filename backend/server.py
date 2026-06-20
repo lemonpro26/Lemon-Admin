@@ -1169,6 +1169,22 @@ async def google_ads_status(_: dict = Depends(require_admin)):
     return gads.status()
 
 
+@api_router.get("/admin/google-ads/sitelinks")
+async def google_ads_sitelinks(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
+    """Real sitelink performance pulled live from Google Ads for the date range."""
+    s_iso, e_iso, _d = _date_range(start, end)
+    if not gnames.is_configured():
+        return {"connected": False, "sitelinks": []}
+    try:
+        cfg = await get_or_create_config()
+        live = cfg.get("live_campaigns") or []
+        rows = await asyncio.to_thread(gnames.fetch_sitelink_metrics, s_iso[:10], e_iso[:10], live)
+        return {"connected": True, "sitelinks": rows, "scoped_campaigns": len(live)}
+    except Exception as e:
+        logger.warning("Sitelink metrics fetch failed: %s", e)
+        return {"connected": True, "sitelinks": [], "error": str(e)[:300]}
+
+
 @api_router.post("/admin/leads/{lead_id}/sold")
 async def mark_lead_sold(lead_id: str, body: SaleBody, _: dict = Depends(require_editor)):
     """Mark a lead as sold with a revenue value, then upload an offline

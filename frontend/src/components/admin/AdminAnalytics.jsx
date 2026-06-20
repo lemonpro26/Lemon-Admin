@@ -89,6 +89,8 @@ export const AdminAnalytics = () => {
   const [syncing, setSyncing] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
   const [drill, setDrill] = useState({ campaign: null, adgroup: null, ad: null });
+  const [sitelinks, setSitelinks] = useState(null); // {connected, sitelinks, error}
+  const [slLoading, setSlLoading] = useState(true);
   const editable = canEditFn();
   const autoSynced = React.useRef(false);
 
@@ -101,6 +103,18 @@ export const AdminAnalytics = () => {
       toast.error('Failed to load analytics.');
     } finally {
       setLoading(false);
+    }
+  }, [range]);
+
+  const loadSitelinks = useCallback(async () => {
+    setSlLoading(true);
+    try {
+      const res = await api.get('/admin/google-ads/sitelinks', { params: { start: range.start, end: range.end } });
+      setSitelinks(res.data);
+    } catch (e) {
+      setSitelinks({ connected: true, sitelinks: [], error: 'Could not load sitelink data.' });
+    } finally {
+      setSlLoading(false);
     }
   }, [range]);
 
@@ -141,6 +155,7 @@ export const AdminAnalytics = () => {
   }, [load]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadSitelinks(); }, [loadSitelinks]);
 
   useEffect(() => {
     if (data?.google_ads_connected && !autoSynced.current) {
@@ -335,16 +350,66 @@ export const AdminAnalytics = () => {
 
       <DrillTable title={levelTitle} columns={columns} rows={rows} onRowClick={onRowClick} testid={levelTestid} />
 
-      {/* Sitelinks — kept as its own section. */}
-      <DrillTable
-        title="By Sitelink"
-        columns={[
-          { key: 'sitelink_id', label: 'Sitelink', render: nameCell('sitelink', 'sitelink_id') },
-          ...metricCols,
-        ]}
-        rows={(data.by_sitelink || []).filter((r) => r.sitelink_id)}
-        testid="analytics-by-sitelink"
-      />
+      {/* Sitelinks — pulled LIVE from Google Ads (independent of first-party capture). */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid="analytics-by-sitelink">
+        <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2">
+          By Sitelink
+          <span className="text-[11px] font-sans font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">Live from Google Ads</span>
+        </div>
+        {slLoading ? (
+          <div className="p-8 text-center text-slate-500 text-sm">Loading sitelink data from Google Ads…</div>
+        ) : sitelinks && sitelinks.connected === false ? (
+          <div className="p-8 text-center text-slate-500 text-sm">Connect Google Ads to see sitelink performance.</div>
+        ) : sitelinks && sitelinks.error ? (
+          <div className="p-8 text-center text-amber-700 text-sm">Google Ads sitelink data unavailable: {sitelinks.error}</div>
+        ) : !sitelinks || (sitelinks.sitelinks || []).length === 0 ? (
+          <div className="p-8 text-center text-slate-500 text-sm">No sitelink clicks in this date range.</div>
+        ) : (
+          <SitelinkTable rows={sitelinks.sitelinks} />
+        )}
+      </div>
     </div>
   );
 };
+
+function SitelinkTable({ rows }) {
+  const withCtr = rows.map((r) => ({
+    ...r,
+    ctr: r.impressions ? Math.round((r.clicks / r.impressions) * 1000) / 10 : 0,
+    conv: Math.round((r.conversions || 0) * 10) / 10,
+  }));
+  const { sorted, sortKey, sortDir, toggle } = useSortable(withCtr, 'clicks', 'desc');
+  const cols = [
+    { key: 'link_text', label: 'Sitelink' },
+    { key: 'impressions', label: 'Impressions', num: true },
+    { key: 'clicks', label: 'Clicks', num: true },
+    { key: 'ctr', label: 'CTR', num: true, render: (r) => `${r.ctr}%` },
+    { key: 'conv', label: 'Conversions', num: true },
+  ];
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {cols.map((c) => (
+              <TableHead key={c.key} className={c.num ? 'text-right' : ''}>
+                <SortLabel label={c.label} k={c.key} sortKey={sortKey} sortDir={sortDir} onClick={toggle} align={c.num ? 'right' : 'left'} />
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((r, i) => (
+            <TableRow key={i} data-testid={`sitelink-row-${i}`}>
+              {cols.map((c) => (
+                <TableCell key={c.key} className={c.num ? 'text-right tabular-nums text-slate-700' : 'font-medium text-slate-900'}>
+                  {c.render ? c.render(r) : (c.num ? (r[c.key] ?? 0).toLocaleString() : r[c.key])}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}

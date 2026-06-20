@@ -128,3 +128,43 @@ def fetch_names() -> dict:
             "sitelink": sitelink, "campaign_type": campaign_type,
             "live_campaigns": live_campaigns, "live_adgroups": live_adgroups}
 
+
+def fetch_sitelink_metrics(start_date: str, end_date: str, campaign_ids=None) -> list:
+    """Real sitelink (asset) performance pulled straight from Google Ads for the
+    given date range (YYYY-MM-DD). Returns a list of
+    {sitelink_id, link_text, clicks, impressions, conversions} aggregated per asset.
+    When campaign_ids is provided, only those campaigns are counted (so the totals
+    reflect THIS landing page's campaigns, not unrelated/historic ones)."""
+    c = _cfg()
+    if not is_configured():
+        raise RuntimeError("Google Ads API is not configured")
+    token = _access_token(c)
+    where = [
+        "campaign_asset.field_type = 'SITELINK'",
+        f"segments.date BETWEEN '{start_date}' AND '{end_date}'",
+    ]
+    ids = [str(x) for x in (campaign_ids or []) if str(x).strip()]
+    if ids:
+        where.append("campaign.id IN (" + ", ".join(ids) + ")")
+    query = (
+        "SELECT campaign.id, asset.id, asset.sitelink_asset.link_text, "
+        "metrics.clicks, metrics.impressions, metrics.conversions "
+        "FROM campaign_asset WHERE " + " AND ".join(where)
+    )
+    out = {}
+    for row in _search(c, token, query):
+        asset = row.get("asset", {})
+        aid = str(asset.get("id") or "")
+        if not aid:
+            continue
+        m = row.get("metrics", {})
+        rec = out.setdefault(aid, {
+            "sitelink_id": aid,
+            "link_text": (asset.get("sitelinkAsset", {}) or {}).get("linkText", "") or f"Sitelink {aid}",
+            "clicks": 0, "impressions": 0, "conversions": 0.0,
+        })
+        rec["clicks"] += int(m.get("clicks", 0) or 0)
+        rec["impressions"] += int(m.get("impressions", 0) or 0)
+        rec["conversions"] += float(m.get("conversions", 0) or 0)
+    return sorted(out.values(), key=lambda r: r["clicks"], reverse=True)
+
