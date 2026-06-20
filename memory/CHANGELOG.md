@@ -1,4 +1,21 @@
 
+
+## 2026-06-20 — Phantom/bot click fix (Demand gen showing fake clicks)
+- ROOT CAUSE: AdsBot-Google crawls landing pages of every ENABLED campaign
+  (even ones not serving today). These hits carry the campaign's tg_ref but NO
+  gclid; real paid clicks always have a gclid/wbraid/gbraid. The old filter only
+  hid NOT-ENABLED campaigns, so AdsBot traffic on still-enabled "Demand gen"
+  slipped through as ~107 clicks.
+- Ingestion: /track/click now drops known bots (is_bot_ua / _BOT_UA_RE: AdsBot,
+  Googlebot, crawlers, headless, monitors, http libs) -> returns {bot:true}, no insert.
+- GET /admin/clicks/diagnose?campaign_id&start&end -> classifies clicks
+  (real_paid vs fake_paid [campaign, no gclid] vs bot_user_agent) + top fake UAs.
+- POST /admin/clicks/purge-bots?campaign_id&start&end -> permanently deletes
+  bot-UA hits + fake paid clicks (campaign tag, no gclid). Real paid kept.
+- Admin Analytics: "Clean bot traffic" button (data-testid analytics-clean-bots)
+  diagnoses all-time, confirms count, then purges. Verified via curl (kept 5 real
+  paid, removed bot/fake). NOTE: user must run this in PRODUCTION to clear the 107.
+
 ## 2026-06-19 — Google Ads names, spam blocking, admin cleanup
 - Google Ads API (REST v21) integration: auto-fetch campaign/ad-group/ad NAMES by ID.
   - google_names_service.py + POST /api/admin/ad-labels/sync-google (6h cache, force param).

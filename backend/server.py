@@ -43,6 +43,30 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'change-me')
 JWT_ALG = "HS256"
 JWT_EXP_HOURS = 24
 
+# --- Bot / crawler detection ----------------------------------------------
+# Real Google Ads *paid* clicks always carry a gclid (or wbraid/gbraid). The
+# biggest source of phantom clicks is AdsBot-Google, which crawls the landing
+# page of every ENABLED campaign (even ones not serving today) to check ad
+# quality — these hits carry the campaign's tg_ref but NO gclid. We drop known
+# bots at ingestion and can purge any that slipped through.
+import re as _re
+_BOT_UA_RE = _re.compile(
+    r"(adsbot|googlebot|google-inspectiontool|apis-google|mediapartners|bingbot|"
+    r"slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebookexternalhit|"
+    r"facebot|twitterbot|linkedinbot|embedly|quora link|pinterest|slackbot|"
+    r"vkshare|w3c_validator|redditbot|applebot|semrushbot|ahrefsbot|mj12bot|"
+    r"dotbot|petalbot|bytespider|gptbot|ccbot|claudebot|anthropic|perplexity|"
+    r"headlesschrome|phantomjs|puppeteer|playwright|python-requests|python-urllib|"
+    r"curl/|wget/|go-http-client|java/|okhttp|axios|node-fetch|libwww|scrapy|"
+    r"uptimerobot|pingdom|lighthouse|statuscake|datadog|newrelic|bot\b|spider|"
+    r"crawler|crawl|monitoring|preview)",
+    _re.IGNORECASE,
+)
+
+
+def is_bot_ua(ua: str) -> bool:
+    return bool(ua and _BOT_UA_RE.search(ua))
+
 # Where the website Contact form is forwarded.
 CONTACT_FORWARD_EMAIL = os.environ.get('CONTACT_FORWARD_EMAIL', 'info@lemonpros.com')
 
@@ -392,6 +416,11 @@ async def track_click(body: ClickTrack, request: Request):
     """Record a click/visit, de-duplicated per session_id. Captures full Google
     Ads attribution and the hook rule that matched (for per-hook traffic)."""
     cfg = await get_or_create_config()
+    ua = request.headers.get("user-agent", "")
+    # Drop known bots/crawlers (e.g. AdsBot-Google crawling enabled campaigns)
+    # so they never inflate paid-campaign click counts.
+    if is_bot_ua(ua):
+        return {"success": True, "bot": True}
     ip = resolve_client_ip(request.headers)
     geo = lookup_geo(ip, "", "")
     now = _now_iso()
@@ -993,6 +1022,65 @@ async def purge_test_data(_: dict = Depends(require_editor)):
     cr = await db.clicks.delete_many(clicks_q)
     lr = await db.leads.delete_many(leads_q)
     return {"success": True, "clicks_deleted": cr.deleted_count, "leads_deleted": lr.deleted_count}
+
+
+def _fake_paid_click_query(campaign_id: str = "") -> dict:
+    """A click is a phantom/fake PAID click when it carries a campaign tag but no
+    Google click id (gclid/wbraid/gbraid) — real paid clicks always have one.
+    AdsBot-Google crawling enabled campaigns is the usual source."""
+    no_gid = {"$and": [
+        {"$or": [{"gclid": {"$in": ["", None]}}, {"gclid": {"$exists": False}}]},
+        {"$or": [{"wbraid": {"$in": ["", None]}}, {"wbraid": {"$exists": False}}]},
+        {"$or": [{"gbraid": {"$in": ["", None]}}, {"gbraid": {"$exists": False}}]},
+    ]}
+    has_campaign = {"campaign_id": {"$nin": ["", None]}} if not campaign_id else {"campaign_id": campaign_id}
+    return {"$and": [has_campaign, no_gid]}
+
+
+@api_router.get("/admin/clicks/diagnose")
+async def diagnose_clicks(_: dict = Depends(require_admin), campaign_id: str = Query(""),
+                          start: str = Query(""), end: str = Query("")):
+    """Classify clicks so the owner can see WHERE phantom traffic comes from:
+    real paid (campaign + gclid), fake paid (campaign, no gclid = bot crawl),
+    bot user-agent, and organic. Optionally scoped to one campaign / date range."""
+    s_iso, e_iso, _ = _date_range(start, end)
+    date_q = {"first_seen": {"$gte": s_iso, "$lte": e_iso}}
+
+    total = await db.clicks.count_documents(date_q)
+    bot_ua = await db.clicks.count_documents({**date_q, "user_agent": {"$regex": _BOT_UA_RE.pattern, "$options": "i"}})
+    fake_paid = await db.clicks.count_documents({"$and": [date_q, _fake_paid_click_query(campaign_id)]})
+    scope = {"campaign_id": campaign_id} if campaign_id else {"campaign_id": {"$nin": ["", None]}}
+    paid_total = await db.clicks.count_documents({**date_q, **scope})
+    real_paid = paid_total - fake_paid
+
+    # Top user agents among the fake-paid clicks for transparency.
+    top_uas = []
+    async for row in db.clicks.aggregate([
+        {"$match": {"$and": [date_q, _fake_paid_click_query(campaign_id)]}},
+        {"$group": {"_id": "$user_agent", "n": {"$sum": 1}}},
+        {"$sort": {"n": -1}}, {"$limit": 8},
+    ]):
+        top_uas.append({"user_agent": (row["_id"] or "(none)")[:120], "count": row["n"]})
+
+    return {"total_clicks": total, "bot_user_agent": bot_ua,
+            "paid_clicks": paid_total, "real_paid": real_paid, "fake_paid": fake_paid,
+            "campaign_id": campaign_id or None, "top_fake_user_agents": top_uas}
+
+
+@api_router.post("/admin/clicks/purge-bots")
+async def purge_bot_clicks(_: dict = Depends(require_editor), campaign_id: str = Query(""),
+                           start: str = Query(""), end: str = Query("")):
+    """Permanently delete phantom clicks: any bot user-agent hit, plus paid clicks
+    that have a campaign tag but no gclid/wbraid/gbraid (AdsBot crawls). Optionally
+    scoped to one campaign / date range. Real paid clicks are untouched."""
+    s_iso, e_iso, _ = _date_range(start, end)
+    date_q = {"first_seen": {"$gte": s_iso, "$lte": e_iso}}
+    query = {"$and": [date_q, {"$or": [
+        {"user_agent": {"$regex": _BOT_UA_RE.pattern, "$options": "i"}},
+        _fake_paid_click_query(campaign_id),
+    ]}]}
+    res = await db.clicks.delete_many(query)
+    return {"success": True, "clicks_deleted": res.deleted_count, "campaign_id": campaign_id or None}
 
 
 @api_router.post("/admin/leads/reattribute-hooks")
