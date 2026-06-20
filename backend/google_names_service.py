@@ -68,30 +68,45 @@ def _search(c, token, query):
 
 def fetch_names() -> dict:
     """Return {"campaign": {id: name}, "adgroup": {id: name}, "ad": {id: name},
-    "sitelink": {id: link_text}, "campaign_type": {id: channel_type}}.
+    "sitelink": {id: link_text}, "campaign_type": {id: channel_type},
+    "live_campaigns": [ids], "live_adgroups": [ids]}.
+    Only ENABLED (live / serving) campaigns & ad groups are returned, so the
+    admin analytics can hide paused / removed campaigns.
     Covers ALL campaign types (Search, Performance Max, Demand Gen, Display, etc.)."""
     c = _cfg()
     if not is_configured():
         raise RuntimeError("Google Ads API is not configured")
     token = _access_token(c)
     campaign, adgroup, ad, sitelink, campaign_type = {}, {}, {}, {}, {}
+    live_campaigns, live_adgroups = [], []
 
+    # Only ENABLED campaigns = currently live / serving.
     for row in _search(c, token,
-                       "SELECT campaign.id, campaign.name, campaign.advertising_channel_type FROM campaign"):
+                       "SELECT campaign.id, campaign.name, campaign.advertising_channel_type "
+                       "FROM campaign WHERE campaign.status = 'ENABLED'"):
         camp = row.get("campaign", {})
         if camp.get("id"):
-            campaign[str(camp["id"])] = camp.get("name", "")
-            campaign_type[str(camp["id"])] = camp.get("advertisingChannelType", "")
+            cid = str(camp["id"])
+            campaign[cid] = camp.get("name", "")
+            campaign_type[cid] = camp.get("advertisingChannelType", "")
+            live_campaigns.append(cid)
 
-    for row in _search(c, token, "SELECT ad_group.id, ad_group.name FROM ad_group"):
+    # Only ENABLED ad groups inside ENABLED campaigns.
+    for row in _search(c, token,
+                       "SELECT ad_group.id, ad_group.name FROM ad_group "
+                       "WHERE ad_group.status = 'ENABLED' AND campaign.status = 'ENABLED'"):
         ag = row.get("adGroup", {})
         if ag.get("id"):
-            adgroup[str(ag["id"])] = ag.get("name", "")
+            agid = str(ag["id"])
+            adgroup[agid] = ag.get("name", "")
+            live_adgroups.append(agid)
 
     # Ad creatives — label by ad id with a readable fallback.
     try:
         for row in _search(c, token,
-                           "SELECT ad_group_ad.ad.id, ad_group_ad.ad.name FROM ad_group_ad"):
+                           "SELECT ad_group_ad.ad.id, ad_group_ad.ad.name FROM ad_group_ad "
+                           "WHERE ad_group_ad.status = 'ENABLED' AND ad_group.status = 'ENABLED' "
+                           "AND campaign.status = 'ENABLED'"):
             adobj = row.get("adGroupAd", {}).get("ad", {})
             if adobj.get("id"):
                 ad[str(adobj["id"])] = adobj.get("name") or f"Ad {adobj['id']}"
@@ -110,5 +125,6 @@ def fetch_names() -> dict:
         logger.info("Sitelink-name fetch skipped: %s", e)
 
     return {"campaign": campaign, "adgroup": adgroup, "ad": ad,
-            "sitelink": sitelink, "campaign_type": campaign_type}
+            "sitelink": sitelink, "campaign_type": campaign_type,
+            "live_campaigns": live_campaigns, "live_adgroups": live_adgroups}
 

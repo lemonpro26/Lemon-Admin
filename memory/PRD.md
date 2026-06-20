@@ -58,6 +58,12 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - Admin Leads tab now shows a "Calls vs Form Leads" summary card row: Form Leads, Phone Calls,
   Total Leads (form + calls), and Form Conv. Rate — driven by `GET /api/admin/stats`, respects the date range.
 
+## Implemented (2026-06-20)
+- Admin Leads summary card row (Form Leads / Phone Calls / Total / Form Conv. Rate) wired to `/api/admin/stats`.
+- Fixed Admin page not scrolling: `overflow-x: hidden` → `overflow-x: clip` on html/body/#root (the `hidden` value silently made the body a scroll container, blocking vertical scroll).
+- DateRangeFilter now requires an explicit **Apply** click (no auto-apply on select); supports single-day picks.
+- Analytics now shows **live campaigns only**: Google Ads sync fetches only ENABLED campaigns/ad-groups/ads and stores `live_campaigns`/`live_adgroups`; `/admin/analytics` filters out non-live numeric campaign IDs (keeps untracked/direct). "Sync names" refreshes the live list.
+
 ## Backlog / Next
 - P1: User to provide CRM API endpoint → set `CRM_WEBHOOK_URL` in backend/.env.
 - P1: User to provide SMTP creds for live email notifications.

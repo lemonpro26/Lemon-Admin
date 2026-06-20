@@ -1128,6 +1128,8 @@ async def sync_google_ad_labels(force: bool = False, _: dict = Depends(require_e
         {"_id": "singleton"},
         {"$set": {"ad_labels": labels,
                   "campaign_types": fetched.get("campaign_type") or {},
+                  "live_campaigns": fetched.get("live_campaigns") or [],
+                  "live_adgroups": fetched.get("live_adgroups") or [],
                   "ad_labels_synced_at": _now_iso()}},
         upsert=True,
     )
@@ -1363,17 +1365,29 @@ async def _agg_clicks(group_fields: list, s_iso: str, e_iso: str) -> dict:
 async def admin_analytics(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
     s_iso, e_iso, _days = _date_range(start, end)
 
+    cfg = await get_or_create_config()
+    # Live (ENABLED) campaign / ad-group IDs synced from Google Ads. When present,
+    # analytics tables only show live campaigns and hide paused/removed ones.
+    live_campaigns = set(cfg.get("live_campaigns") or [])
+    live_adgroups = set(cfg.get("live_adgroups") or [])
+
     async def breakdown(fields: list):
         clicks = await _agg_clicks(fields, s_iso, e_iso)
         leads = await _agg_count(db.leads, fields, "created_at", s_iso, e_iso)
         keys = set(clicks) | set(leads)
         rows = []
         for k in keys:
+            entry = {fields[i]: k[i] for i in range(len(fields))}
+            # Hide non-live campaigns (numeric IDs from paused/removed campaigns).
+            # Keep direct/untracked rows (empty campaign_id) and keep everything if
+            # we don't yet have a synced live-campaign list.
+            cid = entry.get("campaign_id")
+            if live_campaigns and cid and cid not in live_campaigns:
+                continue
             cinfo = clicks.get(k, {})
             c = cinfo.get("clicks", 0)
             bounced = cinfo.get("bounced", 0)
             lc = leads.get(k, 0)
-            entry = {fields[i]: k[i] for i in range(len(fields))}
             entry["clicks"] = c
             entry["leads"] = lc
             entry["conversion_rate"] = round((lc / c * 100), 1) if c else (100.0 if lc else 0.0)
@@ -1388,8 +1402,8 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
         "by_keyword": await breakdown(["keyword"]),
         "by_sitelink": await breakdown(["sitelink_id"]),
-        "ad_labels": (await get_or_create_config()).get("ad_labels") or {},
-        "campaign_types": (await get_or_create_config()).get("campaign_types") or {},
+        "ad_labels": cfg.get("ad_labels") or {},
+        "campaign_types": cfg.get("campaign_types") or {},
         "google_ads_connected": gnames.is_configured(),
         "range": {"start": s_iso, "end": e_iso},
     }
