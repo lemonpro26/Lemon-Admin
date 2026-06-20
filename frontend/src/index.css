@@ -46,8 +46,10 @@ body,
     width: 100%;
     max-width: 100%;
     /* Guard against any accidental horizontal overflow forcing the browser to
-       zoom out (the classic "opens as desktop site" symptom on phones). */
-    overflow-x: hidden;
+       zoom out (the classic "opens as desktop site" symptom on phones).
+       `clip` (not `hidden`) avoids creating a scroll container that can block
+       vertical page scrolling / break sticky headers. */
+    overflow-x: clip;
 }
 
 /* 100dvh fallback for older mobile browsers that don't support dvh units. */

@@ -45,10 +45,22 @@ export const DateRangeFilter = ({ value, onChange }) => {
   };
 
   const onSelect = (r) => {
+    // Just stage the selection — don't apply until the user clicks Apply.
     setRange(r || {});
-    if (r?.from && r?.to) {
-      onChange({ start: toISO(r.from), end: toISO(r.to) });
-    }
+  };
+
+  const applyRange = () => {
+    const from = range?.from;
+    const to = range?.to || range?.from; // single date → same day range
+    if (!from) return;
+    onChange({ start: toISO(from), end: toISO(to) });
+    setOpen(false);
+  };
+
+  // Keep the staged selection in sync whenever the popover (re)opens.
+  const handleOpenChange = (next) => {
+    if (next) setRange({ from: parse(value.start), to: parse(value.end) });
+    setOpen(next);
   };
 
   const isToday = value.start === value.end && value.start === toISO(new Date());
@@ -56,8 +68,14 @@ export const DateRangeFilter = ({ value, onChange }) => {
     ? (isToday ? 'Today' : pretty(value.start))
     : `${pretty(value.start)} \u2013 ${pretty(value.end)}`;
 
+  const stagedLabel = range?.from
+    ? (range?.to && toISO(range.to) !== toISO(range.from)
+        ? `${pretty(toISO(range.from))} \u2013 ${pretty(toISO(range.to))}`
+        : pretty(toISO(range.from)))
+    : 'Pick a date';
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="h-10 rounded-xl border-slate-200 gap-2 font-medium" data-testid="date-range-trigger">
           <CalendarIcon className="h-4 w-4 text-slate-500" />
@@ -78,13 +96,27 @@ export const DateRangeFilter = ({ value, onChange }) => {
               </button>
             ))}
           </div>
-          <Calendar
-            mode="range"
-            selected={range}
-            onSelect={onSelect}
-            numberOfMonths={1}
-            initialFocus
-          />
+          <div className="flex flex-col">
+            <Calendar
+              mode="range"
+              selected={range}
+              onSelect={onSelect}
+              numberOfMonths={1}
+              initialFocus
+            />
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 p-3">
+              <span className="text-xs text-slate-500" data-testid="date-staged-label">{stagedLabel}</span>
+              <Button
+                size="sm"
+                onClick={applyRange}
+                disabled={!range?.from}
+                className="rounded-lg"
+                data-testid="date-apply-button"
+              >
+                Apply
+              </Button>
+            </div>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
