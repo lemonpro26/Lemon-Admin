@@ -156,6 +156,7 @@ class HookRuleBody(BaseModel):
     hook2: str
     weight: int = 50
     enabled: bool = True
+    hidden: bool = False
 
 
 class NotificationSettings(BaseModel):
@@ -1310,22 +1311,34 @@ async def delete_hook_rule(rule_id: str, _: dict = Depends(require_editor)):
 
 @api_router.get("/admin/ad-entities")
 async def ad_entities(_: dict = Depends(require_admin)):
-    """Distinct campaigns + ad groups captured from incoming traffic & leads."""
-    campaigns = set()
-    adgroups = {}
+    """Distinct campaigns / ad groups / ads captured from incoming traffic & leads,
+    enriched with friendly names so the hooks UI can show names instead of IDs."""
+    campaigns, adgroups, ads = {}, {}, {}
     for coll in (db.clicks, db.leads):
         async for row in coll.aggregate([
-            {"$group": {"_id": {"c": "$campaign_id", "a": "$adgroup_id"}}}
+            {"$group": {"_id": {"c": "$campaign_id", "a": "$adgroup_id", "d": "$ad_id"}}}
         ]):
             c = (row["_id"].get("c") or "").strip()
             a = (row["_id"].get("a") or "").strip()
+            d = (row["_id"].get("d") or "").strip()
             if c:
-                campaigns.add(c)
+                campaigns[c] = True
             if a:
                 adgroups[(c, a)] = True
+            if a and d:
+                ads[(c, a, d)] = True
+    labels = (await get_or_create_config()).get("ad_labels") or {}
+    cl = labels.get("campaign") or {}
+    al = labels.get("adgroup") or {}
+    dl = labels.get("ad") or {}
     return {
-        "campaigns": sorted(campaigns),
-        "adgroups": [{"campaign_id": c, "adgroup_id": a} for (c, a) in sorted(adgroups)],
+        "campaigns": [{"campaign_id": c, "campaign_name": cl.get(c, "")} for c in sorted(campaigns)],
+        "adgroups": [{"campaign_id": c, "adgroup_id": a,
+                      "campaign_name": cl.get(c, ""), "adgroup_name": al.get(a, "")}
+                     for (c, a) in sorted(adgroups)],
+        "ads": [{"campaign_id": c, "adgroup_id": a, "ad_id": d,
+                 "campaign_name": cl.get(c, ""), "adgroup_name": al.get(a, ""), "ad_name": dl.get(d, "")}
+                for (c, a, d) in sorted(ads)],
     }
 
 
@@ -1400,7 +1413,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         "by_campaign": await breakdown(["campaign_id"]),
         "by_adgroup": await breakdown(["campaign_id", "adgroup_id"]),
         "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
-        "by_keyword": await breakdown(["keyword"]),
+        "by_keyword": await breakdown(["campaign_id", "adgroup_id", "ad_id", "keyword"]),
         "by_sitelink": await breakdown(["sitelink_id"]),
         "ad_labels": cfg.get("ad_labels") or {},
         "campaign_types": cfg.get("campaign_types") or {},

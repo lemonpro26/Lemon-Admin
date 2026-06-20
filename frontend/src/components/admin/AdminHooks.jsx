@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Megaphone, Plus, Pencil, Trash2, Save, Sparkles, MousePointerClick, Target, FlaskConical,
+  Search, Eye, EyeOff, ArrowRightLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -38,16 +39,11 @@ const HOME = 'home';
 // Bucket = the set of variants that compete for the same traffic.
 const bucketKey = (r) => `${r.match_campaign || ''}|${r.match_adgroup || ''}|${r.match_ad || ''}`;
 
-const targetLabel = (r) => {
-  if (r.match_adgroup) return `Ad group: ${r.match_adgroup}`;
-  if (r.match_campaign) return `Campaign: ${r.match_campaign}`;
-  return 'Home page (all traffic)';
-};
-
 const newCreateForm = () => ({ hook1: '', hook2: '', target: HOME, weight: 50, label: '' });
 const EMPTY_EDIT = {
   label: '', match_campaign: '', match_adgroup: '', match_ad: '', hook1: '', hook2: '', weight: 50, enabled: true,
 };
+const EMPTY_MOVE = { kind: HOME, adgroup: '', ad: '' };
 
 export const AdminHooks = ({ canEdit }) => {
   const [rules, setRules] = useState([]);
@@ -62,6 +58,27 @@ export const AdminHooks = ({ canEdit }) => {
   const [dialog, setDialog] = useState(null); // {rule}
   const [form, setForm] = useState(EMPTY_EDIT);
   const [busy, setBusy] = useState(false);
+
+  const [search, setSearch] = useState('');
+  const [showHidden, setShowHidden] = useState(false);
+  const [moveDialog, setMoveDialog] = useState(null); // {rule}
+  const [moveForm, setMoveForm] = useState(EMPTY_MOVE);
+  const [moving, setMoving] = useState(false);
+
+  // Friendly-name maps from captured entities.
+  const agName = {};
+  (entities.adgroups || []).forEach((a) => { if (a.adgroup_name) agName[a.adgroup_id] = a.adgroup_name; });
+  const adName = {};
+  (entities.ads || []).forEach((a) => { if (a.ad_name) adName[a.ad_id] = a.ad_name; });
+  const campName = {};
+  (entities.campaigns || []).forEach((c) => { if (c.campaign_name) campName[c.campaign_id] = c.campaign_name; });
+
+  const targetText = (r) => {
+    if (r.match_ad) return `Ad: ${adName[r.match_ad] || r.match_ad}`;
+    if (r.match_adgroup) return `Ad group: ${agName[r.match_adgroup] || r.match_adgroup}`;
+    if (r.match_campaign) return `Campaign: ${campName[r.match_campaign] || r.match_campaign}`;
+    return 'Home page (all traffic)';
+  };
 
   const loadEntities = useCallback(async () => {
     try {
@@ -179,11 +196,84 @@ export const AdminHooks = ({ canEdit }) => {
     }
   };
 
+  // Hide / unhide from view only (does NOT pause serving).
+  const toggleHidden = async (r) => {
+    try {
+      await api.put(`/admin/hook-rules/${r.id}`, {
+        label: r.label, match_campaign: r.match_campaign || '', match_adgroup: r.match_adgroup || '',
+        match_ad: r.match_ad || '', hook1: r.hook1, hook2: r.hook2, weight: r.weight ?? 50,
+        enabled: r.enabled !== false, hidden: !r.hidden,
+      });
+      toast.success(!r.hidden ? 'Hook hidden from view.' : 'Hook shown.');
+      await loadRules();
+    } catch (e) {
+      toast.error('Could not update visibility.');
+    }
+  };
+
+  const openMove = (r) => {
+    setMoveForm({
+      kind: r.match_ad ? 'ad' : (r.match_adgroup ? 'adgroup' : HOME),
+      adgroup: r.match_adgroup || '', ad: r.match_ad || '',
+    });
+    setMoveDialog({ rule: r });
+  };
+
+  // "Move target" = keep the original (paused, stats preserved) + spawn a brand-new
+  // hook with the new target inheriting the same copy & weight.
+  const confirmMove = async () => {
+    const r = moveDialog.rule;
+    let tgt = { match_campaign: '', match_adgroup: '', match_ad: '' };
+    let suffix = 'Home';
+    if (moveForm.kind === 'adgroup') {
+      if (!moveForm.adgroup) { toast.error('Pick an ad group.'); return; }
+      tgt.match_adgroup = moveForm.adgroup;
+      suffix = `AG ${agName[moveForm.adgroup] || moveForm.adgroup}`;
+    } else if (moveForm.kind === 'ad') {
+      if (!moveForm.ad) { toast.error('Pick an ad.'); return; }
+      tgt.match_ad = moveForm.ad;
+      suffix = `Ad ${adName[moveForm.ad] || moveForm.ad}`;
+    }
+    setMoving(true);
+    try {
+      // 1) create the new hook on the new target
+      await api.post('/admin/hook-rules', {
+        label: `${r.label} → ${suffix}`, hook1: r.hook1, hook2: r.hook2,
+        weight: r.weight ?? 50, enabled: true, ...tgt,
+      });
+      // 2) pause the original (keeps its accumulated stats)
+      await api.put(`/admin/hook-rules/${r.id}`, {
+        label: r.label, match_campaign: r.match_campaign || '', match_adgroup: r.match_adgroup || '',
+        match_ad: r.match_ad || '', hook1: r.hook1, hook2: r.hook2, weight: r.weight ?? 50,
+        enabled: false, hidden: r.hidden || false,
+      });
+      toast.success('New hook created on the new target. Original paused (stats kept).');
+      setMoveDialog(null);
+      await loadRules();
+      await loadEntities();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Move failed.');
+    } finally {
+      setMoving(false);
+    }
+  };
+
   // Group variants by bucket so competing A/B variants sit together.
+  // Apply the search filter + hide filter to what's DISPLAYED (serving math still
+  // uses all enabled rules via servingPct).
+  const q = search.trim().toLowerCase();
+  const hiddenCount = rules.filter((r) => r.hidden).length;
+  const visibleRules = rules.filter((r) => {
+    if (!showHidden && r.hidden) return false;
+    if (!q) return true;
+    return [r.label, r.hook1, r.hook2, targetText(r)]
+      .filter(Boolean).some((s) => s.toLowerCase().includes(q));
+  });
+
   const groups = {};
-  rules.forEach((r) => {
+  visibleRules.forEach((r) => {
     const k = bucketKey(r);
-    (groups[k] = groups[k] || { target: targetLabel(r), rows: [] }).rows.push(r);
+    (groups[k] = groups[k] || { target: targetText(r), rows: [] }).rows.push(r);
   });
   const groupList = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
 
@@ -228,7 +318,8 @@ export const AdminHooks = ({ canEdit }) => {
                     <SelectItem value={HOME}>Home page (all traffic)</SelectItem>
                     {entities.adgroups.map((a) => (
                       <SelectItem key={`${a.campaign_id}-${a.adgroup_id}`} value={a.adgroup_id}>
-                        Ad group: {a.adgroup_id}
+                        Ad group: {a.adgroup_name || a.adgroup_id}
+                        {a.campaign_name ? ` · ${a.campaign_name}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -263,15 +354,43 @@ export const AdminHooks = ({ canEdit }) => {
 
       {/* Variants + per-hook stats */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2">
-          <Megaphone className="h-5 w-5 text-[#EF4444]" /> Hook Variants &amp; Performance
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+          <div className="font-slab font-bold text-slate-900 flex items-center gap-2">
+            <Megaphone className="h-5 w-5 text-[#EF4444]" /> Hook Variants &amp; Performance
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="h-4 w-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search hooks…"
+                className="h-9 w-44 pl-8 rounded-lg border-slate-200"
+                data-testid="hooks-search"
+              />
+            </div>
+            {hiddenCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHidden((v) => !v)}
+                className="h-9 rounded-lg border-slate-200"
+                data-testid="hooks-toggle-hidden"
+              >
+                {showHidden ? <EyeOff className="h-4 w-4 mr-1.5" /> : <Eye className="h-4 w-4 mr-1.5" />}
+                {showHidden ? 'Hide hidden' : `Show hidden (${hiddenCount})`}
+              </Button>
+            )}
+          </div>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-slate-500">Loading hooks\u2026</div>
-        ) : rules.length === 0 ? (
+          <div className="p-8 text-center text-slate-500">Loading hooks…</div>
+        ) : groupList.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm">
-            No hook variants yet. Create one above — set it to the home page or an ad group with a serving %.
+            {rules.length === 0
+              ? 'No hook variants yet — create one above and set it to the home page or an ad group.'
+              : 'No hooks match your search / filter.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -297,12 +416,15 @@ export const AdminHooks = ({ canEdit }) => {
                       </TableCell>
                     </TableRow>
                     {grp.rows.map((r) => (
-                      <TableRow key={r.id} data-testid={`hook-row-${r.id}`}>
+                      <TableRow key={r.id} data-testid={`hook-row-${r.id}`} className={r.hidden ? 'opacity-60' : ''}>
                         <TableCell>
-                          <div className="font-medium text-slate-900">{r.label}</div>
+                          <div className="font-medium text-slate-900 flex items-center gap-2">
+                            {r.label}
+                            {r.hidden && <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-200 text-[10px]">hidden</Badge>}
+                          </div>
                           <div className="text-xs text-slate-400 max-w-[260px] truncate">{r.hook1}</div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell text-slate-600 text-sm">{targetLabel(r)}</TableCell>
+                        <TableCell className="hidden md:table-cell text-slate-600 text-sm">{targetText(r)}</TableCell>
                         <TableCell className="text-right">
                           <div className="font-semibold tabular-nums text-slate-900" data-testid={`hook-serving-${r.id}`}>{servingPct(r)}%</div>
                           <div className="text-[11px] text-slate-400">weight {r.weight}</div>
@@ -322,6 +444,8 @@ export const AdminHooks = ({ canEdit }) => {
                         <TableCell>
                           {canEdit && (
                             <div className="flex items-center gap-1 justify-end">
+                              <button onClick={() => openMove(r)} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors" data-testid={`hook-move-${r.id}`} aria-label="Move target" title="Move to a different target (forks a new hook)"><ArrowRightLeft className="h-4 w-4" /></button>
+                              <button onClick={() => toggleHidden(r)} className="p-1.5 text-slate-400 hover:text-slate-800 transition-colors" data-testid={`hook-hide-${r.id}`} aria-label={r.hidden ? 'Show' : 'Hide'} title={r.hidden ? 'Show in list' : 'Hide from list (keeps serving)'}>{r.hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}</button>
                               <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-slate-800 transition-colors" data-testid={`hook-edit-${r.id}`} aria-label="Edit"><Pencil className="h-4 w-4" /></button>
                               <button onClick={() => remove(r)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors" data-testid={`hook-delete-${r.id}`} aria-label="Delete"><Trash2 className="h-4 w-4" /></button>
                             </div>
@@ -391,6 +515,75 @@ export const AdminHooks = ({ canEdit }) => {
             <Button variant="outline" onClick={() => setDialog(null)} className="rounded-lg">Cancel</Button>
             <Button onClick={saveEdit} disabled={busy} className="rounded-lg bg-[#EF4444] hover:bg-[#DC2626] text-white" data-testid="hook-form-save">
               {busy ? 'Saving\u2026' : 'Save Hook'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move-target dialog (forks a new hook, pauses the original) */}
+      <Dialog open={!!moveDialog} onOpenChange={(o) => !o && setMoveDialog(null)}>
+        <DialogContent className="max-w-lg" data-testid="hook-move-dialog">
+          <DialogHeader><DialogTitle>Move Hook Target</DialogTitle></DialogHeader>
+          <p className="text-sm text-slate-500 -mt-2">
+            This creates a <strong>brand-new hook</strong> on the target you pick (same copy &amp; weight) and
+            <strong> pauses the original</strong> so its current stats are preserved.
+          </p>
+          <div className="grid gap-4">
+            <div>
+              <Label className="text-xs text-slate-600">Move this hook to</Label>
+              <Select value={moveForm.kind} onValueChange={(v) => setMoveForm({ ...moveForm, kind: v })}>
+                <SelectTrigger className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-move-kind">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={HOME}>Home page (all traffic)</SelectItem>
+                  <SelectItem value="adgroup">A specific Ad Group</SelectItem>
+                  <SelectItem value="ad">A specific Ad</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {moveForm.kind === 'adgroup' && (
+              <div>
+                <Label className="text-xs text-slate-600">Ad Group</Label>
+                <Select value={moveForm.adgroup} onValueChange={(v) => setMoveForm({ ...moveForm, adgroup: v })}>
+                  <SelectTrigger className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-move-adgroup">
+                    <SelectValue placeholder="Pick an ad group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {entities.adgroups.map((a) => (
+                      <SelectItem key={`${a.campaign_id}-${a.adgroup_id}`} value={a.adgroup_id}>
+                        {a.adgroup_name || a.adgroup_id}{a.campaign_name ? ` · ${a.campaign_name}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {moveForm.kind === 'ad' && (
+              <div>
+                <Label className="text-xs text-slate-600">Ad</Label>
+                <Select value={moveForm.ad} onValueChange={(v) => setMoveForm({ ...moveForm, ad: v })}>
+                  <SelectTrigger className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hook-move-ad">
+                    <SelectValue placeholder="Pick an ad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(entities.ads || []).map((a) => (
+                      <SelectItem key={`${a.adgroup_id}-${a.ad_id}`} value={a.ad_id}>
+                        {a.ad_name || `Ad ${a.ad_id}`}{a.adgroup_name ? ` · ${a.adgroup_name}` : ''}
+                      </SelectItem>
+                    ))}
+                    {(!entities.ads || entities.ads.length === 0) && (
+                      <div className="px-3 py-2 text-xs text-slate-400">No ads captured from traffic yet.</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveDialog(null)} className="rounded-lg">Cancel</Button>
+            <Button onClick={confirmMove} disabled={moving} className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white" data-testid="hook-move-confirm">
+              {moving ? 'Moving…' : 'Create new hook & pause original'}
             </Button>
           </DialogFooter>
         </DialogContent>

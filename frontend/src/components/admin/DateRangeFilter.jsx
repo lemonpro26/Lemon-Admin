@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -74,51 +74,83 @@ export const DateRangeFilter = ({ value, onChange }) => {
         : pretty(toISO(range.from)))
     : 'Pick a date';
 
+  // ◀ ▶ : step the selected day back / forward by one (collapses any range to a single day).
+  const stepDay = (delta) => {
+    const base = parse(value.start);
+    base.setDate(base.getDate() + delta);
+    const iso = toISO(base);
+    onChange({ start: iso, end: iso });
+  };
+  const nextDisabled = toISO(parse(value.start)) >= toISO(new Date());
+
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="h-10 rounded-xl border-slate-200 gap-2 font-medium" data-testid="date-range-trigger">
-          <CalendarIcon className="h-4 w-4 text-slate-500" />
-          {label}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 z-[200]" align="end">
-        <div className="flex">
-          <div className="flex flex-col gap-1 p-3 border-r border-slate-100 min-w-[140px]">
-            {presets.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => applyPreset(p.days)}
-                className="text-left text-sm px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                data-testid={`date-preset-${p.key}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-col">
-            <Calendar
-              mode="range"
-              selected={range}
-              onSelect={onSelect}
-              numberOfMonths={1}
-              initialFocus
-            />
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 p-3">
-              <span className="text-xs text-slate-500" data-testid="date-staged-label">{stagedLabel}</span>
-              <Button
-                size="sm"
-                onClick={applyRange}
-                disabled={!range?.from}
-                className="rounded-lg"
-                data-testid="date-apply-button"
-              >
-                Apply
-              </Button>
+    <div className="flex items-center gap-1" data-testid="date-range-filter">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => stepDay(-1)}
+        className="h-10 w-10 rounded-xl border-slate-200 shrink-0"
+        data-testid="date-prev-day"
+        aria-label="Previous day"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="h-10 rounded-xl border-slate-200 gap-2 font-medium" data-testid="date-range-trigger">
+            <CalendarIcon className="h-4 w-4 text-slate-500" />
+            {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0 z-[200]" align="end">
+          <div className="flex">
+            <div className="flex flex-col gap-1 p-3 border-r border-slate-100 min-w-[140px]">
+              {presets.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => applyPreset(p.days)}
+                  className="text-left text-sm px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                  data-testid={`date-preset-${p.key}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col">
+              <Calendar
+                mode="range"
+                selected={range}
+                onSelect={onSelect}
+                numberOfMonths={1}
+                initialFocus
+              />
+              <div className="flex items-center justify-between gap-3 border-t border-slate-100 p-3">
+                <span className="text-xs text-slate-500" data-testid="date-staged-label">{stagedLabel}</span>
+                <Button
+                  size="sm"
+                  onClick={applyRange}
+                  disabled={!range?.from}
+                  className="rounded-lg"
+                  data-testid="date-apply-button"
+                >
+                  Apply
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => stepDay(1)}
+        disabled={nextDisabled}
+        className="h-10 w-10 rounded-xl border-slate-200 shrink-0"
+        data-testid="date-next-day"
+        aria-label="Next day"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
   );
 };

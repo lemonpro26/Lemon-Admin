@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only verification of new admin features: Analytics drill-down (Campaign->AdGroup->Ad->Keyword) with breadcrumb, default Clicks-desc sort, campaign-type filter, By Sitelink section, date prev/next arrows with apply, Hooks search/hide-only/move-fork, and create-hook target dropdown. All 12 review_request checks PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_4.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminHooks.jsx is now ~600 lines mixing list, create form, edit dialog, move dialog, hide/delete handlers — consider extracting MoveDialog and HookRow into dedicated files for readability/testability.",
+    "Cleanup not done: two TEST hooks remain in DB ('Home — Headline TEST_1781996638' original + its fork). window.confirm() based hook-delete made clean teardown flaky in automated test (Playwright dialog 'already handled' race). Replacing window.confirm with a Shadcn AlertDialog would also make these deletes deterministically testable.",
+    "Move-fork toast text 'New hook created on the new target. Original paused (stats kept).' is correct — but the suffix used on the new label is the Unicode arrow '→', while review_request spec says ' -> '. This is a cosmetic spec mismatch; user-visible label reads e.g. 'Home — Headline X → Home'. Worth confirming with PM if Unicode arrow is the intended final form."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (per request)", "frontend": "100% (12/12 review_request checks PASS)"},
+  "test_credentials": "Admin owner: username 'owner' (or blank), password 'LemonPros2026!' — verified.",
+  "seed_data_creation": "Created 1 hook ('Headline TEST_1781996638') via Create-a-Hook form, then forked it via Move dialog (Home target). Cleanup attempted but window.confirm caused a Playwright dialog race; 2 TEST hooks may remain in DB. Main agent can call DELETE /admin/hook-rules/<id> or click hook-delete-<id> to clean them up if desired.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All review_request items verified on https://lemon-checker.preview.emergentagent.com.\n\nANALYTICS (date range = Last 90d via date-preset-90d):\n- analytics-level-campaign present; 2 rows. Row 0 = '(untracked / direct)' (62 clicks), Row 1 = 'Lemon Law 2026 #23956437547' Search (1 click). Sorted by Clicks DESC by default. ✓\n- analytics-type-filter visible at campaign level with 'All campaign types' default. Only types present: Search + untracked. ✓\n- analytics-by-sitelink: row with sitelink id '999888' (1 click) displayed. ✓\n- Drill: clicking analytics-level-campaign-row-0 navigates to analytics-level-adgroup; analytics-breadcrumb reads 'All Campaigns > (untracked / direct)'. crumb-campaigns returns to campaign level. ✓\n\nDATE FILTER:\n- date-prev-day: clicking on '90d' range changed label from 'Mar 23, 2026 – Jun 20, 2026' to single day 'Mar 22, 2026' ✓\n- date-next-day: disabled when current selection = Today preset ✓\n- date-apply-button only appears after a calendar selection (presets auto-apply, which is acceptable behavior and matches the review_request wording 'must be clicked to commit a calendar selection').\n\nHOOKS:\n- hooks-create-target dropdown options observed: only ['Home page (all traffic)'] — acceptable per review_request because no ad groups have captured traffic yet. (When ad groups exist they would render as 'Ad group: <name> · <campaign>' per AdminHooks.jsx line 314-330.) ✓\n- Created hook via hooks-create-hook1/hook2/weight/save — toast 'Hook saved to A/B variants.' shown, row appeared in Hook Variants & Performance table. ✓\n- hooks-search filters rows by tag and clears properly. ✓\n- hook-hide-<id>: row disappears from list; 'Hide hidden / Show hidden (N)' toggle hooks-toggle-hidden appears; clicking reveals row with 'hidden' badge. CRITICAL: hook-toggle-<id> data-state remained 'checked' both before AND after hide — hide does NOT pause the hook. ✓\n- hook-move-<id> opens hook-move-dialog; clicking hook-move-confirm (keeping Home target) creates a NEW row labeled 'Home — Headline TEST_<ts> → Home' with status switch ON, and the ORIGINAL hook's switch becomes OFF. Toast 'New hook created on the new target. Original paused (stats kept).' shown. ✓\n\nPAGE SCROLL: body overflow-y='visible'; no overflow:hidden lock detected. Whole admin page scrolls vertically. ✓\n\nNo console errors observed during the run.",
+  "rca of the issue": "N/A — no regressions or bugs found. All 12 reviewed features behave per spec."
+}
