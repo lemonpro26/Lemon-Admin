@@ -1,5 +1,12 @@
 
 
+## 2026-06-20 (pm) — Automatic bot-click cleaning (hands-off)
+- _auto_clean_bot_clicks() runs on every GET /admin/analytics and /admin/stats:
+  silently deletes (all-time) bot user-agent hits + fake paid clicks (campaign
+  tag, no gclid/wbraid/gbraid). Real paid clicks kept. No UI, no button.
+- Removed the manual "Clean bot traffic" button from AdminAnalytics (user wanted
+  it fully automatic and never shown). diagnose/purge-bots endpoints retained.
+
 ## 2026-06-20 — Phantom/bot click fix (Demand gen showing fake clicks)
 - ROOT CAUSE: AdsBot-Google crawls landing pages of every ENABLED campaign
   (even ones not serving today). These hits carry the campaign's tg_ref but NO

@@ -1083,6 +1083,19 @@ async def purge_bot_clicks(_: dict = Depends(require_editor), campaign_id: str =
     return {"success": True, "clicks_deleted": res.deleted_count, "campaign_id": campaign_id or None}
 
 
+async def _auto_clean_bot_clicks():
+    """Silently purge phantom traffic (bot user-agents + paid clicks with no
+    Google click id) across all time. Called on every analytics/stats load so
+    bot traffic is automatically removed and never shown."""
+    try:
+        await db.clicks.delete_many({"$or": [
+            {"user_agent": {"$regex": _BOT_UA_RE.pattern, "$options": "i"}},
+            _fake_paid_click_query(""),
+        ]})
+    except Exception:
+        pass
+
+
 @api_router.post("/admin/leads/reattribute-hooks")
 async def reattribute_hooks(_: dict = Depends(require_editor)):
     """One-time backfill: align each existing lead's matched_rule_id with the hook
@@ -1322,6 +1335,7 @@ async def retry_lead_conversion(lead_id: str, _: dict = Depends(require_editor))
 
 @api_router.get("/admin/stats")
 async def admin_stats(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
+    await _auto_clean_bot_clicks()
     s_iso, e_iso, _days = _date_range(start, end)
     q = {"created_at": {"$gte": s_iso, "$lte": e_iso}}
     total = await db.leads.count_documents(q)
@@ -1480,6 +1494,7 @@ async def _agg_clicks(group_fields: list, s_iso: str, e_iso: str) -> dict:
 
 @api_router.get("/admin/analytics")
 async def admin_analytics(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
+    await _auto_clean_bot_clicks()
     s_iso, e_iso, _days = _date_range(start, end)
 
     cfg = await get_or_create_config()

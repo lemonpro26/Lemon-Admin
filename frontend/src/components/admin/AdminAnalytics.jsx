@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { BarChart3, RefreshCw, Pencil, ChevronRight, Home, Bug } from 'lucide-react';
+import { BarChart3, RefreshCw, Pencil, ChevronRight, Home } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -87,7 +87,6 @@ export const AdminAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState(todayRange());
   const [syncing, setSyncing] = useState(false);
-  const [cleaning, setCleaning] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
   const [drill, setDrill] = useState({ campaign: null, adgroup: null, ad: null });
   const [sitelinks, setSitelinks] = useState(null); // {connected, sitelinks, error}
@@ -165,33 +164,6 @@ export const AdminAnalytics = () => {
     }
   }, [data, syncGoogle]);
 
-  const cleanBots = async () => {
-    setCleaning(true);
-    try {
-      // All-time scope so historical phantom/bot clicks are removed too.
-      const params = { start: '2000-01-01', end: range.end };
-      const diag = await api.get('/admin/clicks/diagnose', { params });
-      const d = diag.data || {};
-      const removable = (d.fake_paid || 0) + (d.bot_user_agent || 0);
-      if (!removable) {
-        toast.success('No phantom/bot clicks found. Your traffic is clean.');
-        setCleaning(false);
-        return;
-      }
-      const ok = window.confirm(
-        `Found ~${removable} phantom click(s): ${d.fake_paid || 0} paid clicks with no Google click id (AdsBot/crawler hits) and ${d.bot_user_agent || 0} bot user-agents.\n\nReal paid clicks (with a gclid) are kept. Permanently delete the phantom clicks?`,
-      );
-      if (!ok) { setCleaning(false); return; }
-      const res = await api.post('/admin/clicks/purge-bots', null, { params });
-      toast.success(`Removed ${res.data?.clicks_deleted ?? 0} phantom clicks.`);
-      load();
-    } catch (e) {
-      toast.error('Could not clean phantom clicks.');
-    } finally {
-      setCleaning(false);
-    }
-  };
-
   const header = (
     <div className="flex items-center justify-between flex-wrap gap-3">
       <p className="text-sm text-slate-500 flex items-center gap-2">
@@ -202,11 +174,6 @@ export const AdminAnalytics = () => {
         {data?.google_ads_connected && editable && (
           <Button variant="outline" size="sm" onClick={() => syncGoogle(true)} disabled={syncing} className="rounded-xl border-slate-200" data-testid="analytics-sync-google">
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Syncing…' : 'Sync names'}
-          </Button>
-        )}
-        {editable && (
-          <Button variant="outline" size="sm" onClick={cleanBots} disabled={cleaning} className="rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50" data-testid="analytics-clean-bots">
-            <Bug className={`h-4 w-4 mr-2 ${cleaning ? 'animate-pulse' : ''}`} /> {cleaning ? 'Cleaning…' : 'Clean bot traffic'}
           </Button>
         )}
         <Button variant="outline" size="sm" onClick={load} className="rounded-xl border-slate-200" data-testid="analytics-refresh">
