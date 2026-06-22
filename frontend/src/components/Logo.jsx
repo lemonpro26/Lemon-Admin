@@ -2,7 +2,7 @@ import React from 'react';
 
 // Text wordmark logo for Lemon Pros: a lemon icon + bold two-tone text.
 // "Lemon" in dark navy, "PROS" in lemon yellow.
-export const Logo = ({ className = '', size = 'md' }) => {
+export const Logo = ({ className = '', size = 'md', light = false }) => {
   const dims = {
     sm: { icon: 26, t1: 'text-base', t2: 'text-[10px]' },
     md: { icon: 34, t1: 'text-xl sm:text-2xl', t2: 'text-[11px] sm:text-xs' },
@@ -32,12 +32,12 @@ export const Logo = ({ className = '', size = 'md' }) => {
 
       <span className="flex flex-col leading-none">
         <span className={`font-slab font-extrabold tracking-tight ${dims.t1}`}>
-          <span className="text-slate-900">Lemon</span>
-          <span style={{ color: '#E0A800' }}>Pros</span>
+          <span className={light ? 'text-white' : 'text-slate-900'}>Lemon</span>
+          <span style={{ color: light ? '#FACC15' : '#E0A800' }}>Pros</span>
         </span>
         <span
           className={`font-slab font-bold tracking-[0.22em] uppercase ${dims.t2}`}
-          style={{ color: '#94a3b8' }}
+          style={{ color: light ? '#cbd5e1' : '#94a3b8' }}
         >
           Lemon Law Help
         </span>

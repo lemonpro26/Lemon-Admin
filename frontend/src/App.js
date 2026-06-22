@@ -12,6 +12,7 @@ import AdminDashboard from '@/pages/AdminDashboard';
 import LegalPage from '@/pages/LegalPage';
 import Contact from '@/pages/Contact';
 import MockupHome from '@/pages/MockupHome';
+import MockupFunnel from '@/pages/MockupFunnel';
 import { trackPageView } from '@/lib/analytics';
 
 // Sends a GA4 page_view on every client-side route change (SPA tracking).
@@ -38,6 +39,7 @@ function App() {
 
           {/* Standalone pages keep their own simple scrollable layout. */}
           <Route path="/mockup" element={<MockupHome />} />
+          <Route path="/mockup/funnel" element={<MockupFunnel />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/terms" element={<LegalPage />} />
           <Route path="/privacy" element={<LegalPage />} />
