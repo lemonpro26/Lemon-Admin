@@ -6,8 +6,8 @@ export const COMPANY = {
   addressLine2: 'Beverly Hills, CA 90211',
   phone: '844-335-8911',
   phoneHref: 'tel:+18443358911',
-  contactEmail: 'info@lemonpros.com',
-  legalEmail: 'info@lemonpros.com',
+  contactEmail: 'info@thelemonpros.com',
+  legalEmail: 'info@thelemonpros.com',
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=9025+Wilshire+Blvd+%23500+Beverly+Hills+CA+90211',
 };
 
@@ -34,7 +34,7 @@ export const LEGAL_DOCS = {
       { type: 'p', text: 'We reserve the right to revise these terms at any time without notice. By using this website, you agree to be bound by the then-current version of these Terms.' },
       { type: 'h', text: '1.7 Contact Information' },
       { type: 'p', text: 'Please address all inquiries regarding these terms to:' },
-      { type: 'email', text: 'info@lemonpros.com' },
+      { type: 'email', text: 'info@thelemonpros.com' },
     ],
   },
   privacy: {
@@ -63,7 +63,7 @@ export const LEGAL_DOCS = {
       { type: 'p', text: 'We employ standard commercial security practices to safeguard your information. No transmission method over the internet is completely secure, but we take every reasonable measure to protect your data.' },
       { type: 'h', text: '2.5 Contact Information' },
       { type: 'p', text: 'For data updates, deletion requests, or privacy inquiries, email us at:' },
-      { type: 'email', text: 'info@lemonpros.com' },
+      { type: 'email', text: 'info@thelemonpros.com' },
     ],
   },
   'do-not-sell': {
@@ -84,7 +84,7 @@ export const LEGAL_DOCS = {
       ] },
       { type: 'h', text: '3.4 Exercise Your Data Rights' },
       { type: 'p', text: 'To request access to or removal of your data, contact us at:' },
-      { type: 'email', text: 'info@lemonpros.com' },
+      { type: 'email', text: 'info@thelemonpros.com' },
     ],
   },
 };

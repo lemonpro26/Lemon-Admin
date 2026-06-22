@@ -41,10 +41,15 @@ export const SiteHeader = () => {
           <ChevronLeft className="h-5 w-5" /> Back
         </button>
       ) : (
-        <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-white min-w-0">
+        <div className="hidden sm:flex items-center gap-2 text-sm sm:text-base font-semibold text-white min-w-0">
           <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
-          <span className="hidden sm:inline">Your information is safe and secure</span>
-          <span className="sm:hidden">Safe &amp; secure</span>
+          <span>Your information is safe and secure</span>
+        </div>
+      )}
+      {!inFunnel && (
+        <div className="sm:hidden flex items-center gap-1.5 text-xs font-semibold text-white">
+          <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span>Secure</span>
         </div>
       )}
 

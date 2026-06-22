@@ -32,7 +32,7 @@ export const Logo = ({ className = '', size = 'md', light = false }) => {
 
       <span className="flex flex-col leading-none">
         <span className={`font-slab font-extrabold tracking-tight ${dims.t1}`}>
-          <span className={light ? 'text-white' : 'text-slate-900'}>Lemon</span>
+          <span className={light ? 'text-white' : 'text-slate-900'}>The Lemon</span>
           <span style={{ color: light ? '#FACC15' : '#E0A800' }}>Pros</span>
         </span>
         <span
