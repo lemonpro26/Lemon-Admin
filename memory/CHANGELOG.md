@@ -1,5 +1,22 @@
 
 
+## 2026-06-22 — New bindright-style design shipped to the MAIN site
+- Approved mockup ported to real public pages. Shared chrome updated: SiteHeader
+  (navy, centered light lemon logo, "safe & secure" white text, big phone with
+  click-to-call conversion, funnel-aware Back + red progress bar) and SiteFooter
+  (navy, links: Terms/Do-Not-Sell/Privacy/Contact + copyright).
+- PublicShell now full-bleed smooth highway+sky scene behind content (replaces
+  SuburbanBand houses). Landing restyled: bold Poppins (font-mock) headline + CTA
+  card; all /track/click + /config/public + start() logic preserved. Hero now shows
+  fallback copy instantly (no blank-hero flash).
+- FunnelStep restyled into a white card with bold Poppins question; all step logic
+  (selectAndNext/goNext/submitLead + field verification) unchanged. Footer pages
+  (Contact/LegalPage) inherit the new navy chrome.
+- Verified by testing agent: 7/7 PASS incl. real Zapier lead submission → thank-you,
+  no JS errors (iteration_6.json). Mockup routes /mockup + /mockup/funnel still exist.
+- ACTION: user must click "Re-deploy changes" to push to production (apply.thelemonpros.com).
+
+
 ## 2026-06-20 (pm2) — Hook target picker redesign + master-admin credential change
 - Hooks "Create a Hook" → "Show this hook on" is now a tab/pill drill-down:
   Home pill + a pill per campaign; clicking a campaign reveals "Entire campaign"
