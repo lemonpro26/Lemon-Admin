@@ -68,10 +68,18 @@ export const SiteHeader = () => {
         onClick={trackPhoneCallConversion}
         data-testid="header-call-link"
         aria-label={`Call Lemon Pros at ${COMPANY.phone}`}
-        className="flex items-center gap-2 text-base sm:text-2xl font-extrabold text-white hover:text-[#FACC15] transition-colors whitespace-nowrap"
+        className="flex flex-col items-end leading-none text-white hover:text-[#FACC15] transition-colors group"
       >
-        <Phone className="h-5 w-5 sm:h-6 sm:w-6" />
-        <span className="hidden xs:inline sm:inline">{COMPANY.phone}</span>
+        <span className="flex items-center gap-2 text-base sm:text-2xl font-extrabold whitespace-nowrap">
+          <Phone className="h-5 w-5 sm:h-6 sm:w-6" />
+          <span className="hidden xs:inline sm:inline">{COMPANY.phone}</span>
+        </span>
+        <span
+          data-testid="header-call-now-label"
+          className="mt-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-[#FACC15] group-hover:text-white"
+        >
+          Call Now
+        </span>
       </a>
 
       {inFunnel && (
