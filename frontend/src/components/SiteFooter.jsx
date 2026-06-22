@@ -28,7 +28,7 @@ export const SiteFooter = () => {
         ))}
         <span className="text-slate-600" aria-hidden="true">•</span>
         <span className="text-slate-400" data-testid="footer-copyright">
-          ©{year} Lemon Pros. All rights reserved. Attorney advertising.
+          ©{year} Lemon Pros. All rights reserved. Attorney advertising. Michael Saeedian, Esq.
         </span>
       </div>
     </footer>
