@@ -150,6 +150,8 @@ def reset_client():
 # ----------------------------- conversion datetime -----------------------------
 def _format_conversion_dt(sale_dt) -> str:
     """Google Ads expects 'YYYY-MM-DD HH:MM:SS+HH:MM'. We emit UTC with +00:00."""
+    if not sale_dt:
+        sale_dt = datetime.now(timezone.utc)
     if isinstance(sale_dt, str):
         try:
             sale_dt = datetime.fromisoformat(sale_dt.replace("Z", "+00:00"))
