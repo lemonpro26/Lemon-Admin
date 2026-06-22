@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Users, Plus, Trash2, Shield, Eye, KeyRound, Crown } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, getRole, getUsername, setSession } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +35,33 @@ export const AdminUsers = ({ canEdit }) => {
   const [editing, setEditing] = useState(null);
   const [editPw, setEditPw] = useState('');
   const [editRole, setEditRole] = useState('editor');
+
+  const isOwner = getRole() === 'owner';
+  const [oc, setOc] = useState({ current_password: '', new_username: '', new_password: '' });
+  const [ocBusy, setOcBusy] = useState(false);
+
+  useEffect(() => { setOc((o) => ({ ...o, new_username: getUsername() })); }, []);
+
+  const saveOwnerCreds = async () => {
+    if (!oc.current_password) { toast.error('Enter your current password to confirm.'); return; }
+    const body = { current_password: oc.current_password };
+    const u = (oc.new_username || '').trim();
+    if (u && u !== getUsername()) body.new_username = u;
+    if (oc.new_password) body.new_password = oc.new_password;
+    if (!body.new_username && !body.new_password) { toast.error('Change the username or password first.'); return; }
+    setOcBusy(true);
+    try {
+      const res = await api.put('/admin/owner-credentials', body);
+      if (res.data?.token) setSession({ token: res.data.token, role: 'owner', username: res.data.username });
+      toast.success('Master admin credentials updated.');
+      setOc({ current_password: '', new_username: res.data?.username || getUsername(), new_password: '' });
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Could not update credentials.');
+    } finally {
+      setOcBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -99,6 +126,35 @@ export const AdminUsers = ({ canEdit }) => {
 
   return (
     <div className="grid gap-6" data-testid="admin-users">
+      {isOwner && (
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-6" data-testid="owner-creds-card">
+          <h2 className="font-slab font-bold text-lg text-slate-900 flex items-center gap-2">
+            <Crown className="h-5 w-5 text-amber-500" /> Master Admin Credentials
+          </h2>
+          <p className="text-sm text-slate-500 mt-1 mb-4">
+            Change your own master login. Enter your current password to confirm. You stay signed in after saving.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-3 items-end">
+            <div>
+              <Label className="text-xs text-slate-600">New username</Label>
+              <Input value={oc.new_username} onChange={(e) => setOc({ ...oc, new_username: e.target.value })} placeholder="owner" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="owner-new-username" />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-600">New password (leave blank to keep)</Label>
+              <Input type="text" value={oc.new_password} onChange={(e) => setOc({ ...oc, new_password: e.target.value })} placeholder="new password" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="owner-new-password" />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-600">Current password</Label>
+              <Input type="password" value={oc.current_password} onChange={(e) => setOc({ ...oc, current_password: e.target.value })} placeholder="confirm current" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="owner-current-password" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <Button onClick={saveOwnerCreds} disabled={ocBusy} className="h-10 rounded-lg bg-amber-500 hover:bg-amber-600 text-white" data-testid="owner-creds-save">
+              <KeyRound className="h-4 w-4 mr-2" /> {ocBusy ? 'Saving\u2026' : 'Update Master Login'}
+            </Button>
+          </div>
+        </div>
+      )}
       {canEdit && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <h2 className="font-slab font-bold text-lg text-slate-900 flex items-center gap-2">

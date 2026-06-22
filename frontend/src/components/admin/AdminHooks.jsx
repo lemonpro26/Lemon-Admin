@@ -39,7 +39,7 @@ const HOME = 'home';
 // Bucket = the set of variants that compete for the same traffic.
 const bucketKey = (r) => `${r.match_campaign || ''}|${r.match_adgroup || ''}|${r.match_ad || ''}`;
 
-const newCreateForm = () => ({ hook1: '', hook2: '', target: HOME, weight: 50, label: '' });
+const newCreateForm = () => ({ hook1: '', hook2: '', tCampaign: HOME, tAdgroup: '', weight: 50, label: '' });
 const EMPTY_EDIT = {
   label: '', match_campaign: '', match_adgroup: '', match_ad: '', hook1: '', hook2: '', weight: 50, enabled: true,
 };
@@ -112,10 +112,16 @@ export const AdminHooks = ({ canEdit }) => {
     return Math.round(((Number(r.weight) || 0) / denom) * 100);
   };
 
-  const targetFromForm = (target) => {
-    if (target === HOME) return { match_campaign: '', match_adgroup: '', match_ad: '' };
-    const ag = entities.adgroups.find((a) => a.adgroup_id === target);
-    return { match_campaign: '', match_adgroup: target, match_ad: '' };
+  const targetFromForm = () => {
+    if (cForm.tCampaign === HOME) return { match_campaign: '', match_adgroup: '', match_ad: '' };
+    if (cForm.tAdgroup) return { match_campaign: '', match_adgroup: cForm.tAdgroup, match_ad: '' };
+    return { match_campaign: cForm.tCampaign, match_adgroup: '', match_ad: '' };
+  };
+
+  const createTargetLabel = () => {
+    if (cForm.tCampaign === HOME) return 'Home';
+    if (cForm.tAdgroup) return `Ad group: ${agName[cForm.tAdgroup] || cForm.tAdgroup}`;
+    return `Campaign: ${campName[cForm.tCampaign] || cForm.tCampaign}`;
   };
 
   const create = async () => {
@@ -124,9 +130,9 @@ export const AdminHooks = ({ canEdit }) => {
       return;
     }
     const w = Math.max(1, Math.min(100, Number(cForm.weight) || 0));
-    const tgt = targetFromForm(cForm.target);
+    const tgt = targetFromForm();
     const label = cForm.label.trim()
-      || `${cForm.target === HOME ? 'Home' : cForm.target} — ${cForm.hook1.slice(0, 40)}`;
+      || `${createTargetLabel()} — ${cForm.hook1.slice(0, 40)}`;
     setCreating(true);
     try {
       await api.post('/admin/hook-rules', { label, hook1: cForm.hook1, hook2: cForm.hook2, weight: w, enabled: true, ...tgt });
@@ -307,23 +313,78 @@ export const AdminHooks = ({ canEdit }) => {
               <Label className="text-xs text-slate-600">Hook 2 (subtext)</Label>
               <Textarea value={cForm.hook2} onChange={(e) => setCForm({ ...cForm, hook2: e.target.value })} rows={2} placeholder="Find out in 60 seconds if your {!state} vehicle qualifies." className="mt-1 rounded-xl border-slate-200" data-testid="hooks-create-hook2" />
             </div>
+            <div>
+              <Label className="text-xs text-slate-600">Show this hook on</Label>
+              <div className="mt-1.5 rounded-xl border border-slate-200 overflow-hidden" data-testid="hooks-create-target">
+                {/* Step 1 — pick Home or a campaign (tab-style pills) */}
+                <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border-b border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setCForm({ ...cForm, tCampaign: HOME, tAdgroup: '' })}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cForm.tCampaign === HOME ? 'bg-[#EF4444] text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}`}
+                    data-testid="hooks-target-home"
+                  >
+                    Home (all traffic)
+                  </button>
+                  {entities.campaigns.map((c) => (
+                    <button
+                      key={c.campaign_id}
+                      type="button"
+                      onClick={() => setCForm({ ...cForm, tCampaign: c.campaign_id, tAdgroup: '' })}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cForm.tCampaign === c.campaign_id ? 'bg-[#EF4444] text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}`}
+                      data-testid={`hooks-target-campaign-${c.campaign_id}`}
+                    >
+                      {c.campaign_name || c.campaign_id}
+                    </button>
+                  ))}
+                </div>
+                {/* Step 2 — when a campaign is active, keep at campaign level or pick an ad group */}
+                {cForm.tCampaign !== HOME && (
+                  <div className="p-2.5">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-1.5 px-0.5">
+                      Inside “{campName[cForm.tCampaign] || cForm.tCampaign}”
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCForm({ ...cForm, tAdgroup: '' })}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!cForm.tAdgroup ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}`}
+                        data-testid="hooks-target-whole-campaign"
+                      >
+                        Entire campaign
+                      </button>
+                      {entities.adgroups.filter((a) => a.campaign_id === cForm.tCampaign).map((a) => (
+                        <button
+                          key={a.adgroup_id}
+                          type="button"
+                          onClick={() => setCForm({ ...cForm, tAdgroup: a.adgroup_id })}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cForm.tAdgroup === a.adgroup_id ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}`}
+                          data-testid={`hooks-target-adgroup-${a.adgroup_id}`}
+                        >
+                          {a.adgroup_name || a.adgroup_id}
+                        </button>
+                      ))}
+                      {entities.adgroups.filter((a) => a.campaign_id === cForm.tCampaign).length === 0 && (
+                        <span className="text-xs text-slate-400 px-1 py-1.5">No ad groups seen yet — hook applies to the whole campaign.</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="mt-1.5 text-xs text-slate-500">
+                Showing on: <span className="font-medium text-slate-700">{createTargetLabel()}</span>
+              </p>
+            </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs text-slate-600">Show this hook on</Label>
-                <Select value={cForm.target} onValueChange={(v) => setCForm({ ...cForm, target: v })}>
-                  <SelectTrigger className="mt-1 h-10 rounded-lg border-slate-200" data-testid="hooks-create-target">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={HOME}>Home page (all traffic)</SelectItem>
-                    {entities.adgroups.map((a) => (
-                      <SelectItem key={`${a.campaign_id}-${a.adgroup_id}`} value={a.adgroup_id}>
-                        Ad group: {a.adgroup_name || a.adgroup_id}
-                        {a.campaign_name ? ` · ${a.campaign_name}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs text-slate-600">Optional name for this hook</Label>
+                <Input
+                  value={cForm.label}
+                  onChange={(e) => setCForm({ ...cForm, label: e.target.value })}
+                  placeholder="e.g. Toyota owners — refund angle"
+                  className="mt-1 h-10 rounded-lg border-slate-200"
+                  data-testid="hooks-create-label"
+                />
               </div>
               <div>
                 <Label className="text-xs text-slate-600">% of serving (share of traffic)</Label>

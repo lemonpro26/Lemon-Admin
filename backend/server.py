@@ -126,6 +126,12 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
 
 
+class OwnerCredsUpdate(BaseModel):
+    current_password: str
+    new_username: Optional[str] = None
+    new_password: Optional[str] = None
+
+
 class LeadCreate(BaseModel):
     model_config = ConfigDict(extra="ignore")
     zip: Optional[str] = ""
@@ -377,6 +383,19 @@ def require_editor(user: dict = Depends(require_admin)) -> dict:
     if user.get("role") == "view_only":
         raise HTTPException(status_code=403, detail="View-only access: changes are not allowed.")
     return user
+
+
+def require_owner(user: dict = Depends(require_admin)) -> dict:
+    """Only the master/owner admin can manage owner credentials."""
+    if user.get("role") != "owner":
+        raise HTTPException(status_code=403, detail="Only the master admin can do this.")
+    return user
+
+
+async def get_owner_account() -> dict:
+    """Custom owner username/password stored in DB (overrides the env default
+    once the owner changes their credentials in Settings)."""
+    return await db.admin_owner.find_one({"_id": "singleton"}) or {}
 
 
 # ----------------------------- Public routes -----------------------------
@@ -700,9 +719,18 @@ async def contact_form(body: ContactBody, background_tasks: BackgroundTasks):
 @api_router.post("/admin/login")
 async def admin_login(body: LoginRequest):
     uname = (body.username or "").strip()
-    # Owner master password (works with blank or 'owner' username).
-    if body.password == ADMIN_PASSWORD and uname.lower() in ("", "owner"):
-        return {"token": create_token("owner", "owner"), "username": "owner", "role": "owner"}
+    owner = await get_owner_account()
+    owner_username = (owner.get("username") or "owner")
+    owner_hash = owner.get("password_hash")
+    # Owner login: blank, "owner", or the custom owner username.
+    if uname.lower() in ("", "owner", owner_username.lower()):
+        ok = False
+        if owner_hash and _verify_pw(body.password, owner_hash):
+            ok = True
+        elif body.password == ADMIN_PASSWORD:
+            ok = True  # env password = bootstrap + recovery
+        if ok:
+            return {"token": create_token(owner_username, "owner"), "username": owner_username, "role": "owner"}
     user = await db.admin_users.find_one({"username": uname})
     if user and _verify_pw(body.password, user.get("password_hash", "")):
         return {"token": create_token(uname, user["role"]), "username": uname, "role": user["role"]}
@@ -717,8 +745,39 @@ async def admin_me(user: dict = Depends(require_admin)):
 @api_router.get("/admin/users")
 async def list_users(user: dict = Depends(require_admin)):
     users = await db.admin_users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", 1).to_list(200)
-    owner = {"username": "owner", "role": "owner", "is_owner": True}
+    owner_acct = await get_owner_account()
+    owner = {"username": owner_acct.get("username") or "owner", "role": "owner", "is_owner": True}
     return {"users": [owner] + users, "current": user}
+
+
+@api_router.put("/admin/owner-credentials")
+async def update_owner_credentials(body: OwnerCredsUpdate, user: dict = Depends(require_owner)):
+    """Master admin self-service: change own username and/or password. Requires
+    the current password (custom DB password or the env bootstrap password)."""
+    owner = await get_owner_account()
+    owner_hash = owner.get("password_hash")
+    valid = (owner_hash and _verify_pw(body.current_password, owner_hash)) or (body.current_password == ADMIN_PASSWORD)
+    if not valid:
+        raise HTTPException(status_code=401, detail="Current password is incorrect.")
+
+    update = {}
+    new_username = (body.new_username or "").strip()
+    if new_username and new_username.lower() != (owner.get("username") or "owner").lower():
+        if await db.admin_users.find_one({"username": new_username}):
+            raise HTTPException(status_code=409, detail="That username is taken by a team member.")
+        update["username"] = new_username
+    if body.new_password:
+        if len(body.new_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+        update["password_hash"] = _hash_pw(body.new_password)
+    if not update:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
+
+    update["updated_at"] = _now_iso()
+    await db.admin_owner.update_one({"_id": "singleton"}, {"$set": update}, upsert=True)
+    final_username = update.get("username") or owner.get("username") or "owner"
+    # Re-issue token because the username (token subject) may have changed.
+    return {"success": True, "username": final_username, "token": create_token(final_username, "owner")}
 
 
 @api_router.post("/admin/users")
