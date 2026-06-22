@@ -8,29 +8,26 @@ const links = [
   { label: 'Contact Us', to: '/contact', testid: 'footer-contact-link' },
 ];
 
-// Single tiny line: legal links + copyright, all on one compact row.
+// Navy footer matching the bindright-style design: legal links + copyright.
 export const SiteFooter = () => {
   const navigate = useNavigate();
   const year = new Date().getFullYear();
   return (
-    <footer
-      className="shrink-0 bg-[#fdf3c9]"
-      data-testid="site-footer"
-    >
-      <div className="max-w-6xl mx-auto px-3 h-[clamp(32px,4.5vh,42px)] flex items-center justify-center flex-wrap gap-x-3 gap-y-0 text-[11px] sm:text-xs text-yellow-800/80">
+    <footer className="shrink-0 bg-[#0F1B3D] text-slate-300" data-testid="site-footer">
+      <div className="max-w-6xl mx-auto px-3 min-h-[clamp(34px,5vh,46px)] py-1.5 flex items-center justify-center flex-wrap gap-x-4 gap-y-0.5 text-[11px] sm:text-xs">
         {links.map((l) => (
           <button
             key={l.testid}
             type="button"
             onClick={() => navigate(l.to)}
-            className="hover:text-yellow-900 transition-colors"
+            className="hover:text-white transition-colors"
             data-testid={l.testid}
           >
             {l.label}
           </button>
         ))}
-        <span className="text-yellow-700/40" aria-hidden="true">•</span>
-        <span data-testid="footer-copyright">
+        <span className="text-slate-600" aria-hidden="true">•</span>
+        <span className="text-slate-400" data-testid="footer-copyright">
           ©{year} Lemon Pros. All rights reserved. Attorney advertising.
         </span>
       </div>

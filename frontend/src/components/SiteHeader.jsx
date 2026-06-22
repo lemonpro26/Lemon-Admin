@@ -1,16 +1,16 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronLeft, Phone } from 'lucide-react';
+import { ChevronLeft, Phone, ShieldCheck } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { COMPANY } from '@/lib/siteContent';
 import { trackPhoneCallConversion } from '@/lib/analytics';
 import { STEP_IDS } from '@/lib/funnel';
 
 /**
- * Funnel-aware header. On funnel steps it shows a back arrow (top-left) that
- * lets the user step backwards through the funnel (and back to the start), and
- * a progress bar (top-right) that fills as the funnel advances. The logo stays
- * centered. A bottom border separates the header from the content.
+ * Bindright-style navy header. Logo is absolutely centered so the side widths
+ * never shift it. Funnel-aware: shows a Back control + a thin progress bar while
+ * the visitor is inside the funnel; otherwise shows the "safe & secure" line.
+ * The phone number (right) fires the click-to-call conversion.
  */
 export const SiteHeader = () => {
   const navigate = useNavigate();
@@ -29,62 +29,52 @@ export const SiteHeader = () => {
   };
 
   return (
-    <header className={`shrink-0 h-[clamp(52px,7.5vh,68px)] bg-white border-b border-slate-200 relative flex items-center px-4 z-40 ${inFunnel ? 'justify-center' : 'justify-start sm:justify-center'}`}>
-      {/* Left: back arrow (funnel only) */}
-      {inFunnel && (
+    <header className="relative shrink-0 h-16 bg-[#0F1B3D] text-white flex items-center justify-between px-4 sm:px-8 z-40">
+      {inFunnel ? (
         <button
           type="button"
           onClick={goBack}
           aria-label="Go back"
-          className="absolute left-2 sm:left-5 top-1/2 -translate-y-1/2 h-9 w-9 flex items-center justify-center rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           data-testid="header-back-button"
+          className="flex items-center gap-1 text-sm font-semibold text-white hover:text-[#FACC15] transition-colors focus:outline-none"
         >
-          <ChevronLeft className="h-6 w-6" />
+          <ChevronLeft className="h-5 w-5" /> Back
         </button>
-      )}
-
-      {/* Center: logo */}
-      <button
-        type="button"
-        onClick={() => navigate('/')}
-        className="flex items-center focus:outline-none"
-        data-testid="site-header-logo"
-        aria-label="Lemon Pros home"
-      >
-        <Logo size="md" />
-      </button>
-
-      {/* Right: progress bar (funnel only) */}
-      {inFunnel && (
-        <div
-          className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 flex items-center gap-2"
-          data-testid="header-progress"
-        >
-          <div className="h-2 w-[clamp(72px,18vw,160px)] rounded-full bg-slate-200 overflow-hidden">
-            <div
-              className="h-full bg-[#EF4444] rounded-full transition-[width] duration-300 ease-out"
-              style={{ width: `${pct}%` }}
-              data-testid="header-progress-fill"
-            />
-          </div>
-          <span className="text-xs font-medium text-slate-400 hidden sm:inline" data-testid="header-progress-label">
-            {index + 1}/{total}
-          </span>
+      ) : (
+        <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-white min-w-0">
+          <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
+          <span className="hidden sm:inline">Your information is safe and secure</span>
+          <span className="sm:hidden">Safe &amp; secure</span>
         </div>
       )}
 
-      {/* Right: click-to-call (landing / non-funnel pages) */}
-      {!inFunnel && (
-        <a
-          href={COMPANY.phoneHref}
-          onClick={trackPhoneCallConversion}
-          className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-full bg-[#EF4444] hover:bg-[#DC2626] text-white font-bold px-3 py-2 text-xs sm:text-sm shadow-[0_6px_16px_rgba(239,68,68,0.30)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-          data-testid="header-call-button"
-          aria-label={`Call Lemon Pros at ${COMPANY.phone}`}
-        >
-          <Phone className="h-4 w-4" />
-          <span className="whitespace-nowrap">{COMPANY.phone}</span>
-        </a>
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        data-testid="site-header-logo"
+        aria-label="Lemon Pros home"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 focus:outline-none"
+      >
+        <Logo size="md" light />
+      </button>
+
+      <a
+        href={COMPANY.phoneHref}
+        onClick={trackPhoneCallConversion}
+        data-testid="header-call-link"
+        aria-label={`Call Lemon Pros at ${COMPANY.phone}`}
+        className="flex items-center gap-2 text-base sm:text-2xl font-extrabold text-white hover:text-[#FACC15] transition-colors whitespace-nowrap"
+      >
+        <Phone className="h-5 w-5 sm:h-6 sm:w-6" />
+        <span className="hidden xs:inline sm:inline">{COMPANY.phone}</span>
+      </a>
+
+      {inFunnel && (
+        <div
+          className="absolute left-0 bottom-0 h-1 bg-[#EF4444] transition-all duration-300"
+          style={{ width: `${pct}%` }}
+          data-testid="funnel-progress"
+        />
       )}
     </header>
   );

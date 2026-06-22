@@ -375,7 +375,7 @@ export default function FunnelStep() {
 
   return (
     <div
-      className="min-h-full flex flex-col justify-center px-4 sm:px-6 pt-[clamp(12px,2.5vh,32px)] pb-[clamp(88px,15vh,170px)]"
+      className="min-h-full flex flex-col justify-start px-4 sm:px-6 pt-[clamp(16px,3.5vh,40px)] pb-8"
       data-testid="page-flow"
     >
       <motion.div
@@ -383,27 +383,29 @@ export default function FunnelStep() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.18 }}
-        className="w-full max-w-4xl mx-auto"
+        className="w-full max-w-3xl mx-auto"
         data-testid="flow-step-container"
       >
-        <div className="text-center mb-[clamp(16px,3vh,32px)]">
-          <h2 className="font-slab font-extrabold text-[clamp(1.5rem,3.6vw,2.25rem)] text-slate-900 leading-tight" data-testid="flow-question">
+        <div className="text-center mb-[clamp(14px,2.5vh,26px)]">
+          <h2 className="font-mock font-extrabold text-[clamp(1.6rem,4vw,2.5rem)] text-[#0F1B3D] leading-tight" data-testid="flow-question">
             {step.question}
           </h2>
           {step.subtitle && (
-            <p className="mt-3 text-[clamp(0.95rem,1.7vw,1.125rem)] font-semibold text-[#EF4444]" data-testid="flow-subtitle">{step.subtitle}</p>
+            <p className="mt-2 text-[clamp(0.95rem,1.7vw,1.125rem)] font-semibold text-[#EF4444]" data-testid="flow-subtitle">{step.subtitle}</p>
           )}
         </div>
 
-        {step.type === 'year' && <YearStep onSelect={(v) => selectAndNext('car_year', v)} />}
-        {step.type === 'make' && <MakeStep onSelect={(v) => selectAndNext('car_make', v)} />}
-        {step.type === 'model' && <ModelStep make={answers.car_make} onSelect={(v) => selectAndNext('car_model', v)} />}
-        {step.type === 'name' && <NameStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
-        {step.type === 'address' && <AddressStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
-        {step.type === 'phone' && <PhoneStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
-        {step.type === 'email' && (
-          <EmailStep answers={answers} setAnswer={setAnswer} onSubmit={submitLead} submitting={submitting} />
-        )}
+        <div className="bg-white rounded-2xl shadow-[0_18px_50px_rgba(15,27,61,0.16)] p-4 sm:p-6">
+          {step.type === 'year' && <YearStep onSelect={(v) => selectAndNext('car_year', v)} />}
+          {step.type === 'make' && <MakeStep onSelect={(v) => selectAndNext('car_make', v)} />}
+          {step.type === 'model' && <ModelStep make={answers.car_make} onSelect={(v) => selectAndNext('car_model', v)} />}
+          {step.type === 'name' && <NameStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
+          {step.type === 'address' && <AddressStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
+          {step.type === 'phone' && <PhoneStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
+          {step.type === 'email' && (
+            <EmailStep answers={answers} setAnswer={setAnswer} onSubmit={submitLead} submitting={submitting} />
+          )}
+        </div>
       </motion.div>
     </div>
   );
