@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Slab:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&family=Roboto+Slab:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -104,6 +104,11 @@ code {
 /* Brand helpers */
 .font-slab {
     font-family: 'Roboto Slab', ui-serif, Georgia, serif;
+}
+
+/* Mockup display font — bold rounded sans (bindright-style) */
+.font-mock {
+    font-family: 'Poppins', 'Inter', -apple-system, sans-serif;
 }
 
 @layer base {

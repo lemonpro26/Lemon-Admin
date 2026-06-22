@@ -41,7 +41,7 @@ export default function MockupFunnel() {
           <div className="mx-auto h-16 w-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
             <CheckCircle2 className="h-9 w-9 text-emerald-500" />
           </div>
-          <h1 className="mt-5 font-slab font-extrabold text-[#0F1B3D] text-[clamp(1.9rem,5vw,3rem)] leading-tight">
+          <h1 className="mt-5 font-mock font-extrabold text-[#0F1B3D] text-[clamp(1.9rem,5vw,3rem)] leading-tight">
             You're all set, {a.first_name || 'friend'}!
           </h1>
           <p className="mt-3 font-semibold text-slate-700 text-lg">
@@ -60,7 +60,7 @@ export default function MockupFunnel() {
     <MockupShell roadHeight="clamp(110px,18vh,240px)" onBack={back} progress={progress}>
       <div className="max-w-3xl mx-auto px-4 pt-7 sm:pt-10" data-testid="page-mockup-funnel">
         <div className="text-center mb-6">
-          <h1 className="font-slab font-extrabold text-[#0F1B3D] leading-tight text-[clamp(1.7rem,4.4vw,2.75rem)]" data-testid="mockup-question">
+          <h1 className="font-mock font-extrabold text-[#0F1B3D] leading-tight text-[clamp(1.7rem,4.4vw,2.75rem)]" data-testid="mockup-question">
             {step.question}
           </h1>
           {step.subtitle && <p className="mt-2 font-semibold text-[#EF4444] text-[clamp(0.95rem,1.7vw,1.15rem)]">{step.subtitle}</p>}
