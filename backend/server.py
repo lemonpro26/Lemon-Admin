@@ -1255,6 +1255,70 @@ async def delete_call(call_id: str, _: dict = Depends(require_editor)):
     return {"success": True}
 
 
+async def _upload_call_conversion(call: dict, sale: SaleBody) -> dict:
+    """Pass a closed phone call back to Google Ads as an offline conversion.
+    Matches on the call's gclid (from CTM / call-from-ads) and the caller's
+    phone number for enhanced matching."""
+    lead_like = {
+        "id": call.get("id"),
+        "email": "",
+        "phone": call.get("caller_number", ""),
+        "gclid": call.get("gclid", ""),
+    }
+    return await asyncio.to_thread(
+        dm.upload_offline_conversion,
+        lead=lead_like, value=sale.value, currency=(sale.currency or "USD"),
+        sale_datetime=sale.sale_datetime, order_id=call.get("id"), enhanced=True,
+    )
+
+
+@api_router.post("/admin/calls/{call_id}/sold")
+async def mark_call_sold(call_id: str, body: SaleBody, _: dict = Depends(require_editor)):
+    """Mark a phone call as sold with a revenue value, then upload an offline
+    conversion (revenue passback) to Google Ads."""
+    call = await db.calls.find_one({"id": call_id}, {"_id": 0})
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+
+    sale_dt = body.sale_datetime or call.get("called_at") or _now_iso()
+    body.sale_datetime = sale_dt
+    result = await _upload_call_conversion(call, body)
+    sale_fields = {
+        "sale_status": "sold",
+        "sale_value": float(body.value),
+        "sale_currency": (body.currency or "USD").upper(),
+        "sale_datetime": sale_dt,
+        "sold_at": _now_iso(),
+        "conversion_uploaded": bool(result.get("ok") and not result.get("validate_only")),
+        "conversion_status": result.get("status"),
+        "conversion_detail": result.get("detail"),
+        "conversion_validate_only": bool(result.get("validate_only")),
+        "conversion_last_attempt": _now_iso(),
+    }
+    await db.calls.update_one({"id": call_id}, {"$set": sale_fields})
+    return {"success": True, "call_id": call_id, "conversion": result, **sale_fields}
+
+
+@api_router.post("/admin/calls/{call_id}/conversion/retry")
+async def retry_call_conversion(call_id: str, _: dict = Depends(require_editor)):
+    call = await db.calls.find_one({"id": call_id}, {"_id": 0})
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+    if call.get("sale_status") != "sold" or call.get("sale_value") is None:
+        raise HTTPException(status_code=400, detail="Call is not marked as sold.")
+    body = SaleBody(value=float(call.get("sale_value")), currency=call.get("sale_currency", "USD"),
+                    sale_datetime=call.get("sale_datetime"))
+    result = await _upload_call_conversion(call, body)
+    await db.calls.update_one({"id": call_id}, {"$set": {
+        "conversion_uploaded": bool(result.get("ok") and not result.get("validate_only")),
+        "conversion_status": result.get("status"),
+        "conversion_detail": result.get("detail"),
+        "conversion_validate_only": bool(result.get("validate_only")),
+        "conversion_last_attempt": _now_iso(),
+    }})
+    return {"success": True, "call_id": call_id, "conversion": result}
+
+
 class AdLabelBody(BaseModel):
     type: str  # "campaign" | "adgroup" | "ad"
     id: str

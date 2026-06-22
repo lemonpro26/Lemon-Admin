@@ -76,9 +76,15 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 
 - **Organic vs paid-untracked split**: the campaign-level "(untracked/direct)" row is now data-driven — split into "Organic" (no gclid/wbraid/gbraid) and "Google Ads (untracked)" (has a Google click id but no campaign id). Only genuinely organic traffic is labeled "Organic". (`/admin/analytics` `_untracked_split`.)
 
+## Implemented (2026-06-22)
+- **Header/branding**: logo wordmark now "The LemonPros"; mobile header shows compact "Secure" badge (no logo overlap); added "CALL NOW" label under header phone. Terms/Privacy email → info@thelemonpros.com. SEO `<meta description>` + `<title>` rewritten (removed "A product of emergent.sh").
+- **Zapier CRM**: lead payload now includes `landing_page=apply.thelemonpros.com` (alongside `source`). Verified delivered 200.
+- **Offline conversions migrated to Google Data Manager API** (`datamanager_service.py`, `events:ingest`). Wired into `_upload_lead_conversion`, `/admin/google-ads/status`. New Import/UPLOAD_CLICKS conversion action created by user — ctId `7658454424` (category PURCHASE, ENABLED). Validate-only test PASSES for both leads and calls (gclid + hashed email/phone matching). Still in VALIDATE_ONLY mode.
+- **Phone-call revenue passback (NEW)**: calls captured via CTM webhook (`/calls/webhook?token=...`) now support "Mark as Sold & Send to Google Ads" in the Calls tab — `POST /admin/calls/{id}/sold` + `/conversion/retry`, `_upload_call_conversion` (matches on call gclid + caller phone). Calls tab UI: Revenue column, conversion badge, detail dialog. Curl-verified end-to-end (validated).
+
 ## Backlog / Next
-- P1: User to provide CRM API endpoint → set `CRM_WEBHOOK_URL` in backend/.env.
+- **P0 GO-LIVE**: set `GOOGLE_ADS_VALIDATE_ONLY=false` in backend/.env + redeploy to send REAL conversions to Google Ads (both leads & calls). Currently validate-only.
+- **P0**: User to point CallTrackingMetrics to webhook: `https://apply.thelemonpros.com/api/calls/webhook?token=0jyaTh6Ufb2MSpPs1U9OlN6bzotpx8K5` (so calls populate the Calls tab).
 - P1: User to provide SMTP creds for live email notifications.
-- P1: User to attach final brand logo/colors → swap Logo.jsx + accent colors.
 - P2: Vehicle "problem/defect" step + repair-attempts question to better qualify lemon-law leads.
 - P2: Make/model search filter for faster selection on long lists.
