@@ -5,7 +5,7 @@ import { Logo } from '@/components/Logo';
 import { COMPANY } from '@/lib/siteContent';
 
 export const HERO_IMG =
-  'https://static.prod-images.emergentagent.com/jobs/77f40ca2-be7c-4af1-a571-bc3da13d847f/images/ef82b7d651c1e12c90e82954c2d5c315606a3657947981207a6ef57caa2c77f2.png';
+  'https://static.prod-images.emergentagent.com/jobs/77f40ca2-be7c-4af1-a571-bc3da13d847f/images/949141c21ff080491a9737d4095f5c83e03163b543157750cd79f3ab13857f70.png';
 
 const FOOTER_LINKS = [
   { label: 'Terms of Use', to: '/terms' },
@@ -16,15 +16,15 @@ const FOOTER_LINKS = [
 
 // Shared navy-header shell for the bindright-style mockup (home + funnel).
 // roadHeight controls how much of the highway illustration shows at the bottom.
-export const MockupShell = ({ children, roadHeight = 'clamp(120px,22vh,300px)', onBack, progress = null }) => {
+export const MockupShell = ({ children, onBack, progress = null }) => {
   const navigate = useNavigate();
   const year = new Date().getFullYear();
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-gradient-to-b from-[#EAF6FF] via-[#CDEBFB] to-[#AEDCF7] overflow-hidden" data-testid="mockup-shell">
-      {/* Navy top bar — centered logo via 3-column grid */}
-      <header className="h-16 bg-[#0F1B3D] text-white grid grid-cols-3 items-center px-4 sm:px-8 shrink-0 z-30">
-        <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-white">
+    <div className="h-[100dvh] flex flex-col bg-[#A2DBF9] overflow-hidden" data-testid="mockup-shell">
+      {/* Navy top bar — logo absolutely centered so side widths never shift it */}
+      <header className="relative h-16 bg-[#0F1B3D] text-white flex items-center justify-between px-4 sm:px-8 shrink-0 z-30">
+        <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-white min-w-0">
           <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
           <span className="hidden sm:inline">Your information is safe and secure</span>
           <span className="sm:hidden">Safe &amp; secure</span>
@@ -32,7 +32,7 @@ export const MockupShell = ({ children, roadHeight = 'clamp(120px,22vh,300px)', 
         <button
           type="button"
           onClick={() => navigate('/mockup')}
-          className="justify-self-center focus:outline-none"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 focus:outline-none"
           aria-label="Lemon Pros home"
           data-testid="mockup-logo"
         >
@@ -40,7 +40,7 @@ export const MockupShell = ({ children, roadHeight = 'clamp(120px,22vh,300px)', 
         </button>
         <a
           href={COMPANY.phoneHref}
-          className="justify-self-end flex items-center gap-2 text-lg sm:text-2xl font-extrabold text-white hover:text-[#FACC15] transition-colors whitespace-nowrap"
+          className="flex items-center gap-2 text-lg sm:text-2xl font-extrabold text-white hover:text-[#FACC15] transition-colors whitespace-nowrap"
           data-testid="mockup-header-phone"
         >
           <Phone className="h-5 w-5 sm:h-6 sm:w-6" /> {COMPANY.phone}
@@ -66,14 +66,13 @@ export const MockupShell = ({ children, roadHeight = 'clamp(120px,22vh,300px)', 
         </div>
       )}
 
-      {/* Stage: road band fixed at bottom, content scrolls above it */}
-      <div className="relative flex-1 overflow-hidden">
+      {/* Stage: one continuous sky+road scene fills the area, words layer on top */}
+      <div className="relative flex-1 overflow-hidden bg-[#A2DBF9]">
         <img
           src={HERO_IMG}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none select-none absolute bottom-0 left-0 w-full object-cover object-bottom z-0"
-          style={{ height: roadHeight }}
+          className="pointer-events-none select-none absolute bottom-0 left-0 w-full h-auto z-0"
         />
         <div className="relative z-10 h-full overflow-y-auto">{children}</div>
       </div>

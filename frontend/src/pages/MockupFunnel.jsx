@@ -36,7 +36,7 @@ export default function MockupFunnel() {
   // ---- Thank-you (mock; no lead is created) ----
   if (done) {
     return (
-      <MockupShell roadHeight="clamp(120px,22vh,300px)" onBack={() => setI(total - 1)}>
+      <MockupShell onBack={() => setI(total - 1)}>
         <div className="max-w-xl mx-auto px-4 pt-12 text-center" data-testid="mockup-thankyou">
           <div className="mx-auto h-16 w-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
             <CheckCircle2 className="h-9 w-9 text-emerald-500" />
@@ -57,7 +57,7 @@ export default function MockupFunnel() {
   }
 
   return (
-    <MockupShell roadHeight="clamp(110px,18vh,240px)" onBack={back} progress={progress}>
+    <MockupShell onBack={back} progress={progress}>
       <div className="max-w-3xl mx-auto px-4 pt-7 sm:pt-10" data-testid="page-mockup-funnel">
         <div className="text-center mb-6">
           <h1 className="font-mock font-extrabold text-[#0F1B3D] leading-tight text-[clamp(1.7rem,4.4vw,2.75rem)]" data-testid="mockup-question">

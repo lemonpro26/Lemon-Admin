@@ -24,7 +24,7 @@ export default function MockupHome() {
   }, []);
 
   return (
-    <MockupShell roadHeight="clamp(140px,30vh,420px)">
+    <MockupShell>
       <div className="max-w-4xl mx-auto px-4 pt-8 sm:pt-14 text-center" data-testid="page-mockup-home">
         <h1
           className="font-mock font-extrabold tracking-tight text-[#0F1B3D] leading-[1.05] text-[clamp(2.3rem,6vw,4.25rem)]"
