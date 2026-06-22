@@ -1,5 +1,21 @@
 
 
+## 2026-06-20 (pm2) — Hook target picker redesign + master-admin credential change
+- Hooks "Create a Hook" → "Show this hook on" is now a tab/pill drill-down:
+  Home pill + a pill per campaign; clicking a campaign reveals "Entire campaign"
+  + ad-group pills. cForm now uses tCampaign/tAdgroup; campaign-level targeting
+  (match_campaign only) is now creatable from the UI (backend already supported it).
+  "Showing on:" summary line reflects the selection.
+- Master Admin Credentials: owner can change own username/password in Settings →
+  Users (owner-creds-card, owner only). Backend: PUT /admin/owner-credentials
+  (require_owner, verifies current password, stores custom creds in db.admin_owner
+  singleton, re-issues JWT). /admin/login checks custom owner creds; env
+  ADMIN_PASSWORD remains an always-valid recovery password. list_users shows the
+  real owner username.
+- Verified: testing agent 15/15 frontend checkpoints PASS (iteration_5.json);
+  owner cred flows + env recovery curl-verified.
+
+
 ## 2026-06-20 (pm) — Automatic bot-click cleaning (hands-off)
 - _auto_clean_bot_clicks() runs on every GET /admin/analytics and /admin/stats:
   silently deletes (all-time) bot user-agent hits + fake paid clicks (campaign
