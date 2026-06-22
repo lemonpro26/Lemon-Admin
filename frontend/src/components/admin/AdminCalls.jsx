@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw } from 'lucide-react';
+import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -119,6 +119,16 @@ export const AdminCalls = () => {
     }
   };
 
+  const addTestCall = async () => {
+    try {
+      await api.post('/admin/calls/test');
+      toast.success('Test call added.');
+      load();
+    } catch (e) {
+      toast.error('Could not add test call.');
+    }
+  };
+
   return (
     <div className="grid gap-4" data-testid="admin-calls">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -127,6 +137,11 @@ export const AdminCalls = () => {
         </p>
         <div className="flex items-center gap-2">
           <DateRangeFilter value={range} onChange={setRange} />
+          {editable && (
+            <Button variant="outline" size="sm" onClick={addTestCall} className="rounded-xl border-slate-200" data-testid="calls-add-test">
+              <Plus className="h-4 w-4 mr-2" /> Test call
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={load} className="rounded-xl border-slate-200" data-testid="calls-refresh">
             <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>

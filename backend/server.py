@@ -1255,6 +1255,37 @@ async def delete_call(call_id: str, _: dict = Depends(require_editor)):
     return {"success": True}
 
 
+@api_router.post("/admin/calls/test")
+async def create_test_call(_: dict = Depends(require_editor)):
+    """Create a realistic sample inbound call (with a sample GCLID) so the team can
+    practice the revenue-passback flow without dialing the tracking number."""
+    rng = random.Random()
+    name = rng.choice(["Alex Johnson", "Jordan Smith", "Sam Garcia", "Taylor Lee", "Casey Brown"])
+    geo = rng.choice([("Los Angeles", "CA"), ("Phoenix", "AZ"), ("Houston", "TX"), ("Miami", "FL")])
+    now = _now_iso()
+    rec = {
+        "id": str(uuid.uuid4()),
+        "caller_number": f"(555) {rng.randint(100,999)}-{rng.randint(1000,9999)}",
+        "caller_name": name,
+        "tracking_number": "(844) 335-8911",
+        "duration": rng.randint(45, 320),
+        "source": "google",
+        "keyword": "lemon law attorney",
+        "campaign": "Lemon Law LA",
+        "gclid": f"TestCallGclid{rng.randint(100000,999999)}",
+        "city": geo[0], "state": geo[1],
+        "recording_url": "",
+        "call_type": "inbound",
+        "called_at": now,
+        "is_test": True,
+        "raw": {"test": True},
+        "created_at": now,
+    }
+    await db.calls.insert_one({**rec})
+    return {"success": True, "call": {k: v for k, v in rec.items() if k != "_id"}}
+
+
+
 async def _upload_call_conversion(call: dict, sale: SaleBody) -> dict:
     """Pass a closed phone call back to Google Ads as an offline conversion.
     Matches on the call's gclid (from CTM / call-from-ads) and the caller's
