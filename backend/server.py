@@ -20,6 +20,7 @@ from datetime import datetime, timezone, timedelta
 from geo import resolve_client_ip, lookup_geo, render_tokens
 from metrics_mock import build_metrics
 import google_ads_service as gads
+import datamanager_service as dm
 import google_names_service as gnames
 from email_service import (
     send_email,
@@ -1319,7 +1320,8 @@ async def set_ad_label(body: AdLabelBody, _: dict = Depends(require_editor)):
 
 
 async def _upload_lead_conversion(lead: dict, sale: SaleBody) -> dict:
-    return gads.upload_offline_conversion(
+    return await asyncio.to_thread(
+        dm.upload_offline_conversion,
         lead=lead, value=sale.value, currency=(sale.currency or "USD"),
         sale_datetime=sale.sale_datetime, order_id=lead.get("id"), enhanced=True,
     )
@@ -1327,7 +1329,7 @@ async def _upload_lead_conversion(lead: dict, sale: SaleBody) -> dict:
 
 @api_router.get("/admin/google-ads/status")
 async def google_ads_status(_: dict = Depends(require_admin)):
-    return gads.status()
+    return dm.status()
 
 
 @api_router.get("/admin/google-ads/sitelinks")
