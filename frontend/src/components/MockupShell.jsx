@@ -5,7 +5,7 @@ import { Logo } from '@/components/Logo';
 import { COMPANY } from '@/lib/siteContent';
 
 export const HERO_IMG =
-  'https://static.prod-images.emergentagent.com/jobs/77f40ca2-be7c-4af1-a571-bc3da13d847f/images/949141c21ff080491a9737d4095f5c83e03163b543157750cd79f3ab13857f70.png';
+  'https://static.prod-images.emergentagent.com/jobs/77f40ca2-be7c-4af1-a571-bc3da13d847f/images/87517e8106e6001c8152c4c3d5f43df41a6ba219493f777bac6b05a46e33c037.png';
 
 const FOOTER_LINKS = [
   { label: 'Terms of Use', to: '/terms' },
@@ -21,7 +21,7 @@ export const MockupShell = ({ children, onBack, progress = null }) => {
   const year = new Date().getFullYear();
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-[#A2DBF9] overflow-hidden" data-testid="mockup-shell">
+    <div className="h-[100dvh] flex flex-col bg-[#86CFFD] overflow-hidden" data-testid="mockup-shell">
       {/* Navy top bar — logo absolutely centered so side widths never shift it */}
       <header className="relative h-16 bg-[#0F1B3D] text-white flex items-center justify-between px-4 sm:px-8 shrink-0 z-30">
         <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-white min-w-0">
@@ -67,12 +67,12 @@ export const MockupShell = ({ children, onBack, progress = null }) => {
       )}
 
       {/* Stage: one continuous sky+road scene fills the area, words layer on top */}
-      <div className="relative flex-1 overflow-hidden bg-[#A2DBF9]">
+      <div className="relative flex-1 overflow-hidden bg-[#86CFFD]">
         <img
           src={HERO_IMG}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none select-none absolute bottom-0 left-0 w-full h-auto z-0"
+          className="pointer-events-none select-none absolute inset-0 w-full h-full object-cover object-bottom z-0"
         />
         <div className="relative z-10 h-full overflow-y-auto">{children}</div>
       </div>
