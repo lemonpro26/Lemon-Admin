@@ -83,11 +83,12 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Phone-call revenue passback (NEW)**: calls captured via CTM webhook (`/calls/webhook?token=...`) now support "Mark as Sold & Send to Google Ads" in the Calls tab — `POST /admin/calls/{id}/sold` + `/conversion/retry`, `_upload_call_conversion` (matches on call gclid + caller phone). Calls tab UI: Revenue column, conversion badge, detail dialog. Curl-verified end-to-end (validated).
 
 ## Backlog / Next
-- **Call → hook attribution (NEW, 2026-06-23)**: `/admin/calls` now enriches each call with `saw_landing_page`, `hook_label`, `hook1/hook2`, `matched_rule_id` by joining the call's gclid (then session_id) to a recorded landing-page click. Calls tab shows a "Hook seen" column (indigo badge w/ hook label) or "No page visit" badge for direct ad click-to-calls; detail dialog shows the hook copy. Verified 100% (iteration_8). NOTE: link works only if CTM passes `gclid` (or `session_id`).
-- **Landing hook flash fixed (2026-06-23)**: hero text hidden (opacity-0) until `/config/public` resolves, then fades in — no more default→variant swap on refresh. Verified (iteration_7).
-- Minor polish (P2): Calls-tab internal date filter is independent of the dashboard `stats` range, so "Calls (N)" count can drift from the filtered table. Cosmetic only.
-- **P0 reminder**: revenue passback is LIVE (`GOOGLE_ADS_VALIDATE_ONLY=false`). Conversion action `7658454424`. Redeploy needed for prod.
-- **P0**: User to confirm CTM is actually delivering calls (prod DB had only the diagnostic call; CTM webhook may be misconfigured — verify the 200s point to our exact URL).
+- **Auto call conversions → Google Ads (NEW, 2026-06-23)**: qualified inbound CTM calls auto-upload as offline call-lead conversions. Dedicated conversion action `7659418481` "CTM Phone Call Lead (Offline Upload)" created via Google Ads API (UPLOAD_CLICKS, PHONE_CALL_LEAD, primary). `_auto_upload_call_conversion` fires on /calls/webhook for non-test calls with duration ≥ `MIN_CALL_CONVERSION_SECONDS` (60); short calls → `skipped_short`. Separate from revenue "Sold" action `7658454424`. event_source=PHONE, value 0. Admin call-detail shows "Auto call conversion" status. Verified 100% (iteration_9). NOTE: action `7659418481` was just created → uploads return propagation `NOT_FOUND` ("rejected") for a few hours, then start succeeding automatically. Requires CTM to pass `gclid`.
+- **Form-submit conversion confirmed Primary**: `7653805834` "LEMONPROS_CONV_SERVER" (WEBPAGE, SUBMIT_LEAD_FORM) = Primary/Enabled — form leads count. Website tap-to-call `7653974598` "Click to call" = Secondary (intentional; avoids double-count with completed-call uploads).
+- **Call → hook attribution (2026-06-23)**: /admin/calls enriched with saw_landing_page/hook_label/hook1/hook2 by joining call gclid→click. "Hook seen"/"No page visit" badges. Verified (iteration_8).
+- **Landing hook flash fixed (2026-06-23)**: hero hidden until /config/public resolves, then fades in. Verified (iteration_7).
+- **P0 reminder**: revenue passback is LIVE (`GOOGLE_ADS_VALIDATE_ONLY=false`). Redeploy needed for prod (env changes: GOOGLE_ADS_CALL_CONVERSION_ACTION_ID, MIN_CALL_CONVERSION_SECONDS).
+- **P0**: Confirm CTM actually delivers calls AND passes `gclid` (prod DB only had the diagnostic call; verify CTM webhook URL + add gclid merge field + install CTM tracking script on landing page for DNI).
 - P1: User to provide SMTP creds for live email notifications.
-- P2: Vehicle "problem/defect" step + repair-attempts question to better qualify lemon-law leads.
-- P2: Make/model search filter for faster selection on long lists.
+- P2: "Hook performance from calls" summary (calls + revenue grouped by hook variant).
+- P2: Vehicle "problem/defect" step to better qualify leads.
