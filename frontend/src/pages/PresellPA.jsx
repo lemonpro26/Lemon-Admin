@@ -9,6 +9,9 @@ import { COMPANY } from '@/lib/siteContent';
 import { Logo } from '@/components/Logo';
 import { CAR_MAKES, makeLogo } from '@/lib/carData';
 
+// Drop the attorney's real headshot URL here to replace the monogram placeholder.
+const ATTORNEY_PHOTO = '';
+
 const HERO_PA =
   'https://images.unsplash.com/photo-1643323921193-1d0177d54751?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200';
 const MECH_PA =
@@ -24,6 +27,7 @@ const TOP_MAKES = POPULAR
 export default function PresellPA() {
   const navigate = useNavigate();
   const { setAnswer, resetAnswers } = useFunnel();
+  const goLegal = (to) => navigate(to);
 
   useEffect(() => {
     const tracking = captureTracking(window.location.search);
@@ -82,10 +86,10 @@ export default function PresellPA() {
         </div>
       </header>
 
-      {/* Advertisement strip */}
+      {/* Attorney advertising strip */}
       <div className="bg-slate-100 border-b border-slate-200">
         <div className="max-w-3xl mx-auto px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] text-slate-400 text-center">
-          Advertisement
+          Attorney Advertising
         </div>
       </div>
 
@@ -96,7 +100,7 @@ export default function PresellPA() {
             LP
           </div>
           <div className="text-sm">
-            <p className="font-semibold text-slate-900">The Lemon Pros Consumer Desk</p>
+            <p className="font-semibold text-slate-900">By The Lemon Pros · Lemon Law Attorneys</p>
             <p className="text-slate-500">Consumer Rights Report · {today}</p>
           </div>
         </div>
@@ -216,6 +220,45 @@ export default function PresellPA() {
           className="w-full h-44 sm:h-56 object-cover rounded-2xl shadow-md mt-6"
         />
 
+        {/* Meet your attorney */}
+        <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" data-testid="pa-attorney">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            {ATTORNEY_PHOTO ? (
+              <img
+                src={ATTORNEY_PHOTO}
+                alt="Michael Saeedian, Esq."
+                className="h-28 w-28 rounded-2xl object-cover ring-2 ring-[#E0A800] shrink-0"
+                data-testid="pa-attorney-photo"
+              />
+            ) : (
+              <div
+                className="h-28 w-28 rounded-2xl bg-[#0B2545] text-white flex items-center justify-center text-3xl font-extrabold ring-2 ring-[#E0A800] shrink-0"
+                data-testid="pa-attorney-photo-placeholder"
+              >
+                MS
+              </div>
+            )}
+            <div className="text-center sm:text-left">
+              <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">Meet Your Attorney</p>
+              <h3 className="font-slab font-extrabold text-slate-900 text-xl mt-1">Michael Saeedian, Esq.</h3>
+              <p className="text-slate-500 text-sm">Founding Attorney · The Lemon Pros</p>
+              <p className="mt-3 text-slate-700 leading-relaxed">
+                Michael Saeedian has dedicated his practice to holding automakers accountable —
+                recovering refunds, replacements, and cash settlements for drivers stuck with
+                defective vehicles. When you submit your case, you work directly with a licensed
+                lemon law attorney, not a call center.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
+                {['Licensed CA Attorney', '100s of Cases Won', 'No Win, No Fee'].map((b) => (
+                  <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1">
+                    {b}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Step 1 */}
         <div className="mt-10">
           <p className="font-bold text-slate-900 text-lg">
@@ -283,19 +326,32 @@ export default function PresellPA() {
       </article>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-slate-50 mt-6">
-        <div className="max-w-3xl mx-auto px-4 py-8 text-center text-sm text-slate-500 space-y-3">
-          <p data-testid="pa-disclaimer">
-            This is an advertisement and not a news article, blog, or consumer protection update. The
-            Lemon Pros is not a law firm and does not provide legal advice; we connect consumers with
-            independent attorneys and advocates. Results vary by case and are not guaranteed.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
-            <a href="/terms" className="hover:text-slate-800" data-testid="pa-footer-terms">Terms of Use</a>
-            <a href="/privacy" className="hover:text-slate-800" data-testid="pa-footer-privacy">Privacy Policy</a>
-            <a href={COMPANY.phoneHref} onClick={trackPhoneCallConversion} className="hover:text-slate-800" data-testid="pa-footer-call">{COMPANY.phone}</a>
+      <footer className="border-t border-slate-200 bg-[#0B2545] text-slate-300 mt-6">
+        <div className="max-w-3xl mx-auto px-4 py-9 text-center space-y-4">
+          <div className="flex flex-col items-center gap-1">
+            <p className="font-slab font-extrabold text-white text-lg">The Lemon Pros</p>
+            <p className="text-sm text-slate-300">{COMPANY.address}</p>
+            <a href={COMPANY.phoneHref} onClick={trackPhoneCallConversion} className="text-sm font-semibold text-[#FACC15] hover:text-white" data-testid="pa-footer-call">
+              {COMPANY.phone}
+            </a>
           </div>
-          <p className="text-slate-400">©{new Date().getFullYear()} The Lemon Pros. All rights reserved. Attorney advertising. Michael Saeedian, Esq.</p>
+
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm">
+            <button type="button" onClick={() => goLegal('/terms')} className="hover:text-white transition-colors" data-testid="pa-footer-terms">Terms of Use</button>
+            <button type="button" onClick={() => goLegal('/do-not-sell')} className="hover:text-white transition-colors" data-testid="pa-footer-dns">Do Not Sell My Info</button>
+            <button type="button" onClick={() => goLegal('/privacy')} className="hover:text-white transition-colors" data-testid="pa-footer-privacy">Privacy</button>
+            <button type="button" onClick={() => goLegal('/contact')} className="hover:text-white transition-colors" data-testid="pa-footer-contact">Contact Us</button>
+          </div>
+
+          <p className="text-xs text-slate-400 leading-relaxed max-w-2xl mx-auto" data-testid="pa-disclaimer">
+            Attorney Advertising. This website is for general informational purposes and does not
+            constitute legal advice. Contacting The Lemon Pros does not create an attorney-client
+            relationship. Prior results do not guarantee a similar outcome. Case evaluations are
+            free and there is no fee unless we win.
+          </p>
+          <p className="text-xs text-slate-500" data-testid="pa-footer-copyright">
+            ©{new Date().getFullYear()} The Lemon Pros. All rights reserved. Attorney advertising. Michael Saeedian, Esq.
+          </p>
         </div>
       </footer>
     </div>
