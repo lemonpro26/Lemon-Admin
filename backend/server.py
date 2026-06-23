@@ -166,6 +166,7 @@ class LeadCreate(BaseModel):
     feeditemid: Optional[str] = ""
     extensionid: Optional[str] = ""
     params: Optional[dict] = None
+    source_page: Optional[str] = ""
 
 
 class ClickTrack(BaseModel):
@@ -183,6 +184,7 @@ class ClickTrack(BaseModel):
     extensionid: Optional[str] = ""
     landing_path: Optional[str] = ""
     params: Optional[dict] = None
+    source_page: Optional[str] = ""
 
 
 class HookRuleBody(BaseModel):
@@ -538,6 +540,7 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
 
     lead = payload.model_dump()
     lead["id"] = str(uuid.uuid4())
+    lead["source_page"] = (payload.source_page or "home").lower()
     lead["full_name"] = f"{payload.first_name} {payload.last_name}".strip()
     lead["city"] = payload.city or geo["city"]
     lead["state"] = payload.state or geo["state"]

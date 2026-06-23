@@ -19,6 +19,16 @@ const MECH_PA =
 const LOT_PA =
   'https://images.pexels.com/photos/29566906/pexels-photo-29566906.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=1200';
 
+const SETTLEMENTS = [
+  { amount: '$107,500', label: 'Mercedes GLE' },
+  { amount: '$98,000', label: 'Tesla Model Y' },
+  { amount: '$94,500', label: 'Ford F-150' },
+  { amount: '$89,000', label: 'Jeep Grand Cherokee' },
+  { amount: '$85,200', label: 'Chevy Silverado' },
+  { amount: '$79,800', label: 'Hyundai Tucson' },
+  { amount: '$76,500', label: 'Kia Sorento' },
+];
+
 const POPULAR = ['Toyota', 'Honda', 'Ford', 'Chevrolet', 'Nissan', 'Jeep', 'Hyundai', 'Kia', 'Ram', 'BMW', 'Mercedes-Benz'];
 const TOP_MAKES = POPULAR
   .map((name) => CAR_MAKES.find((m) => m.name === name))
@@ -36,6 +46,7 @@ export default function PresellPA() {
       .post('/track/click', {
         session_id: sessionId,
         landing_path: window.location.pathname,
+        source_page: 'lapa',
         campaign_id: tracking.campaign_id,
         adgroup_id: tracking.adgroup_id,
         ad_id: tracking.ad_id,
@@ -54,6 +65,7 @@ export default function PresellPA() {
   const start = (make) => {
     resetAnswers();
     setAnswer('started', '1');
+    setAnswer('source_page', 'lapa');
     if (make) setAnswer('car_make', make);
     navigate('/flow/year');
   };
@@ -128,6 +140,20 @@ export default function PresellPA() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Recent settlements */}
+        <div className="mb-7" data-testid="pa-settlements">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold mb-3">Recent Settlements</p>
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+            {SETTLEMENTS.map((s) => (
+              <div key={s.label} className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
+                <p className="font-slab font-extrabold text-emerald-600 text-lg">{s.amount}</p>
+                <p className="text-xs text-slate-600 whitespace-nowrap">{s.label}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1.5">Prior results do not guarantee a similar outcome.</p>
         </div>
 
         {/* Headline */}

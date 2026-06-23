@@ -342,6 +342,9 @@ export default function AdminDashboard() {
                             {lead.is_test && (
                               <Badge variant="outline" className="ml-2 bg-slate-100 text-slate-500 border-slate-200 text-[10px]">test</Badge>
                             )}
+                            {lead.source_page === 'lapa' && (
+                              <Badge variant="outline" className="ml-2 bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`lead-source-${lead.id}`}>PA page</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-slate-600">{lead.phone}</TableCell>
                           <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>
@@ -423,6 +426,7 @@ export default function AdminDashboard() {
                   ['Address', selected.address, 'lead-detail-address'],
                   ['Zip', selected.zip, 'lead-detail-zip'],
                   ['Location', `${selected.city}, ${selected.state}`, 'lead-detail-location'],
+                  ['Source', selected.source_page === 'lapa' ? 'PA page (lapa)' : (selected.source_page || 'home'), 'lead-detail-source'],
                   ['Campaign ID', selected.campaign_id, 'lead-detail-campaign'],
                   ['Ad Group ID', selected.adgroup_id, 'lead-detail-adgroup'],
                   ['Ad ID', selected.ad_id, 'lead-detail-ad'],

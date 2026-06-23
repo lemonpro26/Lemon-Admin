@@ -353,6 +353,7 @@ export default function FunnelStep() {
         phone: answers.phone || '',
         email: emailVal || answers.email || '',
         session_id: getSessionId(),
+        source_page: answers.source_page || 'home',
         campaign_id: tracking.campaign_id,
         adgroup_id: tracking.adgroup_id,
         ad_id: tracking.ad_id,

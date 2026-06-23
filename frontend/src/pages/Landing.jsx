@@ -25,6 +25,7 @@ export default function Landing() {
       .post('/track/click', {
         session_id: sessionId,
         landing_path: window.location.pathname,
+        source_page: 'home',
         campaign_id: tracking.campaign_id,
         adgroup_id: tracking.adgroup_id,
         ad_id: tracking.ad_id,
@@ -64,6 +65,7 @@ export default function Landing() {
   const start = () => {
     resetAnswers();
     setAnswer('started', '1');
+    setAnswer('source_page', 'home');
     navigate('/flow/year');
   };
 

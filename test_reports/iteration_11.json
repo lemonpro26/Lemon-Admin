@@ -1,0 +1,27 @@
+{
+  "summary": "Verified Recent Settlements strip + source_page tracking end-to-end. Backend tests: 6/6 passing for POST /leads source_page persistence (lapa/home/LAPA-normalized/empty-default) and POST /track/click. UI E2E: completed full funnel (/pa -> year -> make -> model -> name -> address -> phone -> email -> /thank-you) from BOTH entry points using real Playwright clicks. Admin dashboard correctly shows 'PA page' badge (data-testid=lead-source-<id>) on the /pa-sourced lead and NO badge on the /-sourced lead; the lead detail dialog data-testid=lead-detail-source reads 'PA page (lapa)' for /pa entry and 'home' for / entry. PresellPA layout confirmed: pa-attorney (y=126) is ABOVE pa-settlements (y=618) which is ABOVE pa-headline (y=775); pa-attorney-award visible. Address/phone/email verification calls (/verify-address, /verify-phone, /verify-email) all worked with a real gmail.com test address. Cleanup: all 6 QA leads created during testing were deleted via /api/admin/leads/{id}.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_lead_source_page.py",
+    "/app/test_reports/pytest/source_page.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/api/verify-email rejects domains it cannot verify MX for (e.g. example.com is currently rejected as 'undeliverable'). This is correct guard behavior but worth noting for any automated test that uses example.com addresses; use gmail.com or similar real domain.",
+    "FunnelStep does not auto-skip the make step when car_make is pre-set via PresellPA.start(make); minor UX nit, not a defect, since pa-make-toyota still routes to /flow/year and the user re-selects Toyota on /flow/make. Consider skip-if-set in a future pass.",
+    "PresellPA.jsx ~370 lines and Landing.jsx ~111 lines — fine. Both correctly call setAnswer('source_page', ...) and /track/click with source_page so dual tagging is consistent on click + lead."
+  ],
+  "updated_files": ["/app/backend/tests/test_lead_source_page.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin owner / LemonPros2026! (from /app/memory/test_credentials.md). Backend auth uses Bearer token from POST /api/admin/login.",
+  "seed_data_creation": "Created 2 leads via real funnel UI (QA LapaTest Tester via /pa, QA HomeTest Tester via /). Backend tests created 4 additional leads (QALAPA/QAHOME via direct POST /api/leads). All 6 leads were deleted at end via DELETE /api/admin/leads/{id}.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "source_page now flows end-to-end through FunnelContext: entry pages (PresellPA.start, Landing.start) call setAnswer('source_page', 'lapa'|'home'), persisted in localStorage 'osgd_funnel_answers', and FunnelStep.submitLead reads answers.source_page in the /api/leads payload. Backend lowercases and stores it; admin UI renders the PA badge only when source_page==='lapa' (data-testid=lead-source-<id>) and lead-detail-source dialog row shows 'PA page (lapa)' or 'home'. /api/track/click also accepts source_page, so per-page click counts can be queried in the future. Verified live against https://lemon-checker.preview.emergentagent.com.",
+  "rca of the issue": "n/a - all features working as specified"
+}
