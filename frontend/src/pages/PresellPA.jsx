@@ -10,7 +10,7 @@ import { Logo } from '@/components/Logo';
 import { CAR_MAKES, makeLogo } from '@/lib/carData';
 
 // Drop the attorney's real headshot URL here to replace the monogram placeholder.
-const ATTORNEY_PHOTO = '';
+const ATTORNEY_PHOTO = 'https://customer-assets.emergentagent.com/job_lemon-checker/artifacts/bijulyp5_attorney.jpg';
 
 const HERO_PA =
   'https://images.unsplash.com/photo-1643323921193-1d0177d54751?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200';
