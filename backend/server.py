@@ -1226,6 +1226,7 @@ async def calls_webhook(request: Request, token: str = ""):
         "keyword": g("keyword"),
         "campaign": g("campaign", "campaign_name"),
         "gclid": g("gclid"),
+        "session_id": g("session_id", "session", "sid"),
         "city": g("city"),
         "state": g("state"),
         "recording_url": g("recording_url", "recording"),
@@ -1239,11 +1240,65 @@ async def calls_webhook(request: Request, token: str = ""):
     return {"success": True, "id": rec["id"]}
 
 
+async def _enrich_calls_with_hooks(items: list) -> list:
+    """For each call, determine whether the caller saw the landing page and which
+    hook variant they saw, by joining the call's gclid (or session_id) to a
+    recorded click. Adds: saw_landing_page (bool), hook_label, hook1, hook2,
+    matched_rule_id. Calls with no matching click are flagged as a direct
+    'click-to-call on the ad' (no page visit)."""
+    if not items:
+        return items
+    gclids = [c.get("gclid") for c in items if c.get("gclid")]
+    sessions = [c.get("session_id") for c in items if c.get("session_id")]
+    clicks_by_gclid, clicks_by_session = {}, {}
+    if gclids or sessions:
+        q = {"$or": []}
+        if gclids:
+            q["$or"].append({"gclid": {"$in": gclids}})
+        if sessions:
+            q["$or"].append({"session_id": {"$in": sessions}})
+        async for ck in db.clicks.find(q, {"gclid": 1, "session_id": 1, "matched_rule_id": 1}):
+            if ck.get("gclid"):
+                clicks_by_gclid[ck["gclid"]] = ck
+            if ck.get("session_id"):
+                clicks_by_session[ck["session_id"]] = ck
+
+    rules = await db.hook_rules.find({}, {"id": 1, "label": 1, "hook1": 1, "hook2": 1}).to_list(length=500)
+    rule_map = {r.get("id"): r for r in rules}
+    cfg = await get_or_create_config()
+    default_hook = {"label": "Default hook", "hook1": cfg.get("hook1", ""), "hook2": cfg.get("hook2", "")}
+
+    for c in items:
+        ck = None
+        if c.get("gclid") and c["gclid"] in clicks_by_gclid:
+            ck = clicks_by_gclid[c["gclid"]]
+        elif c.get("session_id") and c["session_id"] in clicks_by_session:
+            ck = clicks_by_session[c["session_id"]]
+        if ck is None:
+            c["saw_landing_page"] = False
+            c["hook_label"] = None
+            c["hook1"] = None
+            c["hook2"] = None
+            c["matched_rule_id"] = None
+        else:
+            rid = ck.get("matched_rule_id")
+            hook = rule_map.get(rid) if rid else default_hook
+            if not hook:
+                hook = default_hook
+            c["saw_landing_page"] = True
+            c["hook_label"] = hook.get("label") or "Default hook"
+            c["hook1"] = hook.get("hook1")
+            c["hook2"] = hook.get("hook2")
+            c["matched_rule_id"] = rid
+    return items
+
+
 @api_router.get("/admin/calls")
 async def admin_get_calls(start: str = "", end: str = "", _: dict = Depends(require_admin)):
     s_iso, e_iso, _d = _date_range(start, end)
     docs = await db.calls.find({"created_at": {"$gte": s_iso, "$lte": e_iso}}).sort("created_at", -1).to_list(2000)
     items = [{k: v for k, v in c.items() if k != "_id"} for c in docs]
+    items = await _enrich_calls_with_hooks(items)
     return {"calls": items, "total": len(items)}
 
 

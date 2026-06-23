@@ -1,0 +1,30 @@
+{
+  "summary": "Verified the new call -> hook attribution feature end-to-end. Backend pytest (7/7) covers Scenario A (gclid matches a seeded click with browser UA -> saw_landing_page=true, hook_label present, hook1/hook2/matched_rule_id keys present), Scenario B (no matching click -> saw_landing_page=false, hook_label/hook1/hook2/matched_rule_id all null), /admin/calls/test seeding, mark-as-sold revenue passback regression, and auth enforcement (webhook token + admin auth). Frontend Playwright covers: Calls tab label format 'Calls (N)' (data-testid=admin-tab-calls), 'Test call' button adds a row, the new 'Hook seen' column renders the gray 'No page visit' badge (data-testid=call-nopage-<id>) for unmatched test calls, View opens the detail dialog with the 'Landing page & hook' section showing the no-page message (data-testid=call-detail-nopage), and the 'Mark as Sold & Send to Google Ads' control (data-testid=call-mark-sold-button) still renders for editable users. All 4 review items PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Calls -> Call detail Dialog", "issues": ["Console warning: 'Missing Description or aria-describedby for DialogContent' (Radix a11y). Non-blocking but worth adding a DialogDescription for screen readers."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_calls_hook_attribution.py",
+    "/app/test_reports/pytest/iteration_8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminDashboard.jsx line 251: Calls tab label uses stats?.total_calls which is the lifetime/global stat, not the currently-filtered range that the table shows. When the user filters the Calls tab by a date range, the table can show e.g. 3 calls while the trigger still reads 'Calls (12)'. Either drive the trigger count from the same /admin/calls response the tab loads, or rename the badge for clarity.",
+    "_enrich_calls_with_hooks (server.py ~1243): the $or aggregation query is built with empty arrays when both gclids and sessions are empty - the function correctly skips the DB call only when both lists are empty, but if only one is empty an `$or: []` query would be invalid. Currently safe (the if-guard prevents it), but the inner append-only logic could regress; consider building `$or` as a list and only attaching it when non-empty (already done) and assert len($or) > 0 before find.",
+    "AdminCalls.jsx convBadge + addTestCall do not optimistically reload stats - the parent stats counter that powers 'Calls (N)' is fetched in AdminDashboard and is not invalidated after add/delete, so the tab count drifts until next full refresh.",
+    "calls_webhook silently coerces missing/invalid duration to 0 and accepts any payload shape. Worth at least logging when none of the recognized caller_number aliases are present so misconfigured CTM webhooks surface early."
+  ],
+  "updated_files": ["/app/backend/tests/test_calls_hook_attribution.py"],
+  "success_rate": {"backend": "100% (7/7 pytest)", "frontend": "100% (all review items present and behaving)"},
+  "test_credentials": "owner / LemonPros2026! (POST /api/admin/login). CALLS_WEBHOOK_TOKEN=0jyaTh6Ufb2MSpPs1U9OlN6bzotpx8K5.",
+  "seed_data_creation": "Created scratch calls with caller_name 'QA Hook Test ...' and a few clicks with session_id prefix 'TESTHOOK_<uuid>' during the pytest run. Cleanup fixture deletes the calls it tracked via DELETE /api/admin/calls/{id}. Click documents (a handful) remain in db.clicks with the TESTHOOK_ session prefix and the TESTHOOK_A_* gclids - safe (test gclids will never match a real Google Ads click).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend join is implemented in _enrich_calls_with_hooks (server.py ~L1243). Key gotcha for any future setup: POST /api/track/click drops requests with curl-style/bot User-Agents via is_bot_ua(); always send a real browser UA (e.g. Mozilla/5.0 ... Chrome/120 Safari/537.36) when seeding clicks, otherwise the join correctly returns saw_landing_page=false and you'll think the feature is broken. The hook detail UI uses two mutually-exclusive testids: call-detail-hook-label (with hook1/hook2) when saw_landing_page=true, else call-detail-nopage. The table column uses call-hook-<id> vs call-nopage-<id>. Admin tab trigger format is 'Calls (N)' with data-testid=admin-tab-calls. Note: tab count comes from stats?.total_calls (global), not the currently-filtered table.",
+  "rca of the issue": "N/A - feature addition, no defect found. Implementation is correct: enrichment loads clicks by gclid (and falls back to session_id), maps matched_rule_id -> hook_rules.label/hook1/hook2, and uses the config default hook when matched_rule_id is null but a click was found. Calls without a matching click are correctly flagged saw_landing_page=false with all hook fields null."
+}

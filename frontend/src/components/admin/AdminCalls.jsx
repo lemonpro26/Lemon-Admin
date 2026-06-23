@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus } from 'lucide-react';
+import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -156,6 +156,7 @@ export const AdminCalls = () => {
               <TableHead>Number</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead className="hidden md:table-cell">Campaign</TableHead>
+              <TableHead className="hidden lg:table-cell">Hook seen</TableHead>
               <TableHead className="hidden sm:table-cell">Revenue</TableHead>
               <TableHead className="hidden lg:table-cell">Location</TableHead>
               <TableHead>When</TableHead>
@@ -164,15 +165,26 @@ export const AdminCalls = () => {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-slate-400 py-10">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10">Loading…</TableCell></TableRow>
             ) : calls.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
             ) : calls.map((c) => (
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
                 <TableCell className="font-medium text-slate-900">{c.caller_name || '—'}</TableCell>
                 <TableCell className="text-slate-700">{c.caller_number || '—'}</TableCell>
                 <TableCell className="text-slate-700">{fmtDuration(c.duration)}</TableCell>
                 <TableCell className="hidden md:table-cell text-slate-600">{c.campaign || '—'}</TableCell>
+                <TableCell className="hidden lg:table-cell">
+                  {c.saw_landing_page ? (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700" data-testid={`call-hook-${c.id}`} title={c.hook1 || ''}>
+                      {c.hook_label || 'Default hook'}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500" data-testid={`call-nopage-${c.id}`}>
+                      No page visit
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className="hidden sm:table-cell">
                   {c.sale_status === 'sold' ? (
                     <div className="flex flex-col gap-1">
@@ -241,6 +253,33 @@ export const AdminCalls = () => {
                     <span className="text-slate-900 font-medium text-right break-all" data-testid={tid}>{value || '—'}</span>
                   </div>
                 ))}
+              </div>
+
+              {/* Hook seen / landing-page attribution */}
+              <div className="rounded-xl border border-slate-200 p-4 bg-white" data-testid="call-hook-section">
+                <div className="flex items-center gap-2 mb-2">
+                  <FlaskConical className="h-4 w-4 text-indigo-600" />
+                  <span className="font-semibold text-slate-900">Landing page &amp; hook</span>
+                </div>
+                {selected.saw_landing_page ? (
+                  <div className="text-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700" data-testid="call-detail-hook-label">
+                        {selected.hook_label || 'Default hook'}
+                      </span>
+                    </div>
+                    {selected.hook1 && (
+                      <p className="text-slate-900 font-semibold" data-testid="call-detail-hook1">{selected.hook1}</p>
+                    )}
+                    {selected.hook2 && (
+                      <p className="text-slate-600 mt-1" data-testid="call-detail-hook2">{selected.hook2}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500" data-testid="call-detail-nopage">
+                    This caller clicked to call from the ad <strong>without visiting the landing page</strong> (no matching page visit found).
+                  </p>
+                )}
               </div>
 
               {/* Revenue + Google Ads conversion */}
