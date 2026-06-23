@@ -83,10 +83,10 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Phone-call revenue passback (NEW)**: calls captured via CTM webhook (`/calls/webhook?token=...`) now support "Mark as Sold & Send to Google Ads" in the Calls tab — `POST /admin/calls/{id}/sold` + `/conversion/retry`, `_upload_call_conversion` (matches on call gclid + caller phone). Calls tab UI: Revenue column, conversion badge, detail dialog. Curl-verified end-to-end (validated).
 
 ## Backlog / Next
-- **Advertorial presell page `/pa` (NEW, 2026-06-23)**: standalone law-firm advertorial (PresellPA.jsx) that funnels into the existing flow; homepage `/` untouched. Includes "Meet Your Attorney" section with Michael Saeedian's real headshot, law-firm footer (firm name, Beverly Hills address, phone, Attorney Advertising disclaimer, same legal links as main site), popular-make picker → /flow/year. Verified iteration_10 (100%) + photo/name/legal follow-up verified via screenshot.
-- **Company renamed "Lemon Pros" → "The Lemon Pros"** site-wide (COMPANY.name, footer, legal docs). Legal docs (Terms/Privacy/Do-Not-Sell, shared site-wide) updated to LAW-FIRM positioning (removed "not a law firm"/"connects with independent attorneys"; added attorney-client + engagement-agreement language).
-- **Auto call conversions → Google Ads (2026-06-23)**: conversion action 7659418481; qualified CTM calls (≥60s, w/ gclid) auto-upload (value 0, PHONE). Verified iteration_9.
-- **Call→hook attribution (iteration_8)**, **landing hook flash fix (iteration_7)** done.
+- **`source_page` lead/click tracking (NEW, 2026-06-23)**: leads + clicks tagged `source_page` — `lapa` when entering the funnel from `/pa`, `home` from the homepage. Carries through FunnelContext → /leads, stored + forwarded to Zapier; admin leads show a "PA page" badge + Source field. Verified e2e iteration_11 (100%).
+- **`/pa` advertorial polish (2026-06-23)**: attorney section moved to TOP with real headshot + full bio (UCLA, Loyola J.D., CA Bar #265470) and highlighted "National Trial Lawyers — Top 40 Under 40"; brighter hero; "Recent Settlements" strip added. Law-firm footer + legal pages. Verified iteration_10/11.
+- Company renamed site-wide to "The Lemon Pros"; legal docs now law-firm positioned.
+- Auto call conversions (action 7659418481), call→hook attribution, landing hook flash fix — all verified (iterations 8/9).
 - **P0**: Confirm CTM actually delivers calls AND passes `gclid` (prod DB only had the diagnostic call; verify CTM webhook URL + add gclid merge field + install CTM tracking script on landing page for DNI).
 - P1: User to provide SMTP creds for live email notifications.
 - P2: "Hook performance from calls" summary (calls + revenue grouped by hook variant).
