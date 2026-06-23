@@ -121,7 +121,8 @@ def _iso_rfc3339(dt) -> str:
 
 def upload_offline_conversion(lead: dict, value: float, currency: str = "USD",
                               sale_datetime=None, order_id: str = None,
-                              enhanced: bool = True) -> dict:
+                              enhanced: bool = True, conversion_action_id: str = None,
+                              event_source: str = "WEB") -> dict:
     """Send a single offline conversion event via the Data Manager API."""
     if not is_configured():
         return {"ok": False, "status": "not_configured",
@@ -130,13 +131,14 @@ def upload_offline_conversion(lead: dict, value: float, currency: str = "USD",
 
     validate_only = is_validate_only()
     customer_id = _digits(os.environ["GOOGLE_ADS_CUSTOMER_ID"])
-    conversion_action_id = _digits(os.environ["GOOGLE_ADS_CONVERSION_ACTION_ID"])
+    conversion_action_id = _digits(conversion_action_id) if conversion_action_id \
+        else _digits(os.environ["GOOGLE_ADS_CONVERSION_ACTION_ID"])
     gclid = (lead.get("gclid") or "").strip()
 
     event = {
         "eventTimestamp": _iso_rfc3339(sale_datetime),
         "transactionId": str(order_id or lead.get("id") or lead.get("_id") or ""),
-        "eventSource": "WEB",
+        "eventSource": event_source or "WEB",
         "conversionValue": float(value),
         "currency": (currency or "USD").upper(),
     }

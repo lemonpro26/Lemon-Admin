@@ -289,6 +289,21 @@ export const AdminCalls = () => {
                   <span className="font-semibold text-slate-900">Revenue &amp; Google Ads Conversion</span>
                 </div>
 
+                {selected.call_conversion_status && (
+                  <div className="mb-3 text-xs rounded-lg bg-white border border-slate-200 px-3 py-2" data-testid="call-auto-conversion-status">
+                    <span className="font-semibold text-slate-700">Auto call conversion: </span>
+                    <span className="text-slate-600">
+                      {selected.call_conversion_status === 'skipped_short'
+                        ? 'Not counted (call too short)'
+                        : selected.call_conversion_uploaded
+                          ? 'Sent to Google Ads ✓'
+                          : selected.call_conversion_validate_only && selected.call_conversion_status === 'validated'
+                            ? 'Validated (test mode)'
+                            : (selected.call_conversion_detail || selected.call_conversion_status)}
+                    </span>
+                  </div>
+                )}
+
                 {!selected.gclid && (
                   <div className="mb-3 text-xs rounded-lg bg-slate-100 border border-slate-200 text-slate-600 px-3 py-2" data-testid="call-no-gclid-note">
                     No GCLID on this call — Google will match on the caller&apos;s phone number (enhanced) only.

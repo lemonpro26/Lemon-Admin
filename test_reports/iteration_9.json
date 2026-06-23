@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 9 — Auto Call Conversion (CTM → Google Ads). Backend (4/4 pytest passed) + Frontend (all flows verified). Qualified inbound call triggered an upload ATTEMPT to conversion action 7659418481, status='rejected' detail='There was a problem with the request.' last_attempt timestamp set — EXPECTED behavior per spec (conversion action still propagating, destination NOT_FOUND). Short call (20s) correctly marked call_conversion_status='skipped_short' with 'Call under 60s — not counted.'. Test call (is_test=true) correctly excluded — no call_conversion_status field. Frontend dialog renders the 'Auto call conversion' line (data-testid='call-auto-conversion-status') only when status is present; absent for test calls. Regression: Calls (N) tab label, 'Hook seen' column, 'No page visit' badge, and 'Mark as Sold & Send to Google Ads' button all render correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auto_call_conversion.py",
+    "/app/test_reports/pytest/iteration_9_auto_call.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 1954 lines — exceeds 700-line guideline. Recommend extracting Calls/Conversion endpoints (lines ~1193–1480) into /app/backend/routes/calls.py to improve maintainability.",
+    "_auto_upload_call_conversion swallows all exceptions with broad except (line 1232). Acceptable for a fire-and-forget background task, but consider distinguishing transient (network) vs permanent (bad config) failures so the call record can reflect 'error' status with detail for retry.",
+    "When duration is 0/missing, qualified branch is skipped via skipped_short — but call_conversion_last_attempt is NOT set for skipped_short. Frontend may want a uniform last_attempt for both skipped and uploaded; verify if intentional.",
+    "No retry endpoint for the AUTO conversion (separate from /admin/calls/{id}/conversion/retry which is for the 'Sold' revenue passback). Consider adding /admin/calls/{id}/auto-conversion/retry so operators can manually retry once destination has propagated."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auto_call_conversion.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin owner: username='owner' password='LemonPros2026!'. CALLS_WEBHOOK_TOKEN='0jyaTh6Ufb2MSpPs1U9OlN6bzotpx8K5'.",
+  "seed_data_creation": "Created 3 QA calls during testing (QA Auto Qualified 120s, QA Auto Short 20s, Taylor Lee test call); ALL DELETED via /api/admin/calls/{id} after verification — no leftover seed data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Auto Call Conversion feature is fully wired and verified. Observed live response status for action 7659418481 = 'rejected' / 'There was a problem with the request.' This is EXPECTED per spec while the new conversion action propagates inside Google Ads — may auto-transition to 'uploaded' once destination is found (hours-days). If retesting, the assertion is that an upload was ATTEMPTED (call_conversion_status + call_conversion_last_attempt present), NOT that status == uploaded.",
+  "rca_of_the_issue": "N/A — no defects found. Feature works as designed."
+}

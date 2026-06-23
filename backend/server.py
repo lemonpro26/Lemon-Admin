@@ -76,6 +76,13 @@ CRM_WEBHOOK_URL = os.environ.get('CRM_WEBHOOK_URL', '')
 
 CALLS_WEBHOOK_TOKEN = os.environ.get('CALLS_WEBHOOK_TOKEN', '')
 
+# Auto-upload qualified inbound calls to Google Ads as offline call conversions.
+GOOGLE_ADS_CALL_CONVERSION_ACTION_ID = os.environ.get('GOOGLE_ADS_CALL_CONVERSION_ACTION_ID', '')
+try:
+    MIN_CALL_CONVERSION_SECONDS = int(os.environ.get('MIN_CALL_CONVERSION_SECONDS', '60'))
+except Exception:
+    MIN_CALL_CONVERSION_SECONDS = 60
+
 # Referrer substrings whose lead submissions are treated as bot/spam and silently
 # dropped (no DB save, no CRM forward, no email). googlesyndication = display-ad bots.
 BLOCKED_REFERRER_SUBSTRINGS = ("googlesyndication.com", "doubleclick.net")
@@ -1184,6 +1191,49 @@ async def delete_lead(lead_id: str, _: dict = Depends(require_editor)):
 
 
 # ---------------- Phone calls (CallTrackingMetrics webhook) ----------------
+async def _auto_upload_call_conversion(call: dict):
+    """Automatically upload a qualifying inbound call to Google Ads as an offline
+    call-lead conversion (separate from the revenue 'Sold' action). Fires for real
+    (non-test) calls that meet the minimum duration and have a gclid or phone for
+    matching. Never raises; records the result on the call document."""
+    try:
+        if call.get("is_test"):
+            return
+        if not GOOGLE_ADS_CALL_CONVERSION_ACTION_ID:
+            return
+        duration = int(call.get("duration") or 0)
+        if duration < MIN_CALL_CONVERSION_SECONDS:
+            await db.calls.update_one({"id": call["id"]}, {"$set": {
+                "call_conversion_status": "skipped_short",
+                "call_conversion_detail": f"Call under {MIN_CALL_CONVERSION_SECONDS}s — not counted.",
+            }})
+            return
+        lead_like = {
+            "id": call.get("id"),
+            "email": "",
+            "phone": call.get("caller_number", ""),
+            "gclid": call.get("gclid", ""),
+        }
+        result = await asyncio.to_thread(
+            dm.upload_offline_conversion,
+            lead=lead_like, value=0.0, currency="USD",
+            sale_datetime=call.get("called_at"), order_id=call.get("id"),
+            enhanced=True, conversion_action_id=GOOGLE_ADS_CALL_CONVERSION_ACTION_ID,
+            event_source="PHONE",
+        )
+        await db.calls.update_one({"id": call["id"]}, {"$set": {
+            "call_conversion_uploaded": bool(result.get("ok") and not result.get("validate_only")),
+            "call_conversion_status": result.get("status"),
+            "call_conversion_detail": result.get("detail"),
+            "call_conversion_validate_only": bool(result.get("validate_only")),
+            "call_conversion_last_attempt": _now_iso(),
+        }})
+        logger.info("Auto call conversion for %s: %s", call.get("id"), result.get("status"))
+    except Exception as e:
+        logger.warning("Auto call conversion failed for %s: %s", call.get("id"), e)
+
+
+
 @api_router.post("/calls/webhook")
 async def calls_webhook(request: Request, token: str = ""):
     """Receive a completed-call payload pushed by CallTrackingMetrics. Accepts JSON
@@ -1237,6 +1287,7 @@ async def calls_webhook(request: Request, token: str = ""):
     }
     await db.calls.insert_one({**rec})
     logger.info("Call webhook stored: %s (%ss) from %s", rec["caller_number"], duration, rec["source"])
+    asyncio.create_task(_auto_upload_call_conversion(rec))
     return {"success": True, "id": rec["id"]}
 
 
