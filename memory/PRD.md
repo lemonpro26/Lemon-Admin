@@ -83,8 +83,11 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Phone-call revenue passback (NEW)**: calls captured via CTM webhook (`/calls/webhook?token=...`) now support "Mark as Sold & Send to Google Ads" in the Calls tab — `POST /admin/calls/{id}/sold` + `/conversion/retry`, `_upload_call_conversion` (matches on call gclid + caller phone). Calls tab UI: Revenue column, conversion badge, detail dialog. Curl-verified end-to-end (validated).
 
 ## Backlog / Next
-- **P0 GO-LIVE**: set `GOOGLE_ADS_VALIDATE_ONLY=false` in backend/.env + redeploy to send REAL conversions to Google Ads (both leads & calls). Currently validate-only.
-- **P0**: User to point CallTrackingMetrics to webhook: `https://apply.thelemonpros.com/api/calls/webhook?token=0jyaTh6Ufb2MSpPs1U9OlN6bzotpx8K5` (so calls populate the Calls tab).
+- **Call → hook attribution (NEW, 2026-06-23)**: `/admin/calls` now enriches each call with `saw_landing_page`, `hook_label`, `hook1/hook2`, `matched_rule_id` by joining the call's gclid (then session_id) to a recorded landing-page click. Calls tab shows a "Hook seen" column (indigo badge w/ hook label) or "No page visit" badge for direct ad click-to-calls; detail dialog shows the hook copy. Verified 100% (iteration_8). NOTE: link works only if CTM passes `gclid` (or `session_id`).
+- **Landing hook flash fixed (2026-06-23)**: hero text hidden (opacity-0) until `/config/public` resolves, then fades in — no more default→variant swap on refresh. Verified (iteration_7).
+- Minor polish (P2): Calls-tab internal date filter is independent of the dashboard `stats` range, so "Calls (N)" count can drift from the filtered table. Cosmetic only.
+- **P0 reminder**: revenue passback is LIVE (`GOOGLE_ADS_VALIDATE_ONLY=false`). Conversion action `7658454424`. Redeploy needed for prod.
+- **P0**: User to confirm CTM is actually delivering calls (prod DB had only the diagnostic call; CTM webhook may be misconfigured — verify the 200s point to our exact URL).
 - P1: User to provide SMTP creds for live email notifications.
 - P2: Vehicle "problem/defect" step + repair-attempts question to better qualify lemon-law leads.
 - P2: Make/model search filter for faster selection on long lists.
