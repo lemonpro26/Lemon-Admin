@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, ShieldCheck, CheckCircle2, Scale, Clock, ArrowRight, Star } from 'lucide-react';
+import { Phone, ShieldCheck, CheckCircle2, Scale, Clock, ArrowRight, Star, Award, GraduationCap } from 'lucide-react';
 import { api } from '@/lib/api';
 import { captureTracking, getSessionId } from '@/lib/tracking';
 import { useFunnel } from '@/context/FunnelContext';
@@ -13,7 +13,7 @@ import { CAR_MAKES, makeLogo } from '@/lib/carData';
 const ATTORNEY_PHOTO = 'https://customer-assets.emergentagent.com/job_lemon-checker/artifacts/bijulyp5_attorney.jpg';
 
 const HERO_PA =
-  'https://images.unsplash.com/photo-1643323921193-1d0177d54751?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200';
+  'https://images.unsplash.com/photo-1504203640717-b7d237a3dc84?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200';
 const MECH_PA =
   'https://images.unsplash.com/photo-1615906655593-ad0386982a0f?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200';
 const LOT_PA =
@@ -58,12 +58,6 @@ export default function PresellPA() {
     navigate('/flow/year');
   };
 
-  const today = new Date().toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
   return (
     <div className="min-h-[100dvh] bg-white font-sans text-slate-800" data-testid="presell-pa-page">
       {/* Top brand bar */}
@@ -94,14 +88,45 @@ export default function PresellPA() {
       </div>
 
       <article className="max-w-3xl mx-auto px-4 py-8">
-        {/* Byline */}
-        <div className="flex items-center gap-3 mb-5" data-testid="pa-byline">
-          <div className="h-10 w-10 rounded-full bg-[#0B2545] text-white flex items-center justify-center font-bold">
-            LP
-          </div>
-          <div className="text-sm">
-            <p className="font-semibold text-slate-900">By The Lemon Pros · Lemon Law Attorneys</p>
-            <p className="text-slate-500">Consumer Rights Report · {today}</p>
+        {/* Meet your attorney — credibility opener (top) */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-7" data-testid="pa-attorney">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            <img
+              src={ATTORNEY_PHOTO}
+              alt="Michael Saeedian, Esq."
+              className="h-32 w-32 rounded-2xl object-cover ring-2 ring-[#E0A800] shrink-0"
+              data-testid="pa-attorney-photo"
+            />
+            <div className="text-center sm:text-left">
+              <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">Meet Your Attorney</p>
+              <h2 className="font-slab font-extrabold text-slate-900 text-2xl mt-1">Michael Saeedian, Esq.</h2>
+              <p className="text-slate-500 text-sm">Founding Attorney · The Lemon Pros · CA State Bar #265470</p>
+
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0B2545] text-white px-4 py-1.5 font-bold text-sm" data-testid="pa-attorney-award">
+                <Award className="h-4 w-4 text-[#FACC15]" />
+                National Trial Lawyers — Top 40 Under 40
+              </div>
+
+              <p className="mt-3 text-slate-700 leading-relaxed">
+                Michael Saeedian is a California Lemon Law attorney that auto manufacturers fear. A
+                UCLA graduate with a Juris Doctorate from Loyola Law School, he{' '}
+                <strong>exclusively practices lemon law</strong> — fighting to secure the maximum
+                refund, replacement, or cash settlement for drivers stuck with defective vehicles.
+                When you submit your case, you work directly with a licensed, award-winning
+                attorney, not a call center.
+              </p>
+
+              <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
+                {['Top 100 Trial Lawyers', '5-Star Rated on Yelp', 'Lead Counsel Rated', 'No Win, No Fee'].map((b) => (
+                  <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1">
+                    {b}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1.5">
+                <GraduationCap className="h-4 w-4" /> UCLA · J.D., Loyola Law School, Los Angeles
+              </p>
+            </div>
           </div>
         </div>
 
@@ -219,45 +244,6 @@ export default function PresellPA() {
           alt="Row of vehicles at a dealership"
           className="w-full h-44 sm:h-56 object-cover rounded-2xl shadow-md mt-6"
         />
-
-        {/* Meet your attorney */}
-        <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" data-testid="pa-attorney">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-            {ATTORNEY_PHOTO ? (
-              <img
-                src={ATTORNEY_PHOTO}
-                alt="Michael Saeedian, Esq."
-                className="h-28 w-28 rounded-2xl object-cover ring-2 ring-[#E0A800] shrink-0"
-                data-testid="pa-attorney-photo"
-              />
-            ) : (
-              <div
-                className="h-28 w-28 rounded-2xl bg-[#0B2545] text-white flex items-center justify-center text-3xl font-extrabold ring-2 ring-[#E0A800] shrink-0"
-                data-testid="pa-attorney-photo-placeholder"
-              >
-                MS
-              </div>
-            )}
-            <div className="text-center sm:text-left">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">Meet Your Attorney</p>
-              <h3 className="font-slab font-extrabold text-slate-900 text-xl mt-1">Michael Saeedian, Esq.</h3>
-              <p className="text-slate-500 text-sm">Founding Attorney · The Lemon Pros</p>
-              <p className="mt-3 text-slate-700 leading-relaxed">
-                Michael Saeedian has dedicated his practice to holding automakers accountable —
-                recovering refunds, replacements, and cash settlements for drivers stuck with
-                defective vehicles. When you submit your case, you work directly with a licensed
-                lemon law attorney, not a call center.
-              </p>
-              <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
-                {['Licensed CA Attorney', '100s of Cases Won', 'No Win, No Fee'].map((b) => (
-                  <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1">
-                    {b}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Step 1 */}
         <div className="mt-10">
