@@ -14,8 +14,6 @@ const ATTORNEY_PHOTO = 'https://customer-assets.emergentagent.com/job_lemon-chec
 
 const HERO_PA =
   'https://images.unsplash.com/photo-1504203640717-b7d237a3dc84?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200';
-const MECH_PA =
-  'https://images.unsplash.com/photo-1615906655593-ad0386982a0f?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200';
 const LOT_PA =
   'https://images.pexels.com/photos/29566906/pexels-photo-29566906.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=1200';
 
@@ -220,28 +218,6 @@ export default function PresellPA() {
             See If My Car Qualifies <ArrowRight className="h-4 w-4" />
           </button>
         </div>
-
-        {/* How do I find out */}
-        <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-10" data-testid="pa-section-findout">
-          How Do I Find Out If My Car Qualifies?
-        </h2>
-        <p className="mt-3 text-[17px] text-slate-700 leading-relaxed">
-          It&apos;s simple. Answer a few quick questions about your vehicle below — it takes less than
-          2 minutes. You&apos;ll instantly find out whether your situation may qualify for a refund,
-          replacement, or compensation, and connect with experienced lemon law professionals at no
-          cost to you.
-        </p>
-        <button
-          onClick={() => start()}
-          className="block w-full mt-5 rounded-2xl overflow-hidden shadow-md group"
-          data-testid="pa-mech-image-cta"
-        >
-          <img
-            src={MECH_PA}
-            alt="Mechanic inspecting a vehicle engine"
-            className="w-full h-52 sm:h-72 object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        </button>
 
         {/* How do I qualify */}
         <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-10" data-testid="pa-section-qualify">
