@@ -1,0 +1,23 @@
+{
+  "summary": "Verified bug fix for hero text flash/swap on landing page refresh. Performed frontend-only Playwright testing covering: (1) opacity progression during initial load, (2) visible-text history via MutationObserver, (3) A/B stickiness across 5 refreshes, (4) get-started button navigation regression. All three review-requested checks PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Landing.jsx still initializes the hooks state with the OLD default copy ('Stuck With a Lemon? You May Be Owed Money.' / 'Find out in 60 seconds...'). The opacity-0 wrapper hides this text until the API resolves, so it is not user-visible, but it is brittle: any future regression that removes/short-circuits the opacity gate would immediately bring back the flash. Consider initializing hook1/hook2 as empty strings (or null) and rendering the wrapper only when loaded === true, so the default copy cannot accidentally appear.",
+    "The default hook1/hook2 strings duplicate copy that already lives in the backend resolve_hooks/_weighted_pick defaults. Keep a single source of truth (server) to avoid drift between client default and server-resolved hooks."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% (3/3 review items pass)"},
+  "test_credentials": "None required for landing page",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug-fix verification only. Evidence captured via in-browser MutationObserver + periodic opacity sampling: opacity transitions cleanly from 0.0 -> 1.0 over the fade window; only ONE distinct h1 text is ever visible while opacity > 0.1, so the user never sees the default-then-replace swap. The MutationObserver did observe the underlying React text update for h2 (default copy briefly present in the DOM), but it occurred while wrapper opacity was 0, so it is not user-visible. Across 5 page loads with stable localStorage 'osgd_session_id' (e.g. e59c3eaf-9627-4fb6-8399-af02f207fc07), hook1='Stuck With a Lemon? You May Be Owed Money.' and hook2='Find out in 60 seconds in your defective vehicle qualifies ... under Iowa Lemon Law - at no cost to you.' were identical every time, confirming session-seeded A/B stickiness. The 'Check If Your Car Qualifies' button (data-testid=hero-get-started-button) successfully navigates to /flow/year; the trust line and Free Consultation badge render correctly.",
+  "rca of the issue": "ROOT CAUSE (pre-fix): hooks state was seeded with default copy and rendered immediately; when /config/public resolved with a different A/B variant, setHooks() triggered a re-render that visibly swapped the text in front of the user (the 'really fast flash' reported). FIX: a `loaded` flag (default false) wraps the hero block in an opacity-0 -> opacity-100 transition, flipped only after the API promise settles (then/catch both call setLoaded(true)). Because the state update setHooks({...}) and setLoaded(true) happen in the same .then handler, React batches them into a single commit, so by the time opacity animates from 0 to 1 the DOM already shows the API-resolved text. VERIFIED: opacity stays at 0.0 for the early samples (text hidden) and reaches 1.0 in the late samples; the set of h1 texts observed while opacity > 0.1 has size 1 (only the final text is visible). STICKINESS: getSessionId() persists in localStorage key 'osgd_session_id', so resolve_hooks() on the server returns the same A/B variant on every refresh - confirmed identical across 5 reloads."
+}

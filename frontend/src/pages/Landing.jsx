@@ -8,6 +8,7 @@ import { useFunnel } from '@/context/FunnelContext';
 export default function Landing() {
   const navigate = useNavigate();
   const { setAnswer, resetAnswers } = useFunnel();
+  const [loaded, setLoaded] = useState(false);
   const [hooks, setHooks] = useState({
     hook1: 'Stuck With a Lemon? You May Be Owed Money.',
     hook2:
@@ -47,9 +48,14 @@ export default function Landing() {
     api
       .get(`/config/public?${qs}`)
       .then((res) => {
-        if (mounted) setHooks({ hook1: res.data.hook1, hook2: res.data.hook2 });
+        if (mounted) {
+          setHooks({ hook1: res.data.hook1, hook2: res.data.hook2 });
+          setLoaded(true);
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (mounted) setLoaded(true);
+      });
     return () => {
       mounted = false;
     };
@@ -63,7 +69,7 @@ export default function Landing() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 pt-8 sm:pt-14 text-center" data-testid="page-landing">
-      <div className="transition-opacity duration-500 opacity-100">
+      <div className={`transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}>
         <h1
           className="font-mock font-extrabold tracking-tight text-[#0F1B3D] leading-[1.05] text-[clamp(2.1rem,5.6vw,4rem)]"
           data-testid="hero-hook1"
