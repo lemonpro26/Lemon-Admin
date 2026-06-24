@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2,
-  FileText, Percent, Sigma,
+  FileText, Percent, Sigma, Search, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, TOKEN_KEY, clearSession, canEdit as canEditFn, getRole, getUsername } from '@/lib/api';
@@ -87,6 +87,8 @@ export default function AdminDashboard() {
   const [marking, setMarking] = useState(false);
   const [creatingTest, setCreatingTest] = useState(false);
   const [stats, setStats] = useState(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const { sorted: sortedLeads, sortKey, sortDir, toggle } = useSortable(leads, 'created_at', 'desc');
 
@@ -98,7 +100,10 @@ export default function AdminDashboard() {
   const loadLeads = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/leads', { params: { start: range.start, end: range.end } });
+      const params = debouncedSearch.trim()
+        ? { search: debouncedSearch.trim() }
+        : { start: range.start, end: range.end };
+      const res = await api.get('/admin/leads', { params });
       setLeads(res.data.leads);
       setTotal(res.data.total);
     } catch (e) {
@@ -110,7 +115,7 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [range, logout]);
+  }, [range, logout, debouncedSearch]);
 
   const loadGaStatus = useCallback(async () => {
     try {
@@ -135,6 +140,11 @@ export default function AdminDashboard() {
   useEffect(() => { loadGaStatus(); }, [loadGaStatus]);
   useEffect(() => { loadLeads(); }, [loadLeads]);
   useEffect(() => { loadStats(); }, [loadStats]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const openLead = (lead) => {
     setSelected(lead);
@@ -274,9 +284,29 @@ export default function AdminDashboard() {
           <TabsContent value="leads">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
               <p className="text-sm text-slate-500 flex items-center gap-2">
-                <Users className="h-4 w-4" /> Leads submitted in the selected range.
+                <Users className="h-4 w-4" /> {debouncedSearch.trim() ? `Search results for "${debouncedSearch.trim()}"` : 'Leads submitted in the selected range.'}
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search name or phone…"
+                    className="h-10 w-56 rounded-xl border-slate-200 pl-9 pr-8"
+                    data-testid="lead-search-input"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      data-testid="lead-search-clear"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
                 <DateRangeFilter value={range} onChange={setRange} />
                 {editable && (
                   <Button

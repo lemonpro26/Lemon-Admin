@@ -556,6 +556,7 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
     lead = payload.model_dump()
     lead["id"] = str(uuid.uuid4())
     lead["source_page"] = (payload.source_page or "home").lower()
+    lead["phone_digits"] = _re.sub(r"\D", "", payload.phone or "")
     lead["full_name"] = f"{payload.first_name} {payload.last_name}".strip()
     lead["city"] = payload.city or geo["city"]
     lead["state"] = payload.state or geo["state"]
@@ -1053,13 +1054,31 @@ async def admin_get_leads(
     skip: int = Query(0, ge=0),
     start: str = Query(""),
     end: str = Query(""),
+    search: str = Query(""),
 ):
-    s_iso, e_iso, _days = _date_range(start, end)
-    q = {"created_at": {"$gte": s_iso, "$lte": e_iso}}
+    search = (search or "").strip()
+    if search:
+        # Search by name / phone / email across ALL leads (ignore date range).
+        # Phone match ignores formatting (compare digits only).
+        rx = _re.escape(search)
+        digits = _re.sub(r"\D", "", search)
+        ors = [
+            {"full_name": {"$regex": rx, "$options": "i"}},
+            {"first_name": {"$regex": rx, "$options": "i"}},
+            {"last_name": {"$regex": rx, "$options": "i"}},
+            {"email": {"$regex": rx, "$options": "i"}},
+            {"phone": {"$regex": rx, "$options": "i"}},
+        ]
+        if digits:
+            ors.append({"phone_digits": {"$regex": _re.escape(digits)}})
+        q = {"$or": ors}
+    else:
+        s_iso, e_iso, _days = _date_range(start, end)
+        q = {"created_at": {"$gte": s_iso, "$lte": e_iso}}
     total = await db.leads.count_documents(q)
     cursor = db.leads.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit)
     leads = await cursor.to_list(length=limit)
-    return {"total": total, "leads": leads, "range": {"start": s_iso, "end": e_iso}}
+    return {"total": total, "leads": leads, "range": {"start": start, "end": end}}
 
 
 @api_router.post("/admin/leads/test")
@@ -1079,6 +1098,7 @@ async def create_test_lead(_: dict = Depends(require_editor)):
         "first_name": first, "last_name": last, "full_name": f"{first} {last}",
         "email": f"{first.lower()}.{last.lower()}@example.com",
         "phone": f"(555) {rng.randint(100,999)}-{rng.randint(1000,9999)}",
+        "phone_digits": "",
         "address": f"{rng.randint(100,9999)} Demo St",
         "city": geo[0], "state": geo[1], "zip": geo[2],
         "car_year": vehicle[0], "car_make": vehicle[1], "car_model": vehicle[2],
