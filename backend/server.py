@@ -100,6 +100,9 @@ DEFAULT_CONFIG = {
     # Editable customer thank-you email
     "thank_you_subject": "Thanks for your request — Lemon Pros",
     "thank_you_body": DEFAULT_THANK_YOU_BODY,
+    # Landing-page split test (Home `/` vs PA `/pa`)
+    "split_test_enabled": False,
+    "split_home_pct": 50,
 }
 
 app = FastAPI()
@@ -494,6 +497,28 @@ async def track_engage(body: ClickTrack, request: Request):
     return {"success": True}
 
 
+def _split_bucket(seed: str) -> int:
+    """Stable 0-99 bucket for a visitor (consistent across requests/processes)."""
+    if not seed:
+        seed = uuid.uuid4().hex
+    return int(hashlib.md5(seed.encode()).hexdigest(), 16) % 100
+
+
+@api_router.get("/split/decide")
+async def split_decide(session: str = Query("", description="visitor session id")):
+    """Decide which landing page a visitor should see in the A/B split test.
+    Stable per session (same visitor always gets the same page). When the split
+    test is disabled, everyone goes to Home."""
+    cfg = await get_or_create_config()
+    enabled = bool(cfg.get("split_test_enabled", False))
+    home_pct = int(cfg.get("split_home_pct", 50))
+    if not enabled:
+        return {"enabled": False, "home_pct": home_pct, "target": "home"}
+    target = "home" if _split_bucket(session) < home_pct else "pa"
+    return {"enabled": True, "home_pct": home_pct, "target": target}
+
+
+
 def _dispatch_lead_emails(cfg: dict, lead: dict):
     """Runs in a BackgroundTask. Sends team notification + customer thank-you."""
     try:
@@ -883,6 +908,73 @@ async def admin_update_config(body: ConfigUpdate, _: dict = Depends(require_edit
     await db.site_config.update_one({"_id": "singleton"}, {"$set": update}, upsert=True)
     cfg = await get_or_create_config()
     return serialize_doc(cfg)
+
+
+class SplitTestUpdate(BaseModel):
+    enabled: bool
+    home_pct: int
+
+
+# Map a stored source_page value to a split-test variant key.
+def _variant_of(sp) -> str:
+    return "pa" if (sp or "").lower() == "lapa" else "home"
+
+
+async def _split_test_stats(s_iso: str, e_iso: str) -> dict:
+    """Clicks + leads per landing-page variant (home vs pa), with conversion %."""
+    base = {"home": {"clicks": 0, "leads": 0}, "pa": {"clicks": 0, "leads": 0}}
+    async for c in db.clicks.aggregate([
+        {"$match": {"first_seen": {"$gte": s_iso, "$lte": e_iso}}},
+        {"$group": {"_id": "$source_page", "n": {"$sum": 1}}},
+    ]):
+        base[_variant_of(c["_id"])]["clicks"] += c["n"]
+    async for l in db.leads.aggregate([
+        {"$match": {"created_at": {"$gte": s_iso, "$lte": e_iso}}},
+        {"$group": {"_id": "$source_page", "n": {"$sum": 1}}},
+    ]):
+        base[_variant_of(l["_id"])]["leads"] += l["n"]
+    out = {}
+    for k, v in base.items():
+        c, lc = v["clicks"], v["leads"]
+        out[k] = {"clicks": c, "leads": lc,
+                  "conversion_rate": round((lc / c * 100), 1) if c else 0.0}
+    # Winner by conversion % (require both variants to have clicks for a verdict).
+    winner = None
+    h, p = out["home"], out["pa"]
+    if h["clicks"] and p["clicks"]:
+        if h["conversion_rate"] > p["conversion_rate"]:
+            winner = "home"
+        elif p["conversion_rate"] > h["conversion_rate"]:
+            winner = "pa"
+        else:
+            winner = "tie"
+    out["winner"] = winner
+    return out
+
+
+@api_router.get("/admin/split-test")
+async def get_split_test(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
+    cfg = await get_or_create_config()
+    s_iso, e_iso, _days = _date_range(start, end)
+    return {
+        "enabled": bool(cfg.get("split_test_enabled", False)),
+        "home_pct": int(cfg.get("split_home_pct", 50)),
+        "stats": await _split_test_stats(s_iso, e_iso),
+        "range": {"start": s_iso, "end": e_iso},
+    }
+
+
+@api_router.put("/admin/split-test")
+async def update_split_test(body: SplitTestUpdate, _: dict = Depends(require_editor)):
+    home_pct = max(0, min(100, int(body.home_pct)))
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {"split_test_enabled": bool(body.enabled),
+                  "split_home_pct": home_pct, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    return {"enabled": bool(body.enabled), "home_pct": home_pct}
+
 
 
 @api_router.get("/admin/email-template")

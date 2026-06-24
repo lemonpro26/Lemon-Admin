@@ -90,6 +90,15 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
   falls outside the selected date range, or has no stored click record. Verified
   e2e (group with 3 leads / 11 clicks now shows 45.5% bounce, was ~100%). The
   engage→converted click linkage itself was confirmed working for new sessions.
+- **Landing-page A/B Split Test (NEW)**: new admin "Split Test" tab. Auto-splitter
+  entry route `/split` randomly routes visitors to Home `/` or PA `/pa` by an
+  admin-set Home/PA weight (stable per visitor via md5(session)%100), preserving
+  tracking query params on redirect. Config stored in site_config
+  (`split_test_enabled`, `split_home_pct`). Endpoints: `GET /api/split/decide`,
+  `GET/PUT /api/admin/split-test`. Comparison panel shows Home vs PA visits/leads/
+  conversion %, winner chosen by conversion %. Verified e2e: decide stable +
+  weighted (70%→~69/31), `/split?gclid=..` → `/pa?gclid=..` redirect works.
+  Files: `pages/SplitEntry.jsx`, `components/admin/AdminSplitTest.jsx`.
 
 ## Backlog / Next
 - **`source_page` lead/click tracking (NEW, 2026-06-23)**: leads + clicks tagged `source_page` — `lapa` when entering the funnel from `/pa`, `home` from the homepage. Carries through FunnelContext → /leads, stored + forwarded to Zapier; admin leads show a "PA page" badge + Source field. Verified e2e iteration_11 (100%).

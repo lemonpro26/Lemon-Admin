@@ -14,6 +14,7 @@ import Contact from '@/pages/Contact';
 import MockupHome from '@/pages/MockupHome';
 import MockupFunnel from '@/pages/MockupFunnel';
 import PresellPA from '@/pages/PresellPA';
+import SplitEntry from '@/pages/SplitEntry';
 import { trackPageView } from '@/lib/analytics';
 
 // Sends a GA4 page_view on every client-side route change (SPA tracking).
@@ -42,6 +43,7 @@ function App() {
           <Route path="/mockup" element={<MockupHome />} />
           <Route path="/mockup/funnel" element={<MockupFunnel />} />
           <Route path="/pa" element={<PresellPA />} />
+          <Route path="/split" element={<SplitEntry />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/terms" element={<LegalPage />} />
           <Route path="/privacy" element={<LegalPage />} />
