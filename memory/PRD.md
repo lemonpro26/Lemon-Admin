@@ -82,6 +82,15 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Offline conversions migrated to Google Data Manager API** (`datamanager_service.py`, `events:ingest`). Wired into `_upload_lead_conversion`, `/admin/google-ads/status`. New Import/UPLOAD_CLICKS conversion action created by user — ctId `7658454424` (category PURCHASE, ENABLED). Validate-only test PASSES for both leads and calls (gclid + hashed email/phone matching). Still in VALIDATE_ONLY mode.
 - **Phone-call revenue passback (NEW)**: calls captured via CTM webhook (`/calls/webhook?token=...`) now support "Mark as Sold & Send to Google Ads" in the Calls tab — `POST /admin/calls/{id}/sold` + `/conversion/retry`, `_upload_call_conversion` (matches on call gclid + caller phone). Calls tab UI: Revenue column, conversion badge, detail dialog. Curl-verified end-to-end (validated).
 
+## Implemented (2026-06-24)
+- **Bounce-rate fix (analytics)**: a click that produced a lead can no longer be
+  counted as a bounce. `breakdown()` + `_split_row()` now cap flagged bounces at
+  `max(0, clicks - leads)` so any campaign/ad-group/ad with leads can never show
+  100% bounce. This covers leads whose click predates the engage-tracking fix,
+  falls outside the selected date range, or has no stored click record. Verified
+  e2e (group with 3 leads / 11 clicks now shows 45.5% bounce, was ~100%). The
+  engage→converted click linkage itself was confirmed working for new sessions.
+
 ## Backlog / Next
 - **`source_page` lead/click tracking (NEW, 2026-06-23)**: leads + clicks tagged `source_page` — `lapa` when entering the funnel from `/pa`, `home` from the homepage. Carries through FunnelContext → /leads, stored + forwarded to Zapier; admin leads show a "PA page" badge + Source field. Verified e2e iteration_11 (100%).
 - **`/pa` advertorial polish (2026-06-23)**: attorney section moved to TOP with real headshot + full bio (UCLA, Loyola J.D., CA Bar #265470) and highlighted "National Trial Lawyers — Top 40 Under 40"; brighter hero; "Recent Settlements" strip added. Law-firm footer + legal pages. Verified iteration_10/11.

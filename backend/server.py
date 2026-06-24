@@ -1847,6 +1847,11 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             c = cinfo.get("clicks", 0)
             bounced = cinfo.get("bounced", 0)
             lc = leads.get(k, 0)
+            # A click that produced a lead is by definition not a bounce. Cap the
+            # flagged-bounce count so a group with leads is never shown as a 100%
+            # bounce (covers leads whose click predates the engage-tracking fix,
+            # falls outside the date range, or has no stored click record).
+            bounced = max(0, min(bounced, c - lc))
             entry["clicks"] = c
             entry["leads"] = lc
             entry["conversion_rate"] = round((lc / c * 100), 1) if c else (100.0 if lc else 0.0)
@@ -1888,6 +1893,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     def _split_row(kind, display):
         b = split[kind]
         c, lc, bounced = b["clicks"], b["leads"], b["bounced"]
+        bounced = max(0, min(bounced, c - lc))
         return {"campaign_id": "", "kind": kind, "display": display,
                 "clicks": c, "leads": lc,
                 "conversion_rate": round((lc / c * 100), 1) if c else (100.0 if lc else 0.0),
