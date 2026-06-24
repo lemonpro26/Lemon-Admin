@@ -612,6 +612,18 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
     lead["sitelink_id"] = lead.get("extensionid") or lead.get("feeditemid") or ""
     lead["created_at"] = _now_iso()
 
+    # Phone de-duplication: if this phone already exists as a prior FORM LEAD or a
+    # prior CALL, still save the lead for the record but do NOT fire a duplicate
+    # into the CRM. Match on the last 10 digits (ignores +1 / formatting).
+    digits10 = lead["phone_digits"][-10:]
+    is_dupe = False
+    if len(digits10) >= 10:
+        suffix = {"$regex": _re.escape(digits10) + "$"}
+        prior_lead = await db.leads.count_documents({"phone_digits": suffix})
+        prior_call = await db.calls.count_documents({"caller_digits": suffix})
+        is_dupe = (prior_lead > 0) or (prior_call > 0)
+    lead["crm_duplicate_skipped"] = is_dupe
+
     await db.leads.insert_one({**lead})
 
     if payload.session_id:
@@ -621,8 +633,11 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
         )
 
     background_tasks.add_task(_dispatch_lead_emails, cfg, {k: v for k, v in lead.items() if k != "_id"})
-    background_tasks.add_task(_post_lead_to_crm, {k: v for k, v in lead.items() if k != "_id"})
-    return {"success": True, "id": lead["id"]}
+    if is_dupe:
+        logger.info("Lead %s NOT sent to CRM — duplicate phone %s (prior lead/call exists)", lead["id"], digits10)
+    else:
+        background_tasks.add_task(_post_lead_to_crm, {k: v for k, v in lead.items() if k != "_id"})
+    return {"success": True, "id": lead["id"], "crm_duplicate_skipped": is_dupe}
 
 
 NOMINATIM_HEADERS = {"User-Agent": "LemonPros-LeadFunnel/1.0 (info@lemonpros.com)"}
@@ -1491,10 +1506,12 @@ async def calls_webhook(request: Request, token: str = ""):
         duration = 0
 
     now = _now_iso()
+    _caller = g("caller_number", "caller_id", "from", "caller")
     rec = {
         "id": str(uuid.uuid4()),
-        "caller_number": g("caller_number", "caller_id", "from", "caller"),
+        "caller_number": _caller,
         "caller_name": g("caller_name", "name"),
+        "caller_digits": _re.sub(r"\D", "", _caller),
         "tracking_number": g("tracking_number", "called_number", "dialed_number", "to"),
         "duration": duration,
         "source": g("source"),

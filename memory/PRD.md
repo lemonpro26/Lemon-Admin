@@ -83,22 +83,26 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Phone-call revenue passback (NEW)**: calls captured via CTM webhook (`/calls/webhook?token=...`) now support "Mark as Sold & Send to Google Ads" in the Calls tab — `POST /admin/calls/{id}/sold` + `/conversion/retry`, `_upload_call_conversion` (matches on call gclid + caller phone). Calls tab UI: Revenue column, conversion badge, detail dialog. Curl-verified end-to-end (validated).
 
 ## Implemented (2026-06-24)
-- **Bounce-rate fix (analytics)**: a click that produced a lead can no longer be
-  counted as a bounce. `breakdown()` + `_split_row()` now cap flagged bounces at
-  `max(0, clicks - leads)` so any campaign/ad-group/ad with leads can never show
-  100% bounce. This covers leads whose click predates the engage-tracking fix,
-  falls outside the selected date range, or has no stored click record. Verified
-  e2e (group with 3 leads / 11 clicks now shows 45.5% bounce, was ~100%). The
-  engage→converted click linkage itself was confirmed working for new sessions.
-- **Landing-page A/B Split Test (NEW)**: new admin "Split Test" tab. Auto-splitter
-  entry route `/split` randomly routes visitors to Home `/` or PA `/pa` by an
-  admin-set Home/PA weight (stable per visitor via md5(session)%100), preserving
-  tracking query params on redirect. Config stored in site_config
-  (`split_test_enabled`, `split_home_pct`). Endpoints: `GET /api/split/decide`,
-  `GET/PUT /api/admin/split-test`. Comparison panel shows Home vs PA visits/leads/
-  conversion %, winner chosen by conversion %. Verified e2e: decide stable +
-  weighted (70%→~69/31), `/split?gclid=..` → `/pa?gclid=..` redirect works.
-  Files: `pages/SplitEntry.jsx`, `components/admin/AdminSplitTest.jsx`.
+- **CRM phone de-duplication**: a web-form lead is no longer fired into the CRM
+  (Zapier→QuickBase) if the phone (last 10 digits) already exists as a prior form
+  lead OR a prior call. The lead is still saved to the admin Leads tab and tagged
+  `crm_duplicate_skipped=true` (shown as a red "Duplicate · not sent to CRM" badge).
+  Calls webhook now stores `caller_digits` for matching. `/leads` returns
+  `crm_duplicate_skipped`. Verified e2e on preview (call-match + lead-match skip;
+  fresh number posts). NOTE: only controls leads sent from THIS app — duplicate
+  CALLS in QuickBase come from the user's CTM→Zapier multi-phase trigger (fix in
+  CTM: "Completed-only" + a Zapier de-dupe on CTM call id).
+- **Admin no-cache safeguard**: all `/api/admin/*` responses now send
+  `Cache-Control: no-store` so the dashboard always shows fresh hooks/variants
+  (fixes stale "count stuck / hidden badge stuck" symptoms). Verified via headers.
+- **Spanish landing page (/sp)**: full Spanish experience (landing + funnel +
+  Thank-You; car make/model kept in English) via i18n (`src/lib/i18n.js`,
+  `FunnelContext.lang`). source_page='sp'. Admin "Spanish" tab edits Spanish hooks
+  + shows visits/leads/conversion% + by-campaign/ad-group breakdown. Endpoints:
+  `/config/public?lang=es`, `GET/PUT /admin/spanish`.
+- **Bounce-rate fix**: bounce capped at `max(0, clicks - leads)`; group with leads
+  can never show 100%.
+- **Landing-page A/B Split Test** admin tab + `/split` auto-splitter route.
 
 ## Backlog / Next
 - **`source_page` lead/click tracking (NEW, 2026-06-23)**: leads + clicks tagged `source_page` — `lapa` when entering the funnel from `/pa`, `home` from the homepage. Carries through FunnelContext → /leads, stored + forwarded to Zapier; admin leads show a "PA page" badge + Source field. Verified e2e iteration_11 (100%).

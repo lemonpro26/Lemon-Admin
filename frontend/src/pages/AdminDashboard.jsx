@@ -389,6 +389,12 @@ export default function AdminDashboard() {
                             {lead.source_page === 'lapa' && (
                               <Badge variant="outline" className="ml-2 bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`lead-source-${lead.id}`}>PA page</Badge>
                             )}
+                            {lead.source_page === 'sp' && (
+                              <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`lead-source-sp-${lead.id}`}>Spanish</Badge>
+                            )}
+                            {lead.crm_duplicate_skipped && (
+                              <Badge variant="outline" className="ml-2 bg-rose-50 text-rose-700 border-rose-200 text-[10px]" data-testid={`lead-crm-dup-${lead.id}`}>Duplicate · not sent to CRM</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-slate-600">{lead.phone}</TableCell>
                           <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>
