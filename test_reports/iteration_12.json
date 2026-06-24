@@ -1,0 +1,26 @@
+{
+  "summary": "Backend-only verification of (1) paused-campaign filter in GET /admin/ad-entities and (2) new bounce-rate definition in GET /admin/analytics, plus POST /track/engage endpoint. 7/7 pytest tests passing on https://lemon-checker.preview.emergentagent.com via the production REACT_APP_BACKEND_URL.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_bounce_and_paused_filter.py",
+    "/app/test_reports/pytest/bounce_paused.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "GET /admin/analytics calls _auto_clean_bot_clicks() which deletes ANY click with campaign_id set but no gclid/wbraid/gbraid via _fake_paid_click_query(''). This is by design (AdsBot crawl filter) but it has a SHARP EDGE: any internally-tagged click missing a gclid silently vanishes the next time analytics is loaded. The test had to add a synthetic gclid for the seeded clicks to survive. Worth documenting in README / hook-rules QA notes for future testers — the review_request example body (no gclid) would not survive analytics load.",
+    "BOUNCE_EXPR (server.py:1774) correctly excludes engaged==true and converted==true and visits>1. Looks correct and is consistently applied in _agg_clicks() and _untracked_split(). Good consolidation.",
+    "/admin/ad-entities (server.py:1711) filters via camp_ok/ag_ok using cfg.live_campaigns/live_adgroups; when those sets are empty it falls back to showing everything (correct backward-compat).",
+    "/track/engage is idempotent (single $set), returns {success: True} for missing session_id, skipped:true for empty session, and bot:true for bot UA — all correct."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_bounce_and_paused_filter.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "N/A (backend-only)"},
+  "test_credentials": "Owner admin from /app/memory/test_credentials.md (username='owner', password='LemonPros2026!'). Bearer token from POST /api/admin/login.",
+  "seed_data_creation": "Created 3 clicks (qa-bounce-<ts>-1 live-bounce, qa-bounce-<ts>-2 live-engaged, qa-bounce-<ts>-3 paused) via POST /api/track/click with a real Chrome User-Agent header AND a synthetic gclid (required so /admin/analytics's auto bot-cleaner does not delete them). All 3 qa-bounce-* clicks cleaned up at end of run by direct mongo delete.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "BOTH fixes verified working on the deployed preview backend. Live-campaign whitelist (cfg.live_campaigns) includes '14391026804' — that ID survives /admin/ad-entities while a paused fake ID '99999999999' is correctly filtered out. Bounce rate math: with 2 clicks on the same campaign and one session marked engaged via POST /track/engage, by_campaign[campaign='14391026804'] returns clicks=2 bounce_rate=50.0 (was 100% before the fix). CRITICAL gotcha for future testers seeding clicks: in addition to a non-bot User-Agent, you MUST supply a gclid (or wbraid/gbraid) on any click that carries a campaign_id, otherwise /admin/analytics's _auto_clean_bot_clicks() will delete it on the next admin load (it treats campaign-without-gid as a phantom AdsBot crawl).",
+  "rca of the issue": "Initial test run failed test_live_campaign_bounce_rate_50pct because the seeded click rows were silently removed by _auto_clean_bot_clicks() (server.py:1172) — that helper, invoked at the top of /admin/analytics, deletes any click matching _fake_paid_click_query('') which is 'campaign_id set AND no gclid/wbraid/gbraid'. Real paid Ads clicks always carry a gclid so this is fine in production, but our example payloads (from the review request) had no gclid. Adding gclid='QA-<session_id>' to the seeded clicks fixed it and all 7 tests now pass."
+}

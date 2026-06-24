@@ -479,6 +479,21 @@ async def track_click(body: ClickTrack, request: Request):
     return {"success": True, "deduped": False}
 
 
+@api_router.post("/track/engage")
+async def track_engage(body: ClickTrack, request: Request):
+    """Mark a session as engaged (entered the funnel) so it is not counted as a
+    bounce. Idempotent — safe to call multiple times per session."""
+    if is_bot_ua(request.headers.get("user-agent", "")):
+        return {"success": True, "bot": True}
+    if not body.session_id:
+        return {"success": True, "skipped": True}
+    await db.clicks.update_one(
+        {"session_id": body.session_id},
+        {"$set": {"engaged": True, "last_seen": _now_iso()}},
+    )
+    return {"success": True}
+
+
 def _dispatch_lead_emails(cfg: dict, lead: dict):
     """Runs in a BackgroundTask. Sends team notification + customer thank-you."""
     try:
@@ -1712,17 +1727,31 @@ async def ad_entities(_: dict = Depends(require_admin)):
             if a and d:
                 ads[(c, a, d)] = True
     labels = (await get_or_create_config()).get("ad_labels") or {}
+    cfg = await get_or_create_config()
+    live_campaigns = set(cfg.get("live_campaigns") or [])
+    live_adgroups = set(cfg.get("live_adgroups") or [])
     cl = labels.get("campaign") or {}
     al = labels.get("adgroup") or {}
     dl = labels.get("ad") or {}
+
+    # When a live-campaign list has been synced from Google Ads, hide paused/removed
+    # campaigns (and their ad groups/ads). If not yet synced, show everything.
+    def camp_ok(c):
+        return (not live_campaigns) or (c in live_campaigns)
+
+    def ag_ok(c, a):
+        if not camp_ok(c):
+            return False
+        return (not live_adgroups) or (a in live_adgroups)
+
     return {
-        "campaigns": [{"campaign_id": c, "campaign_name": cl.get(c, "")} for c in sorted(campaigns)],
+        "campaigns": [{"campaign_id": c, "campaign_name": cl.get(c, "")} for c in sorted(campaigns) if camp_ok(c)],
         "adgroups": [{"campaign_id": c, "adgroup_id": a,
                       "campaign_name": cl.get(c, ""), "adgroup_name": al.get(a, "")}
-                     for (c, a) in sorted(adgroups)],
+                     for (c, a) in sorted(adgroups) if ag_ok(c, a)],
         "ads": [{"campaign_id": c, "adgroup_id": a, "ad_id": d,
                  "campaign_name": cl.get(c, ""), "adgroup_name": al.get(a, ""), "ad_name": dl.get(d, "")}
-                for (c, a, d) in sorted(ads)],
+                for (c, a, d) in sorted(ads) if ag_ok(c, a)],
     }
 
 
@@ -1740,15 +1769,27 @@ async def _agg_count(collection, group_fields: list, date_field: str, s_iso: str
     return out
 
 
+# A bounce = a landing visit where the visitor never engaged with the funnel,
+# never converted into a lead, and only had a single page view.
+BOUNCE_EXPR = {"$cond": [{"$and": [
+    {"$ne": ["$engaged", True]},
+    {"$ne": ["$converted", True]},
+    {"$lte": [{"$ifNull": ["$visits", 1]}, 1]},
+]}, 1, 0]}
+
+
+
 async def _agg_clicks(group_fields: list, s_iso: str, e_iso: str) -> dict:
-    """Clicks + bounced (single-visit sessions) per group, from the clicks collection."""
+    """Clicks + bounced per group, from the clicks collection. A bounce is a
+    landing visit where the visitor never engaged (did not enter the funnel),
+    never converted, and had a single page view."""
     group_id = {f: f"${f}" for f in group_fields}
     pipeline = [
         {"$match": {"first_seen": {"$gte": s_iso, "$lte": e_iso}}},
         {"$group": {
             "_id": group_id,
             "clicks": {"$sum": 1},
-            "bounced": {"$sum": {"$cond": [{"$lte": [{"$ifNull": ["$visits", 1]}, 1]}, 1, 0]}},
+            "bounced": {"$sum": BOUNCE_EXPR},
         }},
     ]
     out = {}
@@ -1810,7 +1851,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             {"$match": {"first_seen": {"$gte": s_iso, "$lte": e_iso}, "campaign_id": {"$in": ["", None]}}},
             {"$group": {"_id": {"$cond": [has_gid, "paid", "organic"]},
                         "clicks": {"$sum": 1},
-                        "bounced": {"$sum": {"$cond": [{"$lte": [{"$ifNull": ["$visits", 1]}, 1]}, 1, 0]}}}},
+                        "bounced": {"$sum": BOUNCE_EXPR}}},
         ]):
             b = out.get(row["_id"]) or out["organic"]
             b["clicks"] = row["clicks"]; b["bounced"] = row["bounced"]

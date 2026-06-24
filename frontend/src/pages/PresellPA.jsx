@@ -65,6 +65,7 @@ export default function PresellPA() {
     setAnswer('started', '1');
     setAnswer('source_page', 'lapa');
     if (make) setAnswer('car_make', make);
+    api.post('/track/engage', { session_id: getSessionId() }).catch(() => {});
     navigate('/flow/year');
   };
 

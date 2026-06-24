@@ -66,6 +66,7 @@ export default function Landing() {
     resetAnswers();
     setAnswer('started', '1');
     setAnswer('source_page', 'home');
+    api.post('/track/engage', { session_id: getSessionId() }).catch(() => {});
     navigate('/flow/year');
   };
 
