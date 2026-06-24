@@ -1,0 +1,41 @@
+{
+  "summary": "Full e2e frontend test of the new Spanish landing/funnel/Thank-You at /sp and the admin Spanish tab. Spanish UI, funnel submission (lead stored with source_page='sp'), admin Spanish hooks edit+save+reflect+restore all work. English regression at / and language toggling between / and /sp work. ISSUE: admin Spanish 'Visits' stat shows 0 despite multiple successful POST /api/track/click 200 responses to /sp (lead count works, visit/click count for source_page='sp' does not).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/admin/spanish",
+        "issue": "Spanish stats 'clicks' (visits) returns 0 even though POST /api/track/click is sent and returns 200 every time /sp loads (verified 4+ times with same date range 'Today'). Stats card shows 0 visits, 1 lead, 0% conversion, but By-Campaign row shows 0 visits / 1 lead / 100% — internally inconsistent. Conversion % calc likely divides by clicks; missing visit counts inflate row-level conversion and zero out top-card conversion.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Spanish admin stats",
+        "issue": "After visiting /sp multiple times the admin Spanish 'spanish-stat-clicks' card stays at 0. This is a backend/stat-counting bug, but it surfaces in the admin UI integration as broken metrics for /sp visits.",
+        "affected_selectors": ["spanish-stat-clicks", "spanish-stat-conv", "spanish-by-campaign", "spanish-by-adgroup"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Investigate /api/admin/spanish stats aggregation: POST /api/track/click with source_page='sp' is not being counted into the Spanish 'Visits' card. Likely the source_page filter on the clicks aggregation doesn't match, or clicks are being recorded under the wrong source_page (e.g. defaulting to 'home'). Verify Mongo collection: check clicks for landing_path='/sp' or source_page='sp' for today, and confirm admin/spanish stats query filters on source_page='sp'."
+  ],
+  "critical_code_review_comments": [
+    "Landing.jsx submits /track/click on mount but does NOT depend on pageLang/sourcePage in its useEffect deps (eslint-disabled). If the same SPA session loads / first then navigates to /sp, sourcePage in the closure could go stale — but our test reloaded /sp directly so this is not the failure cause here.",
+    "AdminSpanish stats and By-Campaign conversion math are inconsistent (top card uses leads/clicks*100 → 0%, table row shows 100%). Define a single canonical formula and handle clicks=0 with leads>0 case explicitly.",
+    "i18n strings file is fine; consider extracting Spanish 'errors.addrUnverified' wording shown when SmartyStreets rejects an address — current behavior caused initial QA to be stuck (acceptable production behavior, just a QA note)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "95%"},
+  "test_credentials": "Admin: username blank, password LemonPros2026! (per /app/memory/test_credentials.md)",
+  "seed_data_creation": "Submitted 1 Spanish-funnel lead: first=PruebaQA last=Tester, year 2023, address 200 N Spring St Los Angeles CA 90012, phone (213) 555-0147, email spqa.prueba.830706@gmail.com, source_page='sp'. Spanish hooks were temporarily edited then restored to canonical originals: hook1='¿Atrapado con un Auto Defectuoso? Podría Tener Derecho a una Compensación.', hook2='Averigüe en 60 segundos si su vehículo defectuoso califica para un reembolso, reemplazo o compensación en efectivo — sin costo alguno para usted.'",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Spanish UI is fully functional. The only outstanding defect is that admin Spanish 'Visits' stat does not increment when /sp is loaded (POST /api/track/click returns 200 but the aggregator doesn't surface them under source_page='sp'). Note: /api/leads does correctly tag and surface source_page='sp' (Leads card and breakdown tables show lead count). Also note: addresses like '123 Test St' get rejected by SmartyStreets address verification — use a real address (we used LA City Hall: 200 N Spring St). Emails on @example.com get rejected by deliverability; use @gmail.com etc.",
+  "rca of the issue": "Reproduction: 1) Load /sp 4 times (each POST /api/track/click → 200). 2) Submit Spanish funnel (lead is created, source_page='sp'). 3) Login /admin → Spanish tab, range=Today → spanish-stat-clicks=0, spanish-stat-leads=1, spanish-stat-conv=0%. Expected: clicks>=4. Likely RCA: the click-aggregation query in GET /api/admin/spanish either (a) filters on landing_path != '/sp' (uses '/' or similar), or (b) filters on source_page='sp' but the /track/click handler is persisting source_page as 'home' or empty for /sp visits, or (c) is time-zone bounded such that 'today' excludes those entries. Frontend payload IS correct: Landing.jsx posts source_page: 'sp' for the /sp route. Mitigation: inspect the backend admin/spanish stats handler and the clicks collection to confirm where source_page='sp' rows are or are not landing."
+}

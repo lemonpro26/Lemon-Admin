@@ -10,6 +10,7 @@ import { useFunnel } from '@/context/FunnelContext';
 import { getTracking, getSessionId } from '@/lib/tracking';
 import { NotchedField } from '@/components/NotchedField';
 import { Button } from '@/components/ui/button';
+import { tr } from '@/lib/i18n';
 
 const RED_BTN =
   'h-14 w-full rounded-xl bg-[#EF4444] hover:bg-[#DC2626] text-white font-bold text-lg shadow-sm transition-colors disabled:opacity-70';
@@ -97,7 +98,7 @@ function ModelStep({ make, onSelect }) {
 }
 
 /* ---------------- Address step (with verification) ---------------- */
-function AddressStep({ answers, setAnswer, onNext }) {
+function AddressStep({ answers, setAnswer, onNext, t }) {
   const [street, setStreet] = useState(answers.address || '');
   const [city, setCity] = useState(answers.city || '');
   const [state, setState] = useState(answers.state || '');
@@ -108,16 +109,15 @@ function AddressStep({ answers, setAnswer, onNext }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!street.trim()) {
-      setError('Please enter your street address.');
+      setError(t.errors.street);
       return;
     }
     if (!/^\d{5}$/.test(zip.trim())) {
-      setError('Please enter a valid 5-digit ZIP code.');
+      setError(t.errors.zip);
       return;
     }
     setError('');
     setVerifying(true);
-    // Resolve city/state from ZIP when not provided.
     try {
       if (!city || !state) {
         const g = await api.get(`/geo-zip?zip=${encodeURIComponent(zip)}`);
@@ -138,7 +138,7 @@ function AddressStep({ answers, setAnswer, onNext }) {
       if (res.data.valid || res.data.soft) {
         onNext();
       } else {
-        setError("We couldn't verify that address. Please double-check and try again.");
+        setError(t.errors.addrUnverified);
       }
     } catch (err) {
       setAnswer('address', street.trim());
@@ -152,35 +152,35 @@ function AddressStep({ answers, setAnswer, onNext }) {
   return (
     <form onSubmit={submit} className="mx-auto max-w-xl w-full grid gap-4">
       <NotchedField
-        label="Street Address"
+        label={t.fields.street}
         value={street}
         onChange={(e) => setStreet(e.target.value)}
-        placeholder="123 Main St"
+        placeholder={t.fields.streetPh}
         data-testid="address-street-input"
         autoFocus
       />
       <div className="grid grid-cols-3 gap-3">
-        <NotchedField label="City" value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" data-testid="address-city-input" />
-        <NotchedField label="State" value={state} onChange={(e) => setState(e.target.value)} placeholder="CA" data-testid="address-state-input" />
+        <NotchedField label={t.fields.city} value={city} onChange={(e) => setCity(e.target.value)} placeholder={t.fields.cityPh} data-testid="address-city-input" />
+        <NotchedField label={t.fields.state} value={state} onChange={(e) => setState(e.target.value)} placeholder={t.fields.statePh} data-testid="address-state-input" />
         <NotchedField
-          label="ZIP"
+          label={t.fields.zip}
           value={zip}
           onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
-          placeholder="90015"
+          placeholder={t.fields.zipPh}
           inputMode="numeric"
           data-testid="address-zip-input"
         />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={verifying} className={`mt-3 ${RED_BTN}`} data-testid="address-continue-button">
-        {verifying ? 'Verifying\u2026' : 'Continue'}
+        {verifying ? t.buttons.verifying : t.buttons.continue}
       </Button>
     </form>
   );
 }
 
 /* ---------------- Name step ---------------- */
-function NameStep({ answers, setAnswer, onNext }) {
+function NameStep({ answers, setAnswer, onNext, t }) {
   const [first, setFirst] = useState(answers.first_name || '');
   const [last, setLast] = useState(answers.last_name || '');
   const [errors, setErrors] = useState({});
@@ -188,8 +188,8 @@ function NameStep({ answers, setAnswer, onNext }) {
   const submit = (e) => {
     e.preventDefault();
     const er = {};
-    if (!first.trim()) er.first = 'Please enter your first name.';
-    if (!last.trim()) er.last = 'Please enter your last name.';
+    if (!first.trim()) er.first = t.errors.first;
+    if (!last.trim()) er.last = t.errors.last;
     setErrors(er);
     if (Object.keys(er).length) return;
     setAnswer('first_name', first.trim());
@@ -199,17 +199,17 @@ function NameStep({ answers, setAnswer, onNext }) {
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-xl w-full grid gap-4">
-      <NotchedField label="First Name" value={first} onChange={(e) => setFirst(e.target.value)}
-        placeholder="John" error={errors.first} data-testid="name-first-input" autoFocus />
-      <NotchedField label="Last Name" value={last} onChange={(e) => setLast(e.target.value)}
-        placeholder="Smith" error={errors.last} data-testid="name-last-input" />
-      <Button type="submit" className={`mt-3 ${RED_BTN}`} data-testid="name-continue-button">Continue</Button>
+      <NotchedField label={t.fields.firstName} value={first} onChange={(e) => setFirst(e.target.value)}
+        placeholder={t.fields.firstPh} error={errors.first} data-testid="name-first-input" autoFocus />
+      <NotchedField label={t.fields.lastName} value={last} onChange={(e) => setLast(e.target.value)}
+        placeholder={t.fields.lastPh} error={errors.last} data-testid="name-last-input" />
+      <Button type="submit" className={`mt-3 ${RED_BTN}`} data-testid="name-continue-button">{t.buttons.continue}</Button>
     </form>
   );
 }
 
 /* ---------------- Phone step ---------------- */
-function PhoneStep({ answers, setAnswer, onNext }) {
+function PhoneStep({ answers, setAnswer, onNext, t }) {
   const [phone, setPhone] = useState(answers.phone || '');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -217,7 +217,7 @@ function PhoneStep({ answers, setAnswer, onNext }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!/^[0-9+()\-\s]{7,}$/.test(phone.trim())) {
-      setError('Please enter a valid phone number.');
+      setError(t.errors.phone);
       return;
     }
     setError('');
@@ -228,10 +228,9 @@ function PhoneStep({ answers, setAnswer, onNext }) {
         setAnswer('phone', res.data.formatted || phone.trim());
         onNext();
       } else {
-        setError("That doesn't look like a real phone number. Please enter a valid number.");
+        setError(t.errors.phoneReal);
       }
     } catch (err) {
-      // Network/validator error — don't block a genuine user.
       setAnswer('phone', phone.trim());
       onNext();
     } finally {
@@ -241,17 +240,17 @@ function PhoneStep({ answers, setAnswer, onNext }) {
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-xl w-full">
-      <NotchedField label="Phone Number" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-        placeholder="(555) 123-4567" error={error} data-testid="phone-input" autoFocus />
+      <NotchedField label={t.fields.phone} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+        placeholder={t.fields.phonePh} error={error} data-testid="phone-input" autoFocus />
       <Button type="submit" disabled={checking} className={`mt-7 ${RED_BTN}`} data-testid="phone-continue-button">
-        {checking ? 'Checking\u2026' : 'Continue'}
+        {checking ? t.buttons.checking : t.buttons.continue}
       </Button>
     </form>
   );
 }
 
 /* ---------------- Email step (final → submit) ---------------- */
-function EmailStep({ answers, setAnswer, onSubmit, submitting }) {
+function EmailStep({ answers, setAnswer, onSubmit, submitting, t }) {
   const [email, setEmail] = useState(answers.email || '');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -259,7 +258,7 @@ function EmailStep({ answers, setAnswer, onSubmit, submitting }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
-      setError('Please enter a valid email address.');
+      setError(t.errors.email);
       return;
     }
     setError('');
@@ -267,11 +266,7 @@ function EmailStep({ answers, setAnswer, onSubmit, submitting }) {
     try {
       const res = await api.post('/verify-email', { email: email.trim() });
       if (!res.data.valid) {
-        setError(
-          res.data.reason === 'undeliverable'
-            ? "That email domain doesn't accept mail. Please check for typos."
-            : 'Please enter a valid email address.'
-        );
+        setError(res.data.reason === 'undeliverable' ? t.errors.emailUndeliverable : t.errors.email);
         setChecking(false);
         return;
       }
@@ -280,7 +275,6 @@ function EmailStep({ answers, setAnswer, onSubmit, submitting }) {
       setAnswer('email', clean);
       onSubmit(clean);
     } catch (err) {
-      // Network/validator error — don't block a genuine user.
       setAnswer('email', email.trim());
       onSubmit(email.trim());
     }
@@ -288,18 +282,15 @@ function EmailStep({ answers, setAnswer, onSubmit, submitting }) {
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-xl w-full">
-      <NotchedField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@email.com" error={error} data-testid="email-input" autoFocus />
+      <NotchedField label={t.fields.email} type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+        placeholder={t.fields.emailPh} error={error} data-testid="email-input" autoFocus />
       <Button type="submit" disabled={submitting || checking} className={`mt-7 ${RED_BTN}`} data-testid="email-submit-button">
-        {submitting || checking ? 'Submitting\u2026' : 'See If I Qualify'}
+        {submitting || checking ? t.buttons.submitting : t.buttons.submit}
       </Button>
       <p className="mt-6 text-[11px] leading-relaxed text-slate-400 text-center">
-        By clicking the button above, I provide my electronic signature authorizing Lemon Pros and its
-        affiliated law firms to contact me by phone, text, and email at the number and address provided,
-        including via automated technology and pre-recorded messages, even if my number is on a Do-Not-Call
-        list. This is legal advertising and not a guarantee of any outcome. Consent is not a condition of any
-        purchase. Message and data rates may apply. You may revoke consent at any time. You also agree to our{' '}
-        <span className="text-blue-500">terms</span> and <span className="text-blue-500">privacy policy</span>.
+        {t.consent}{' '}
+        <span className="text-blue-500">{t.consentTerms}</span> {t.consentAnd}{' '}
+        <span className="text-blue-500">{t.consentPrivacy}</span>.
       </p>
     </form>
   );
@@ -309,16 +300,18 @@ function EmailStep({ answers, setAnswer, onSubmit, submitting }) {
 export default function FunnelStep() {
   const { step: stepId } = useParams();
   const navigate = useNavigate();
-  const { answers, setAnswer } = useFunnel();
+  const { answers, setAnswer, lang } = useFunnel();
+  const t = tr(lang);
   const [submitting, setSubmitting] = useState(false);
 
   const step = getStep(stepId);
   const index = getStepIndex(stepId);
   const total = STEP_IDS.length;
+  const stepText = (t.steps && t.steps[stepId]) || {};
 
   useEffect(() => {
     if (!answers.started) {
-      navigate('/', { replace: true });
+      navigate(lang === 'es' ? '/sp' : '/', { replace: true });
       return;
     }
     if (!step) navigate(`/flow/${STEP_IDS[0]}`, { replace: true });
@@ -369,7 +362,7 @@ export default function FunnelStep() {
       await api.post('/leads', payload);
       navigate('/thank-you');
     } catch (e) {
-      toast.error('Something went wrong submitting your request. Please try again.');
+      toast.error(t.errors.submit);
       setSubmitting(false);
     }
   };
@@ -389,10 +382,10 @@ export default function FunnelStep() {
       >
         <div className="text-center mb-[clamp(14px,2.5vh,26px)]">
           <h2 className="font-mock font-extrabold text-[clamp(1.6rem,4vw,2.5rem)] text-[#0F1B3D] leading-tight" data-testid="flow-question">
-            {step.question}
+            {stepText.q}
           </h2>
-          {step.subtitle && (
-            <p className="mt-2 text-[clamp(0.95rem,1.7vw,1.125rem)] font-semibold text-[#EF4444]" data-testid="flow-subtitle">{step.subtitle}</p>
+          {stepText.sub && (
+            <p className="mt-2 text-[clamp(0.95rem,1.7vw,1.125rem)] font-semibold text-[#EF4444]" data-testid="flow-subtitle">{stepText.sub}</p>
           )}
         </div>
 
@@ -400,11 +393,11 @@ export default function FunnelStep() {
           {step.type === 'year' && <YearStep onSelect={(v) => selectAndNext('car_year', v)} />}
           {step.type === 'make' && <MakeStep onSelect={(v) => selectAndNext('car_make', v)} />}
           {step.type === 'model' && <ModelStep make={answers.car_make} onSelect={(v) => selectAndNext('car_model', v)} />}
-          {step.type === 'name' && <NameStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
-          {step.type === 'address' && <AddressStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
-          {step.type === 'phone' && <PhoneStep answers={answers} setAnswer={setAnswer} onNext={goNext} />}
+          {step.type === 'name' && <NameStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}
+          {step.type === 'address' && <AddressStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}
+          {step.type === 'phone' && <PhoneStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}
           {step.type === 'email' && (
-            <EmailStep answers={answers} setAnswer={setAnswer} onSubmit={submitLead} submitting={submitting} />
+            <EmailStep answers={answers} setAnswer={setAnswer} onSubmit={submitLead} submitting={submitting} t={t} />
           )}
         </div>
       </motion.div>

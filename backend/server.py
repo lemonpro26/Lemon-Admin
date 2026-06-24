@@ -93,6 +93,9 @@ BLOCKED_REFERRER_SUBSTRINGS = ("googlesyndication.com", "doubleclick.net")
 DEFAULT_CONFIG = {
     "hook1": "Stuck With a Lemon? You May Be Owed Money.",
     "hook2": "Find out in 60 seconds if your defective vehicle qualifies for a refund, replacement, or cash compensation under {!state} Lemon Law — at no cost to you.",
+    # Spanish landing page (/sp) hooks
+    "hook1_es": "¿Atrapado con un Auto Defectuoso? Podría Tener Derecho a una Compensación.",
+    "hook2_es": "Averigüe en 60 segundos si su vehículo defectuoso califica para un reembolso, reemplazo o compensación en efectivo — sin costo alguno para usted.",
     # Email notification settings
     "notification_emails": ["info@lemonpros.com"],
     "notify_team": True,
@@ -424,13 +427,25 @@ async def get_public_config(
     adgroup: str = Query("", description="ad group id"),
     ad: str = Query("", description="ad / creative id (sub2)"),
     session: str = Query("", description="visitor session id (A/B serving seed)"),
+    lang: str = Query("", description="language: 'es' for the Spanish page"),
 ):
     """Return hooks with {!city}/{!state} resolved from visitor IP geolocation.
     When location is unknown the macros are stripped. The serving hook is chosen
-    by weighted A/B among matching variants, seeded by the session id."""
+    by weighted A/B among matching variants, seeded by the session id. For the
+    Spanish page (lang=es) the editable Spanish hooks are returned (no A/B)."""
     cfg = await get_or_create_config()
     ip = resolve_client_ip(request.headers)
     geo = lookup_geo(ip, "", "")
+    if (lang or "").lower() == "es":
+        return {
+            "hook1": render_tokens(cfg.get("hook1_es", ""), geo["city"], geo["state"]),
+            "hook2": render_tokens(cfg.get("hook2_es", ""), geo["city"], geo["state"]),
+            "city": geo["city"],
+            "state": geo["state"],
+            "geo_source": geo["source"],
+            "matched_rule": None,
+            "matched_rule_label": "Spanish page",
+        }
     resolved = await resolve_hooks(cfg, campaign, adgroup, ad, seed=session)
     return {
         "hook1": render_tokens(resolved["hook1"], geo["city"], geo["state"]),
@@ -917,7 +932,12 @@ class SplitTestUpdate(BaseModel):
 
 # Map a stored source_page value to a split-test variant key.
 def _variant_of(sp) -> str:
-    return "pa" if (sp or "").lower() == "lapa" else "home"
+    v = (sp or "").lower()
+    if v == "lapa":
+        return "pa"
+    if v in ("", "home"):
+        return "home"
+    return ""  # other pages (e.g. 'sp') are excluded from the Home/PA split
 
 
 async def _split_test_stats(s_iso: str, e_iso: str) -> dict:
@@ -927,12 +947,16 @@ async def _split_test_stats(s_iso: str, e_iso: str) -> dict:
         {"$match": {"first_seen": {"$gte": s_iso, "$lte": e_iso}}},
         {"$group": {"_id": "$source_page", "n": {"$sum": 1}}},
     ]):
-        base[_variant_of(c["_id"])]["clicks"] += c["n"]
+        v = _variant_of(c["_id"])
+        if v:
+            base[v]["clicks"] += c["n"]
     async for l in db.leads.aggregate([
         {"$match": {"created_at": {"$gte": s_iso, "$lte": e_iso}}},
         {"$group": {"_id": "$source_page", "n": {"$sum": 1}}},
     ]):
-        base[_variant_of(l["_id"])]["leads"] += l["n"]
+        v = _variant_of(l["_id"])
+        if v:
+            base[v]["leads"] += l["n"]
     out = {}
     for k, v in base.items():
         c, lc = v["clicks"], v["leads"]
@@ -974,6 +998,77 @@ async def update_split_test(body: SplitTestUpdate, _: dict = Depends(require_edi
         upsert=True,
     )
     return {"enabled": bool(body.enabled), "home_pct": home_pct}
+
+
+class SpanishHooksUpdate(BaseModel):
+    hook1_es: str
+    hook2_es: str
+
+
+async def _source_breakdown(source_page: str, s_iso: str, e_iso: str, fields: list) -> list:
+    """Clicks + leads grouped by `fields`, restricted to one source_page."""
+    def _grp(prefix):
+        return {f: f"${f}" for f in fields}
+    clicks = {}
+    async for row in db.clicks.aggregate([
+        {"$match": {"first_seen": {"$gte": s_iso, "$lte": e_iso}, "source_page": source_page}},
+        {"$group": {"_id": _grp("c"), "n": {"$sum": 1}}},
+    ]):
+        key = tuple((row["_id"].get(f) or "") for f in fields)
+        clicks[key] = row["n"]
+    leads = {}
+    async for row in db.leads.aggregate([
+        {"$match": {"created_at": {"$gte": s_iso, "$lte": e_iso}, "source_page": source_page}},
+        {"$group": {"_id": _grp("l"), "n": {"$sum": 1}}},
+    ]):
+        key = tuple((row["_id"].get(f) or "") for f in fields)
+        leads[key] = row["n"]
+    rows = []
+    for k in set(clicks) | set(leads):
+        entry = {fields[i]: k[i] for i in range(len(fields))}
+        c, lc = clicks.get(k, 0), leads.get(k, 0)
+        entry["clicks"] = c
+        entry["leads"] = lc
+        entry["conversion_rate"] = round((lc / c * 100), 1) if c else (100.0 if lc else 0.0)
+        rows.append(entry)
+    rows.sort(key=lambda r: (r["leads"], r["clicks"]), reverse=True)
+    return rows
+
+
+@api_router.get("/admin/spanish")
+async def get_spanish(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
+    """Spanish-page (`/sp`, source_page='sp') control panel: editable hooks +
+    totals + campaign/ad-group breakdown filtered to Spanish traffic only."""
+    cfg = await get_or_create_config()
+    s_iso, e_iso, _days = _date_range(start, end)
+    clicks = await db.clicks.count_documents(
+        {"first_seen": {"$gte": s_iso, "$lte": e_iso}, "source_page": "sp"})
+    leads = await db.leads.count_documents(
+        {"created_at": {"$gte": s_iso, "$lte": e_iso}, "source_page": "sp"})
+    return {
+        "hook1_es": cfg.get("hook1_es", ""),
+        "hook2_es": cfg.get("hook2_es", ""),
+        "stats": {
+            "clicks": clicks,
+            "leads": leads,
+            "conversion_rate": round((leads / clicks * 100), 1) if clicks else 0.0,
+        },
+        "by_campaign": await _source_breakdown("sp", s_iso, e_iso, ["campaign_id"]),
+        "by_adgroup": await _source_breakdown("sp", s_iso, e_iso, ["campaign_id", "adgroup_id"]),
+        "ad_labels": cfg.get("ad_labels") or {},
+        "range": {"start": s_iso, "end": e_iso},
+    }
+
+
+@api_router.put("/admin/spanish")
+async def update_spanish(body: SpanishHooksUpdate, _: dict = Depends(require_editor)):
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {"hook1_es": body.hook1_es, "hook2_es": body.hook2_es, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    return {"hook1_es": body.hook1_es, "hook2_es": body.hook2_es}
+
 
 
 

@@ -4,28 +4,32 @@ import { Star, ShieldCheck, Scale, ArrowRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { captureTracking, getSessionId } from '@/lib/tracking';
 import { useFunnel } from '@/context/FunnelContext';
+import { tr } from '@/lib/i18n';
 
-export default function Landing() {
+// Shared landing page. Renders the English home (`/`) or the Spanish page (`/sp`)
+// based on props. `sourcePage` tags clicks/leads ('home' vs 'sp'); `pageLang`
+// drives all copy + the funnel language.
+export default function Landing({ sourcePage = 'home', pageLang = 'en' }) {
   const navigate = useNavigate();
-  const { setAnswer, resetAnswers } = useFunnel();
+  const { setAnswer, resetAnswers, setLang } = useFunnel();
+  const t = tr(pageLang);
   const [loaded, setLoaded] = useState(false);
   const [hooks, setHooks] = useState({
-    hook1: 'Stuck With a Lemon? You May Be Owed Money.',
-    hook2:
-      'Find out in 60 seconds if your defective vehicle qualifies for a refund, replacement, or cash compensation — at no cost to you.',
+    hook1: t.landing.defaultHook1,
+    hook2: t.landing.defaultHook2,
   });
 
   useEffect(() => {
     let mounted = true;
+    setLang(pageLang);
 
-    // Capture Google Ads attribution params + record a (de-duped) click.
     const tracking = captureTracking(window.location.search);
     const sessionId = getSessionId();
     api
       .post('/track/click', {
         session_id: sessionId,
         landing_path: window.location.pathname,
-        source_page: 'home',
+        source_page: sourcePage,
         campaign_id: tracking.campaign_id,
         adgroup_id: tracking.adgroup_id,
         ad_id: tracking.ad_id,
@@ -45,6 +49,7 @@ export default function Landing() {
       adgroup: tracking.adgroup_id || '',
       ad: tracking.ad_id || '',
       session: sessionId || '',
+      lang: pageLang === 'es' ? 'es' : '',
     }).toString();
     api
       .get(`/config/public?${qs}`)
@@ -64,8 +69,9 @@ export default function Landing() {
 
   const start = () => {
     resetAnswers();
+    setLang(pageLang);
     setAnswer('started', '1');
-    setAnswer('source_page', 'home');
+    setAnswer('source_page', sourcePage);
     api.post('/track/engage', { session_id: getSessionId() }).catch(() => {});
     navigate('/flow/year');
   };
@@ -90,20 +96,20 @@ export default function Landing() {
       <div className="mt-7 sm:mt-9 mx-auto w-full max-w-xl">
         <div className="relative bg-white rounded-2xl shadow-[0_18px_50px_rgba(15,27,61,0.18)] px-5 pt-7 pb-5">
           <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#EF4444] text-white text-sm font-bold px-4 py-1.5 rounded-lg whitespace-nowrap shadow-md after:content-[''] after:absolute after:left-1/2 after:-bottom-1.5 after:-translate-x-1/2 after:border-x-8 after:border-x-transparent after:border-t-8 after:border-t-[#EF4444]">
-            Takes 60 seconds — see if you qualify!
+            {t.landing.tooltip}
           </span>
           <button
             onClick={start}
             className="group h-14 w-full px-7 rounded-xl font-bold text-lg bg-[#EF4444] hover:bg-[#DC2626] text-white shadow-[0_10px_24px_rgba(239,68,68,0.35)] transition-colors flex items-center justify-center gap-2"
             data-testid="hero-get-started-button"
           >
-            Check If Your Car Qualifies
+            {t.landing.cta}
             <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
           </button>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-xs sm:text-sm text-slate-500" data-testid="hero-trust-line">
-            <span className="flex items-center gap-1.5"><Star className="h-4 w-4 text-amber-400 fill-amber-400" /> 5-Star Rated</span>
-            <span className="flex items-center gap-1.5" data-testid="hero-badge-free-consultation"><ShieldCheck className="h-4 w-4 text-emerald-500" /> 100% Free Consultation</span>
-            <span className="flex items-center gap-1.5"><Scale className="h-4 w-4 text-blue-500" /> No Win, No Fee</span>
+            <span className="flex items-center gap-1.5"><Star className="h-4 w-4 text-amber-400 fill-amber-400" /> {t.landing.rated}</span>
+            <span className="flex items-center gap-1.5" data-testid="hero-badge-free-consultation"><ShieldCheck className="h-4 w-4 text-emerald-500" /> {t.landing.freeConsult}</span>
+            <span className="flex items-center gap-1.5"><Scale className="h-4 w-4 text-blue-500" /> {t.landing.noWinNoFee}</span>
           </div>
         </div>
       </div>

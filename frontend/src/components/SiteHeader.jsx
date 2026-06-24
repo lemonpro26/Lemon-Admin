@@ -5,6 +5,8 @@ import { Logo } from '@/components/Logo';
 import { COMPANY } from '@/lib/siteContent';
 import { trackPhoneCallConversion } from '@/lib/analytics';
 import { STEP_IDS } from '@/lib/funnel';
+import { useFunnel } from '@/context/FunnelContext';
+import { tr } from '@/lib/i18n';
 
 /**
  * Bindright-style navy header. Logo is absolutely centered so the side widths
@@ -15,6 +17,9 @@ import { STEP_IDS } from '@/lib/funnel';
 export const SiteHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { lang } = useFunnel();
+  const t = tr(lang);
+  const home = lang === 'es' ? '/sp' : '/';
 
   const match = location.pathname.match(/^\/flow\/(.+)$/);
   const stepId = match ? match[1] : null;
@@ -25,7 +30,7 @@ export const SiteHeader = () => {
 
   const goBack = () => {
     if (index > 0) navigate(`/flow/${STEP_IDS[index - 1]}`);
-    else navigate('/');
+    else navigate(home);
   };
 
   return (
@@ -38,24 +43,24 @@ export const SiteHeader = () => {
           data-testid="header-back-button"
           className="flex items-center gap-1 text-sm font-semibold text-white hover:text-[#FACC15] transition-colors focus:outline-none"
         >
-          <ChevronLeft className="h-5 w-5" /> Back
+          <ChevronLeft className="h-5 w-5" /> {t.header.back}
         </button>
       ) : (
         <div className="hidden sm:flex items-center gap-2 text-sm sm:text-base font-semibold text-white min-w-0">
           <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
-          <span>Your information is safe and secure</span>
+          <span>{t.header.secure}</span>
         </div>
       )}
       {!inFunnel && (
         <div className="sm:hidden flex items-center gap-1.5 text-xs font-semibold text-white">
           <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
-          <span>Secure</span>
+          <span>{t.header.secureShort}</span>
         </div>
       )}
 
       <button
         type="button"
-        onClick={() => navigate('/')}
+        onClick={() => navigate(home)}
         data-testid="site-header-logo"
         aria-label="Lemon Pros home"
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 focus:outline-none"
@@ -78,7 +83,7 @@ export const SiteHeader = () => {
           data-testid="header-call-now-label"
           className="mt-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-[#FACC15] group-hover:text-white"
         >
-          Call Now
+          {t.header.callNow}
         </span>
       </a>
 

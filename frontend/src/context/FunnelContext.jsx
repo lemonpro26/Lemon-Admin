@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'osgd_funnel_answers';
+const LANG_KEY = 'osgd_lang';
 const FunnelContext = createContext(null);
 
 function loadInitial() {
@@ -12,8 +13,17 @@ function loadInitial() {
   }
 }
 
+function loadLang() {
+  try {
+    return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en';
+  } catch (e) {
+    return 'en';
+  }
+}
+
 export function FunnelProvider({ children }) {
   const [answers, setAnswers] = useState(loadInitial);
+  const [lang, setLangState] = useState(loadLang);
 
   useEffect(() => {
     try {
@@ -35,8 +45,18 @@ export function FunnelProvider({ children }) {
     }
   };
 
+  const setLang = (l) => {
+    const next = l === 'es' ? 'es' : 'en';
+    setLangState(next);
+    try {
+      localStorage.setItem(LANG_KEY, next);
+    } catch (e) {
+      // ignore
+    }
+  };
+
   return (
-    <FunnelContext.Provider value={{ answers, setAnswer, resetAnswers }}>
+    <FunnelContext.Provider value={{ answers, setAnswer, resetAnswers, lang, setLang }}>
       {children}
     </FunnelContext.Provider>
   );

@@ -4,10 +4,12 @@ import { CheckCircle2, Phone, Clock } from 'lucide-react';
 import { useFunnel } from '@/context/FunnelContext';
 import { trackGenerateLead, trackAdsConversion } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
+import { tr } from '@/lib/i18n';
 
 export default function ThankYou() {
   const navigate = useNavigate();
-  const { resetAnswers } = useFunnel();
+  const { resetAnswers, lang } = useFunnel();
+  const t = tr(lang);
 
   useEffect(() => {
     // GA4 lead conversion (reaching Thank-You = a completed lead). No PII sent.
@@ -27,30 +29,29 @@ export default function ThankYou() {
           <CheckCircle2 className="h-9 w-9 text-emerald-500" />
         </div>
         <h1 className="mt-5 font-slab font-bold text-[clamp(1.6rem,3.5vw,2rem)] text-slate-900">
-          You're all set!
+          {t.thankyou.title}
         </h1>
         <p className="mt-3 text-slate-600">
-          Thanks for your request. A Lemon Pros case specialist will reach out shortly to review your
-          vehicle and explain your options — your consultation is 100% free.
+          {t.thankyou.body}
         </p>
 
         <div className="mt-6 grid gap-3 text-left">
           <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 p-3">
             <Phone className="h-5 w-5 text-blue-500" />
-            <span className="text-sm text-slate-700">Expect a call from a lemon-law specialist.</span>
+            <span className="text-sm text-slate-700">{t.thankyou.expectCall}</span>
           </div>
           <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 p-3">
             <Clock className="h-5 w-5 text-blue-500" />
-            <span className="text-sm text-slate-700">Most case reviews are completed same day.</span>
+            <span className="text-sm text-slate-700">{t.thankyou.sameDay}</span>
           </div>
         </div>
 
         <Button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(lang === 'es' ? '/sp' : '/')}
           className="mt-7 h-12 w-full rounded-xl bg-[#EF4444] hover:bg-[#DC2626] text-white font-semibold transition-colors"
           data-testid="thank-you-home-button"
         >
-          Back to Home
+          {t.thankyou.backHome}
         </Button>
       </div>
     </div>

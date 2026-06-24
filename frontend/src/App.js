@@ -35,6 +35,7 @@ function App() {
           {/* Public funnel pages share a persistent shell (fixed houses + tiny footer). */}
           <Route element={<PublicShell />}>
             <Route path="/" element={<Landing />} />
+            <Route path="/sp" element={<Landing sourcePage="sp" pageLang="es" />} />
             <Route path="/flow/:step" element={<FunnelStep />} />
             <Route path="/thank-you" element={<ThankYou />} />
           </Route>

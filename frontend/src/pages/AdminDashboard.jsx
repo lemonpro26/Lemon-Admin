@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
-  DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2,
+  DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages,
   FileText, Percent, Sigma, Search, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,6 +25,7 @@ import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { AdminCalls } from '@/components/admin/AdminCalls';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { AdminSplitTest } from '@/components/admin/AdminSplitTest';
+import { AdminSpanish } from '@/components/admin/AdminSpanish';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 function fmtDate(iso) {
@@ -260,6 +261,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="hooks" data-testid="admin-tab-hooks"><Megaphone className="h-4 w-4 mr-2" /> Hooks</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="admin-tab-analytics"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</TabsTrigger>
             <TabsTrigger value="split" data-testid="admin-tab-split"><FlaskConical className="h-4 w-4 mr-2" /> Split Test</TabsTrigger>
+            <TabsTrigger value="spanish" data-testid="admin-tab-spanish"><Languages className="h-4 w-4 mr-2" /> Spanish</TabsTrigger>
             <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.total_calls ?? 0})</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
@@ -280,6 +282,11 @@ export default function AdminDashboard() {
           {/* SPLIT TEST */}
           <TabsContent value="split">
             <AdminSplitTest />
+          </TabsContent>
+
+          {/* SPANISH */}
+          <TabsContent value="spanish">
+            <AdminSpanish />
           </TabsContent>
 
           {/* CALLS */}
