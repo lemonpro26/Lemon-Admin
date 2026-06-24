@@ -2184,6 +2184,19 @@ async def admin_metrics(
 # Include the router in the main app
 app.include_router(api_router)
 
+
+@app.middleware("http")
+async def no_store_admin(request: Request, call_next):
+    """Force admin API responses to never be cached (browser or CDN), so the
+    dashboard always reflects the latest hooks/variants/edits immediately."""
+    response = await call_next(request)
+    if request.url.path.startswith("/api/admin"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
