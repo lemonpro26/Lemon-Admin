@@ -94,6 +94,12 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [matchedCalls, setMatchedCalls] = useState([]);
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('admin_active_tab') || 'hooks');
+
+  const onTabChange = useCallback((v) => {
+    setActiveTab(v);
+    localStorage.setItem('admin_active_tab', v);
+  }, []);
 
   const { sorted: sortedLeads, sortKey, sortDir, toggle } = useSortable(leads, 'created_at', 'desc');
 
@@ -268,7 +274,7 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <Tabs defaultValue="hooks">
+        <Tabs value={activeTab} onValueChange={onTabChange}>
           <TabsList className="mb-6 flex-wrap h-auto">
             <TabsTrigger value="hooks" data-testid="admin-tab-hooks"><Megaphone className="h-4 w-4 mr-2" /> Hooks</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="admin-tab-analytics"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</TabsTrigger>
