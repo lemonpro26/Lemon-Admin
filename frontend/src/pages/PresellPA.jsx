@@ -155,6 +155,13 @@ export default function PresellPA() {
             ))}
           </div>
           <p className="text-[11px] text-slate-400 mt-1.5">Prior results do not guarantee a similar outcome.</p>
+          <button
+            onClick={() => start()}
+            className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold px-6 py-3.5 shadow-md shadow-red-500/20 transition-colors"
+            data-testid="pa-settlements-cta"
+          >
+            See If My Car Qualifies <ArrowRight className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Headline */}
