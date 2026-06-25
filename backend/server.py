@@ -515,7 +515,32 @@ async def track_engage(body: ClickTrack, request: Request):
     return {"success": True}
 
 
-def _split_bucket(seed: str) -> int:
+# Ordered funnel steps (must match frontend STEP_IDS).
+FUNNEL_STEPS = ["year", "make", "model", "name", "address", "phone", "email"]
+
+
+class StepTrack(BaseModel):
+    session_id: str
+    step: str = ""
+    index: int = -1
+
+
+@api_router.post("/track/step")
+async def track_step(body: StepTrack, request: Request):
+    """Record the furthest funnel step a visitor reached (for drop-off analytics).
+    Only ever advances (uses $max). Idempotent."""
+    if is_bot_ua(request.headers.get("user-agent", "")):
+        return {"success": True, "bot": True}
+    if not body.session_id:
+        return {"success": True, "skipped": True}
+    idx = body.index if body.index >= 0 else (FUNNEL_STEPS.index(body.step) if body.step in FUNNEL_STEPS else -1)
+    if idx < 0:
+        return {"success": True, "skipped": True}
+    await db.clicks.update_one(
+        {"session_id": body.session_id},
+        {"$max": {"funnel_max_step": idx}, "$set": {"engaged": True, "last_seen": _now_iso()}},
+    )
+    return {"success": True}
     """Stable 0-99 bucket for a visitor (consistent across requests/processes)."""
     if not seed:
         seed = uuid.uuid4().hex
@@ -1097,6 +1122,79 @@ async def _source_breakdown(source_page: str, s_iso: str, e_iso: str, fields: li
         rows.append(entry)
     rows.sort(key=lambda r: (r["leads"], r["clicks"]), reverse=True)
     return rows
+
+
+@api_router.get("/admin/funnel")
+async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
+    """Per-landing-page funnel: how many visitors reach each step and where they
+    drop off. Stages: Landing view -> Year -> Make -> Model -> Name -> Address ->
+    Phone -> Email -> Submitted."""
+    s_iso, e_iso, _d = _date_range(start, end)
+    match = {"first_seen": {"$gte": s_iso, "$lte": e_iso}}
+
+    # Histogram of furthest step reached, grouped by source page.
+    pages = {}  # page -> {"views": n, "hist": {idx: n}, "converted": n}
+
+    def _page(sp):
+        key = (sp or "home").lower()
+        if key not in ("home", "lapa", "sp"):
+            key = "home"
+        return key
+
+    async for row in db.clicks.aggregate([
+        {"$match": match},
+        {"$group": {"_id": {"sp": "$source_page", "step": "$funnel_max_step"}, "n": {"$sum": 1}}},
+    ]):
+        p = _page(row["_id"].get("sp"))
+        d = pages.setdefault(p, {"views": 0, "hist": {}, "converted": 0})
+        step = row["_id"].get("step")
+        d["views"] += row["n"]
+        if step is not None and step >= 0:
+            d["hist"][step] = d["hist"].get(step, 0) + row["n"]
+
+    async for row in db.clicks.aggregate([
+        {"$match": {**match, "converted": True}},
+        {"$group": {"_id": "$source_page", "n": {"$sum": 1}}},
+    ]):
+        p = _page(row["_id"])
+        pages.setdefault(p, {"views": 0, "hist": {}, "converted": 0})["converted"] += row["n"]
+
+    labels = {"home": "Home", "lapa": "PA Page", "sp": "Spanish"}
+    stage_names = ["Landing View"] + [s.capitalize() for s in FUNNEL_STEPS] + ["Submitted"]
+
+    def build(d):
+        views = d["views"]
+        hist = d["hist"]
+        # reached[i] = visitors whose furthest step >= i
+        reached = []
+        for i in range(len(FUNNEL_STEPS)):
+            reached.append(sum(n for st, n in hist.items() if st >= i))
+        counts = [views] + reached + [d["converted"]]
+        stages = []
+        prev = None
+        for name, c in zip(stage_names, counts):
+            drop = (prev - c) if (prev is not None and prev >= c) else 0
+            drop_pct = round((drop / prev * 100), 1) if prev else 0.0
+            pct_of_top = round((c / counts[0] * 100), 1) if counts[0] else 0.0
+            stages.append({"stage": name, "count": c, "drop": drop, "drop_pct": drop_pct, "pct_of_views": pct_of_top})
+            prev = c
+        return {"views": views, "submitted": d["converted"],
+                "conversion_rate": round((d["converted"] / views * 100), 1) if views else 0.0,
+                "stages": stages}
+
+    # Overall (sum of all pages)
+    overall = {"views": 0, "hist": {}, "converted": 0}
+    for d in pages.values():
+        overall["views"] += d["views"]
+        overall["converted"] += d["converted"]
+        for st, n in d["hist"].items():
+            overall["hist"][st] = overall["hist"].get(st, 0) + n
+
+    result = {"overall": build(overall)}
+    for key, lbl in labels.items():
+        result[key] = {"label": lbl, **build(pages.get(key, {"views": 0, "hist": {}, "converted": 0}))}
+    result["range"] = {"start": s_iso, "end": e_iso}
+    return result
 
 
 @api_router.get("/admin/spanish")

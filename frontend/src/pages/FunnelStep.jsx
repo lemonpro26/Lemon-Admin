@@ -316,6 +316,10 @@ export default function FunnelStep() {
     }
     if (!step) navigate(`/flow/${STEP_IDS[0]}`, { replace: true });
     window.scrollTo(0, 0);
+    // Record furthest funnel step reached (for drop-off analytics).
+    if (step && index >= 0) {
+      api.post('/track/step', { session_id: getSessionId(), step: stepId, index }).catch(() => {});
+    }
   }, [stepId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!step) return null;

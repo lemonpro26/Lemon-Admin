@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
-  DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid,
+  DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid, Filter,
   FileText, Percent, Sigma, Search, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,6 +27,7 @@ import { AdminSettings } from '@/components/admin/AdminSettings';
 import { AdminSplitTest } from '@/components/admin/AdminSplitTest';
 import { AdminSpanish } from '@/components/admin/AdminSpanish';
 import { AdminPages } from '@/components/admin/AdminPages';
+import { AdminFunnel } from '@/components/admin/AdminFunnel';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 function fmtDate(iso) {
@@ -271,6 +272,7 @@ export default function AdminDashboard() {
           <TabsList className="mb-6 flex-wrap h-auto">
             <TabsTrigger value="hooks" data-testid="admin-tab-hooks"><Megaphone className="h-4 w-4 mr-2" /> Hooks</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="admin-tab-analytics"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</TabsTrigger>
+            <TabsTrigger value="funnel" data-testid="admin-tab-funnel"><Filter className="h-4 w-4 mr-2" /> Funnel</TabsTrigger>
             <TabsTrigger value="split" data-testid="admin-tab-split"><FlaskConical className="h-4 w-4 mr-2" /> Split Test</TabsTrigger>
             <TabsTrigger value="spanish" data-testid="admin-tab-spanish"><Languages className="h-4 w-4 mr-2" /> Spanish</TabsTrigger>
             <TabsTrigger value="pages" data-testid="admin-tab-pages"><LayoutGrid className="h-4 w-4 mr-2" /> Pages</TabsTrigger>
@@ -289,6 +291,11 @@ export default function AdminDashboard() {
           {/* ANALYTICS */}
           <TabsContent value="analytics">
             <AdminAnalytics />
+          </TabsContent>
+
+          {/* FUNNEL */}
+          <TabsContent value="funnel">
+            <AdminFunnel />
           </TabsContent>
 
           {/* SPLIT TEST */}
