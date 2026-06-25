@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Filter, ArrowDown, TrendingDown } from 'lucide-react';
+import { Filter, ArrowDown, TrendingDown, PhoneCall } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
@@ -58,8 +58,9 @@ export function AdminFunnel() {
 
   useEffect(() => { load(); }, [load]);
 
-  const cur = data?.[page] || { views: 0, submitted: 0, conversion_rate: 0, stages: [] };
+  const cur = data?.[page] || { views: 0, submitted: 0, calls: 0, conversions: 0, conversion_rate: 0, stages: [] };
   const topCount = cur.stages?.[0]?.count || 0;
+  const isOverall = page === 'overall';
 
   return (
     <div className="space-y-6" data-testid="admin-funnel">
@@ -85,18 +86,30 @@ export function AdminFunnel() {
       </div>
 
       {/* Summary */}
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="text-sm text-slate-500">Landing Views</div>
           <div className="mt-1 text-3xl font-extrabold text-[#0F1B3D]" data-testid="funnel-views">{loading ? '—' : cur.views}</div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="text-sm text-slate-500">Leads Submitted</div>
+          <div className="text-sm text-slate-500">Form Leads</div>
           <div className="mt-1 text-3xl font-extrabold text-emerald-600" data-testid="funnel-submitted">{loading ? '—' : cur.submitted}</div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="text-sm text-slate-500 flex items-center gap-1.5">
+            <PhoneCall className="h-3.5 w-3.5" /> Phone Calls
+          </div>
+          <div className="mt-1 text-3xl font-extrabold text-indigo-600" data-testid="funnel-calls">{loading ? '—' : (cur.calls || 0)}</div>
+          {!isOverall && !loading && <div className="text-[11px] text-slate-400 mt-1">Calls aren't page-specific — see All Pages</div>}
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="text-sm text-slate-500">Overall Conversion</div>
           <div className="mt-1 text-3xl font-extrabold text-[#0F1B3D]" data-testid="funnel-conv">{loading ? '—' : `${cur.conversion_rate}%`}</div>
+          {isOverall && !loading && (
+            <div className="text-[11px] text-slate-400 mt-1" data-testid="funnel-conv-note">
+              {cur.submitted} leads + {cur.calls || 0} calls ÷ {cur.views} views
+            </div>
+          )}
         </div>
       </div>
 

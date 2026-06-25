@@ -1292,7 +1292,7 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
     labels = {"home": "Home", "lapa": "PA Page", "sp": "Spanish"}
     stage_names = ["Landing View"] + [s.capitalize() for s in FUNNEL_STEPS] + ["Submitted"]
 
-    def build(d):
+    def build(d, calls=0):
         views = d["views"]
         hist = d["hist"]
         # reached[i] = visitors whose furthest step >= i
@@ -1308,9 +1308,17 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
             pct_of_top = round((c / counts[0] * 100), 1) if counts[0] else 0.0
             stages.append({"stage": name, "count": c, "drop": drop, "drop_pct": drop_pct, "pct_of_views": pct_of_top})
             prev = c
-        return {"views": views, "submitted": d["converted"],
-                "conversion_rate": round((d["converted"] / views * 100), 1) if views else 0.0,
+        # A phone call counts as a conversion too. Calls aren't tied to a specific
+        # landing page (inbound), so they're only folded into the "All Pages" view.
+        conversions = d["converted"] + calls
+        return {"views": views, "submitted": d["converted"], "calls": calls,
+                "conversions": conversions,
+                "form_conversion_rate": round((d["converted"] / views * 100), 1) if views else 0.0,
+                "conversion_rate": round((conversions / views * 100), 1) if views else 0.0,
                 "stages": stages}
+
+    # Total inbound calls in range — counted as conversions on the overall view.
+    total_calls = await db.calls.count_documents({"created_at": {"$gte": s_iso, "$lte": e_iso}})
 
     # Overall (sum of all pages)
     overall = {"views": 0, "hist": {}, "converted": 0}
@@ -1320,7 +1328,7 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
         for st, n in d["hist"].items():
             overall["hist"][st] = overall["hist"].get(st, 0) + n
 
-    result = {"overall": build(overall)}
+    result = {"overall": build(overall, calls=total_calls), "total_calls": total_calls}
     for key, lbl in labels.items():
         result[key] = {"label": lbl, **build(pages.get(key, {"views": 0, "hist": {}, "converted": 0}))}
     result["range"] = {"start": s_iso, "end": e_iso}

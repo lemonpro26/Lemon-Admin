@@ -206,7 +206,7 @@ export function AdminSplitTest() {
         </div>
       </div>
 
-      {running.length === 0 && (
+      {!loading && running.length === 0 && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-700" data-testid="split-no-running">
           No test is currently running — everyone who hits <code>/split</code> goes to Home. Start a test below to begin routing.
         </div>
