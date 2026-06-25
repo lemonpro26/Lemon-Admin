@@ -82,7 +82,30 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Offline conversions migrated to Google Data Manager API** (`datamanager_service.py`, `events:ingest`). Wired into `_upload_lead_conversion`, `/admin/google-ads/status`. New Import/UPLOAD_CLICKS conversion action created by user — ctId `7658454424` (category PURCHASE, ENABLED). Validate-only test PASSES for both leads and calls (gclid + hashed email/phone matching). Still in VALIDATE_ONLY mode.
 - **Phone-call revenue passback (NEW)**: calls captured via CTM webhook (`/calls/webhook?token=...`) now support "Mark as Sold & Send to Google Ads" in the Calls tab — `POST /admin/calls/{id}/sold` + `/conversion/retry`, `_upload_call_conversion` (matches on call gclid + caller phone). Calls tab UI: Revenue column, conversion badge, detail dialog. Curl-verified end-to-end (validated).
 
+## Implemented (2026-06-25)
+- **Split Test → Experiments system (rewrite)**: the Split Test tab is now a
+  reusable A/B experiment manager. Create a test by picking ANY pages (Home/PA/
+  Spanish + custom Pages) with relative weights, Start/Stop (one runs at a time),
+  Delete, and keep past tests as history with their results. `/split` routes per
+  the RUNNING experiment (stable weighted pick) and stamps `se`/`sv` on the
+  redirect; the destination page forwards `split_experiment_id`+`split_variant`
+  onto the click AND the lead. Stats count ONLY split-routed traffic (fixes the
+  old "Home shows 1000+ views" — it counted all home traffic). Per-variant
+  visits/leads/conversion% + winner by conversion%. Backend: `experiments`
+  collection, `GET/POST/PUT/DELETE /admin/experiments`, rewritten `/split/decide`.
+  tracking.js captures `se`/`sv` (sticky through funnel). Verified e2e: non-split
+  click excluded; split clicks/lead counted per variant.
+
 ## Implemented (2026-06-24)
+- **Pages tab (admin)**: new "Pages" tab lists all live pages (Home `/`, PA `/pa`,
+  Spanish `/sp`, Split `/split`) with full URL + copy/open buttons, plus a
+  user-managed list of custom page links (add/remove). Stored in config
+  `custom_pages`. Endpoints `GET/PUT /admin/pages`. URLs built from current origin
+  (so they read apply.thelemonpros.com on production). Verified e2e.
+- **Calls table sorting + unified leads/calls search**: every Calls column sortable
+  (useSortable+SortLabel); Leads search bar also queries calls (`/admin/calls?search=`)
+  and shows a "Matching calls" section. Calls store `caller_digits` (webhook + test +
+  startup backfill).
 - **CRM phone de-duplication**: a web-form lead is no longer fired into the CRM
   (Zapier→QuickBase) if the phone (last 10 digits) already exists as a prior form
   lead OR a prior call. The lead is still saved to the admin Leads tab and tagged

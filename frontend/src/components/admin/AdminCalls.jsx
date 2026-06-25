@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
+import { useSortable, SortLabel } from '@/lib/useSortable';
 
 const fmtDuration = (s) => {
   const n = Number(s) || 0;
@@ -46,6 +47,7 @@ export const AdminCalls = () => {
   const [marking, setMarking] = useState(false);
   const [gaStatus, setGaStatus] = useState(null);
   const editable = canEditFn();
+  const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,14 +154,14 @@ export const AdminCalls = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Caller</TableHead>
-              <TableHead>Number</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead className="hidden md:table-cell">Campaign</TableHead>
-              <TableHead className="hidden lg:table-cell">Hook seen</TableHead>
-              <TableHead className="hidden sm:table-cell">Revenue</TableHead>
-              <TableHead className="hidden lg:table-cell">Location</TableHead>
-              <TableHead>When</TableHead>
+              <TableHead><SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              <TableHead><SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              <TableHead><SortLabel label="Duration" k="duration" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              <TableHead className="hidden md:table-cell"><SortLabel label="Campaign" k="campaign" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              <TableHead className="hidden lg:table-cell"><SortLabel label="Hook seen" k="hook_label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              <TableHead className="hidden sm:table-cell"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              <TableHead className="hidden lg:table-cell"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              <TableHead><SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -168,7 +170,7 @@ export const AdminCalls = () => {
               <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10">Loading…</TableCell></TableRow>
             ) : calls.length === 0 ? (
               <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
-            ) : calls.map((c) => (
+            ) : sortedCalls.map((c) => (
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
                 <TableCell className="font-medium text-slate-900">{c.caller_name || '—'}</TableCell>
                 <TableCell className="text-slate-700">{c.caller_number || '—'}</TableCell>

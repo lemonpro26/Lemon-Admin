@@ -106,6 +106,8 @@ DEFAULT_CONFIG = {
     # Landing-page split test (Home `/` vs PA `/pa`)
     "split_test_enabled": False,
     "split_home_pct": 50,
+    # User-managed directory of custom page links (built-ins are added client-side)
+    "custom_pages": [],
 }
 
 app = FastAPI()
@@ -173,6 +175,8 @@ class LeadCreate(BaseModel):
     extensionid: Optional[str] = ""
     params: Optional[dict] = None
     source_page: Optional[str] = ""
+    split_experiment_id: Optional[str] = ""
+    split_variant: Optional[str] = ""
 
 
 class ClickTrack(BaseModel):
@@ -191,6 +195,8 @@ class ClickTrack(BaseModel):
     landing_path: Optional[str] = ""
     params: Optional[dict] = None
     source_page: Optional[str] = ""
+    split_experiment_id: Optional[str] = ""
+    split_variant: Optional[str] = ""
 
 
 class HookRuleBody(BaseModel):
@@ -519,18 +525,37 @@ def _split_bucket(seed: str) -> int:
     return int(hashlib.md5(seed.encode()).hexdigest(), 16) % 100
 
 
+def _weighted_variant(variants: list, seed: str) -> dict:
+    """Stable weighted pick of a variant for a visitor (seeded by session)."""
+    total = sum(max(0, int(v.get("weight", 0))) for v in variants) or 1
+    bucket = int(hashlib.md5((seed or uuid.uuid4().hex).encode()).hexdigest(), 16) % total
+    acc = 0
+    for v in variants:
+        acc += max(0, int(v.get("weight", 0)))
+        if bucket < acc:
+            return v
+    return variants[-1]
+
+
 @api_router.get("/split/decide")
 async def split_decide(session: str = Query("", description="visitor session id")):
-    """Decide which landing page a visitor should see in the A/B split test.
-    Stable per session (same visitor always gets the same page). When the split
-    test is disabled, everyone goes to Home."""
-    cfg = await get_or_create_config()
-    enabled = bool(cfg.get("split_test_enabled", False))
-    home_pct = int(cfg.get("split_home_pct", 50))
-    if not enabled:
-        return {"enabled": False, "home_pct": home_pct, "target": "home"}
-    target = "home" if _split_bucket(session) < home_pct else "pa"
-    return {"enabled": True, "home_pct": home_pct, "target": target}
+    """Decide which page a visitor should see for the currently RUNNING experiment.
+    Stable per session. When no experiment is running, everyone goes Home. The
+    returned experiment_id + variant are stamped on the visitor's click/lead so
+    the Split Test stats count ONLY traffic that came through /split."""
+    exp = await db.experiments.find_one({"status": "running"})
+    if not exp:
+        return {"running": False, "target": "/", "experiment_id": "", "variant": ""}
+    variants = exp.get("variants", [])
+    if not variants:
+        return {"running": False, "target": "/", "experiment_id": "", "variant": ""}
+    chosen = _weighted_variant(variants, session)
+    return {
+        "running": True,
+        "experiment_id": exp["id"],
+        "variant": chosen.get("label", ""),
+        "target": chosen.get("path", "/"),
+    }
 
 
 
@@ -940,79 +965,106 @@ async def admin_update_config(body: ConfigUpdate, _: dict = Depends(require_edit
     return serialize_doc(cfg)
 
 
-class SplitTestUpdate(BaseModel):
-    enabled: bool
-    home_pct: int
+class ExperimentVariant(BaseModel):
+    label: str
+    path: str
+    weight: int = 50
 
 
-# Map a stored source_page value to a split-test variant key.
-def _variant_of(sp) -> str:
-    v = (sp or "").lower()
-    if v == "lapa":
-        return "pa"
-    if v in ("", "home"):
-        return "home"
-    return ""  # other pages (e.g. 'sp') are excluded from the Home/PA split
+class ExperimentBody(BaseModel):
+    name: str
+    variants: List[ExperimentVariant]
 
 
-async def _split_test_stats(s_iso: str, e_iso: str) -> dict:
-    """Clicks + leads per landing-page variant (home vs pa), with conversion %."""
-    base = {"home": {"clicks": 0, "leads": 0}, "pa": {"clicks": 0, "leads": 0}}
+async def _experiment_stats(exp: dict) -> dict:
+    """Per-variant clicks/leads/conversion for an experiment — counts ONLY traffic
+    that was routed through /split (stamped with this experiment id)."""
+    eid = exp["id"]
+    clicks = {}
     async for c in db.clicks.aggregate([
-        {"$match": {"first_seen": {"$gte": s_iso, "$lte": e_iso}}},
-        {"$group": {"_id": "$source_page", "n": {"$sum": 1}}},
+        {"$match": {"split_experiment_id": eid}},
+        {"$group": {"_id": "$split_variant", "n": {"$sum": 1}}},
     ]):
-        v = _variant_of(c["_id"])
-        if v:
-            base[v]["clicks"] += c["n"]
+        clicks[c["_id"] or ""] = c["n"]
+    leads = {}
     async for l in db.leads.aggregate([
-        {"$match": {"created_at": {"$gte": s_iso, "$lte": e_iso}}},
-        {"$group": {"_id": "$source_page", "n": {"$sum": 1}}},
+        {"$match": {"split_experiment_id": eid}},
+        {"$group": {"_id": "$split_variant", "n": {"$sum": 1}}},
     ]):
-        v = _variant_of(l["_id"])
-        if v:
-            base[v]["leads"] += l["n"]
-    out = {}
-    for k, v in base.items():
-        c, lc = v["clicks"], v["leads"]
-        out[k] = {"clicks": c, "leads": lc,
-                  "conversion_rate": round((lc / c * 100), 1) if c else 0.0}
-    # Winner by conversion % (require both variants to have clicks for a verdict).
+        leads[l["_id"] or ""] = l["n"]
+    variants = []
+    best = None
+    for v in exp.get("variants", []):
+        lbl = v.get("label", "")
+        c, lc = clicks.get(lbl, 0), leads.get(lbl, 0)
+        conv = round((lc / c * 100), 1) if c else 0.0
+        row = {"label": lbl, "path": v.get("path", ""), "weight": v.get("weight", 0),
+               "clicks": c, "leads": lc, "conversion_rate": conv}
+        variants.append(row)
+        if c > 0 and (best is None or conv > best["conversion_rate"]):
+            best = row
+    # Winner only if at least two variants have traffic and one clearly leads.
+    with_traffic = [v for v in variants if v["clicks"] > 0]
     winner = None
-    h, p = out["home"], out["pa"]
-    if h["clicks"] and p["clicks"]:
-        if h["conversion_rate"] > p["conversion_rate"]:
-            winner = "home"
-        elif p["conversion_rate"] > h["conversion_rate"]:
-            winner = "pa"
-        else:
-            winner = "tie"
-    out["winner"] = winner
-    return out
+    if len(with_traffic) >= 2:
+        top = max(v["conversion_rate"] for v in with_traffic)
+        leaders = [v for v in with_traffic if v["conversion_rate"] == top]
+        winner = "tie" if len(leaders) > 1 else leaders[0]["label"]
+    return {"variants": variants, "winner": winner}
 
 
-@api_router.get("/admin/split-test")
-async def get_split_test(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
-    cfg = await get_or_create_config()
-    s_iso, e_iso, _days = _date_range(start, end)
-    return {
-        "enabled": bool(cfg.get("split_test_enabled", False)),
-        "home_pct": int(cfg.get("split_home_pct", 50)),
-        "stats": await _split_test_stats(s_iso, e_iso),
-        "range": {"start": s_iso, "end": e_iso},
-    }
+@api_router.get("/admin/experiments")
+async def list_experiments(_: dict = Depends(require_admin)):
+    docs = await db.experiments.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    for d in docs:
+        d["stats"] = await _experiment_stats(d)
+    return {"experiments": docs}
 
 
-@api_router.put("/admin/split-test")
-async def update_split_test(body: SplitTestUpdate, _: dict = Depends(require_editor)):
-    home_pct = max(0, min(100, int(body.home_pct)))
-    await db.site_config.update_one(
-        {"_id": "singleton"},
-        {"$set": {"split_test_enabled": bool(body.enabled),
-                  "split_home_pct": home_pct, "updated_at": _now_iso()}},
-        upsert=True,
-    )
-    return {"enabled": bool(body.enabled), "home_pct": home_pct}
+@api_router.post("/admin/experiments")
+async def create_experiment(body: ExperimentBody, _: dict = Depends(require_editor)):
+    variants = [{"label": v.label.strip() or v.path,
+                 "path": "/" + v.path.strip().lstrip("/"),
+                 "weight": max(0, int(v.weight))} for v in body.variants]
+    exp = {"id": str(uuid.uuid4()), "name": body.name.strip() or "Untitled test",
+           "variants": variants, "status": "draft",
+           "created_at": _now_iso(), "stopped_at": ""}
+    await db.experiments.insert_one(dict(exp))
+    return exp
+
+
+@api_router.put("/admin/experiments/{exp_id}")
+async def update_experiment(exp_id: str, body: dict, _: dict = Depends(require_editor)):
+    exp = await db.experiments.find_one({"id": exp_id})
+    if not exp:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    update = {"updated_at": _now_iso()}
+    if "name" in body:
+        update["name"] = str(body["name"]).strip() or exp.get("name")
+    if "variants" in body and isinstance(body["variants"], list):
+        update["variants"] = [{"label": (v.get("label") or v.get("path") or "").strip(),
+                               "path": "/" + str(v.get("path", "")).strip().lstrip("/"),
+                               "weight": max(0, int(v.get("weight", 0)))} for v in body["variants"]]
+    if "status" in body and body["status"] in ("draft", "running", "stopped"):
+        new_status = body["status"]
+        if new_status == "running":
+            # Only one experiment runs at a time.
+            await db.experiments.update_many({"status": "running"}, {"$set": {"status": "stopped", "stopped_at": _now_iso()}})
+        if new_status == "stopped":
+            update["stopped_at"] = _now_iso()
+        update["status"] = new_status
+    await db.experiments.update_one({"id": exp_id}, {"$set": update})
+    doc = await db.experiments.find_one({"id": exp_id}, {"_id": 0})
+    doc["stats"] = await _experiment_stats(doc)
+    return doc
+
+
+@api_router.delete("/admin/experiments/{exp_id}")
+async def delete_experiment(exp_id: str, _: dict = Depends(require_editor)):
+    res = await db.experiments.delete_one({"id": exp_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    return {"success": True}
 
 
 class SpanishHooksUpdate(BaseModel):
@@ -1083,6 +1135,35 @@ async def update_spanish(body: SpanishHooksUpdate, _: dict = Depends(require_edi
         upsert=True,
     )
     return {"hook1_es": body.hook1_es, "hook2_es": body.hook2_es}
+
+
+class PageItem(BaseModel):
+    label: str
+    path: str
+
+
+class PagesUpdate(BaseModel):
+    pages: List[PageItem]
+
+
+@api_router.get("/admin/pages")
+async def get_pages(_: dict = Depends(require_admin)):
+    cfg = await get_or_create_config()
+    return {"custom_pages": cfg.get("custom_pages", []) or []}
+
+
+@api_router.put("/admin/pages")
+async def update_pages(body: PagesUpdate, _: dict = Depends(require_editor)):
+    pages = []
+    for p in body.pages:
+        path = ("/" + p.path.strip().lstrip("/")) if p.path.strip() else "/"
+        pages.append({"id": str(uuid.uuid4()), "label": p.label.strip() or path, "path": path})
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {"custom_pages": pages, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    return {"custom_pages": pages}
 
 
 
@@ -1587,9 +1668,23 @@ async def _enrich_calls_with_hooks(items: list) -> list:
 
 
 @api_router.get("/admin/calls")
-async def admin_get_calls(start: str = "", end: str = "", _: dict = Depends(require_admin)):
-    s_iso, e_iso, _d = _date_range(start, end)
-    docs = await db.calls.find({"created_at": {"$gte": s_iso, "$lte": e_iso}}).sort("created_at", -1).to_list(2000)
+async def admin_get_calls(start: str = "", end: str = "", search: str = Query(""), _: dict = Depends(require_admin)):
+    search = (search or "").strip()
+    if search:
+        # Search by caller name / number across ALL calls (ignore date range).
+        rx = _re.escape(search)
+        digits = _re.sub(r"\D", "", search)
+        ors = [
+            {"caller_name": {"$regex": rx, "$options": "i"}},
+            {"caller_number": {"$regex": rx, "$options": "i"}},
+        ]
+        if digits:
+            ors.append({"caller_digits": {"$regex": _re.escape(digits)}})
+        q = {"$or": ors}
+    else:
+        s_iso, e_iso, _d = _date_range(start, end)
+        q = {"created_at": {"$gte": s_iso, "$lte": e_iso}}
+    docs = await db.calls.find(q).sort("created_at", -1).to_list(2000)
     items = [{k: v for k, v in c.items() if k != "_id"} for c in docs]
     items = await _enrich_calls_with_hooks(items)
     return {"calls": items, "total": len(items)}
@@ -1611,10 +1706,12 @@ async def create_test_call(_: dict = Depends(require_editor)):
     name = rng.choice(["Alex Johnson", "Jordan Smith", "Sam Garcia", "Taylor Lee", "Casey Brown"])
     geo = rng.choice([("Los Angeles", "CA"), ("Phoenix", "AZ"), ("Houston", "TX"), ("Miami", "FL")])
     now = _now_iso()
+    _num = f"(555) {rng.randint(100,999)}-{rng.randint(1000,9999)}"
     rec = {
         "id": str(uuid.uuid4()),
-        "caller_number": f"(555) {rng.randint(100,999)}-{rng.randint(1000,9999)}",
+        "caller_number": _num,
         "caller_name": name,
+        "caller_digits": _re.sub(r"\D", "", _num),
         "tracking_number": "(844) 335-8911",
         "duration": rng.randint(45, 320),
         "source": "google",
@@ -2232,6 +2329,16 @@ logger = logging.getLogger(__name__)
 @app.on_event("startup")
 async def startup():
     await get_or_create_config()
+    # One-time backfill: normalize caller digits on existing calls so phone
+    # search + lead de-duplication also match calls captured before this field.
+    try:
+        async for c in db.calls.find({"caller_digits": {"$exists": False}}, {"caller_number": 1}):
+            await db.calls.update_one(
+                {"_id": c["_id"]},
+                {"$set": {"caller_digits": _re.sub(r"\D", "", c.get("caller_number") or "")}},
+            )
+    except Exception as e:
+        logger.error("caller_digits backfill failed: %s", e)
     logger.info("Lemon Pros API started")
 
 

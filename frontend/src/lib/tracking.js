@@ -26,7 +26,7 @@ const PASSTHROUGH = [
   'network', 'device', 'devicemodel', 'placement', 'adposition', 'target',
 ];
 
-const EMPTY = { campaign_id: '', adgroup_id: '', ad_id: '', keyword: '', gclid: '', gbraid: '', wbraid: '', referrer: '', feeditemid: '', extensionid: '', params: {} };
+const EMPTY = { campaign_id: '', adgroup_id: '', ad_id: '', keyword: '', gclid: '', gbraid: '', wbraid: '', referrer: '', feeditemid: '', extensionid: '', split_experiment_id: '', split_variant: '', params: {} };
 
 export function getTracking() {
   try {
@@ -42,6 +42,7 @@ export function getTracking() {
 // funnel and refreshes without losing the original source).
 export function captureTracking(search) {
   const p = new URLSearchParams(search || '');
+  const existing = getTracking();
   const data = {
     campaign_id: p.get('tg_ref') || '',
     adgroup_id: p.get('adgroup_id') || '',
@@ -53,6 +54,10 @@ export function captureTracking(search) {
     referrer: (typeof document !== 'undefined' ? document.referrer : '') || '',
     feeditemid: p.get('feeditemid') || '',
     extensionid: p.get('extensionid') || '',
+    // Split-test attribution (stamped by the /split entry redirect). Sticky across
+    // the funnel so the lead carries the experiment + variant it was routed to.
+    split_experiment_id: p.get('se') || existing.split_experiment_id || '',
+    split_variant: p.get('sv') || existing.split_variant || '',
     params: {},
   };
   PASSTHROUGH.forEach((k) => {
@@ -63,7 +68,7 @@ export function captureTracking(search) {
   const hasTracking =
     data.campaign_id || data.adgroup_id || data.ad_id || data.keyword ||
     data.gclid || data.gbraid || data.wbraid || data.referrer ||
-    data.feeditemid || data.extensionid ||
+    data.feeditemid || data.extensionid || p.get('se') ||
     Object.keys(data.params).length > 0;
 
   if (hasTracking) {

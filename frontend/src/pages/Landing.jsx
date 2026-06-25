@@ -40,6 +40,8 @@ export default function Landing({ sourcePage = 'home', pageLang = 'en' }) {
         referrer: tracking.referrer,
         feeditemid: tracking.feeditemid,
         extensionid: tracking.extensionid,
+        split_experiment_id: tracking.split_experiment_id,
+        split_variant: tracking.split_variant,
         params: tracking.params,
       })
       .catch(() => {});

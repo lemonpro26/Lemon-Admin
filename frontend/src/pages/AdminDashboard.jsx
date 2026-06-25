@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
-  DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages,
+  DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid,
   FileText, Percent, Sigma, Search, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,6 +26,7 @@ import { AdminCalls } from '@/components/admin/AdminCalls';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { AdminSplitTest } from '@/components/admin/AdminSplitTest';
 import { AdminSpanish } from '@/components/admin/AdminSpanish';
+import { AdminPages } from '@/components/admin/AdminPages';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 function fmtDate(iso) {
@@ -91,6 +92,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [matchedCalls, setMatchedCalls] = useState([]);
 
   const { sorted: sortedLeads, sortKey, sortDir, toggle } = useSortable(leads, 'created_at', 'desc');
 
@@ -102,12 +104,21 @@ export default function AdminDashboard() {
   const loadLeads = useCallback(async () => {
     setLoading(true);
     try {
-      const params = debouncedSearch.trim()
-        ? { search: debouncedSearch.trim() }
-        : { start: range.start, end: range.end };
+      const q = debouncedSearch.trim();
+      const params = q ? { search: q } : { start: range.start, end: range.end };
       const res = await api.get('/admin/leads', { params });
       setLeads(res.data.leads);
       setTotal(res.data.total);
+      // When searching, also surface matching CALLS so leads + calls are
+      // searchable together from one bar.
+      if (q) {
+        try {
+          const cr = await api.get('/admin/calls', { params: { search: q } });
+          setMatchedCalls(cr.data.calls || []);
+        } catch (e) { setMatchedCalls([]); }
+      } else {
+        setMatchedCalls([]);
+      }
     } catch (e) {
       if (e?.response?.status === 401) {
         logout();
@@ -262,6 +273,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="analytics" data-testid="admin-tab-analytics"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</TabsTrigger>
             <TabsTrigger value="split" data-testid="admin-tab-split"><FlaskConical className="h-4 w-4 mr-2" /> Split Test</TabsTrigger>
             <TabsTrigger value="spanish" data-testid="admin-tab-spanish"><Languages className="h-4 w-4 mr-2" /> Spanish</TabsTrigger>
+            <TabsTrigger value="pages" data-testid="admin-tab-pages"><LayoutGrid className="h-4 w-4 mr-2" /> Pages</TabsTrigger>
             <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.total_calls ?? 0})</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
@@ -289,6 +301,11 @@ export default function AdminDashboard() {
             <AdminSpanish />
           </TabsContent>
 
+          {/* PAGES */}
+          <TabsContent value="pages">
+            <AdminPages />
+          </TabsContent>
+
           {/* CALLS */}
           <TabsContent value="calls">
             <AdminCalls />
@@ -298,7 +315,7 @@ export default function AdminDashboard() {
           <TabsContent value="leads">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
               <p className="text-sm text-slate-500 flex items-center gap-2">
-                <Users className="h-4 w-4" /> {debouncedSearch.trim() ? `Search results for "${debouncedSearch.trim()}"` : 'Leads submitted in the selected range.'}
+                <Users className="h-4 w-4" /> {debouncedSearch.trim() ? `Search results for "${debouncedSearch.trim()}" — leads & calls` : 'Leads submitted in the selected range.'}
               </p>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="relative">
@@ -306,7 +323,7 @@ export default function AdminDashboard() {
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search name or phone…"
+                    placeholder="Search leads & calls…"
                     className="h-10 w-56 rounded-xl border-slate-200 pl-9 pr-8"
                     data-testid="lead-search-input"
                   />
@@ -449,6 +466,50 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+
+            {/* Matching CALLS — surfaced when searching so leads + calls are searchable together */}
+            {debouncedSearch.trim() && (
+              <div className="mt-6" data-testid="lead-search-matched-calls">
+                <p className="text-sm text-slate-500 flex items-center gap-2 mb-3">
+                  <Phone className="h-4 w-4" /> Matching calls ({matchedCalls.length})
+                </p>
+                {matchedCalls.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
+                    No calls match "{debouncedSearch.trim()}".
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <Table data-testid="admin-matched-calls-table">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Caller</TableHead>
+                            <TableHead>Number</TableHead>
+                            <TableHead className="hidden sm:table-cell">Duration</TableHead>
+                            <TableHead className="hidden md:table-cell">Campaign</TableHead>
+                            <TableHead className="hidden sm:table-cell">Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {matchedCalls.map((c) => (
+                            <TableRow key={c.id} data-testid={`matched-call-row-${c.id}`}>
+                              <TableCell className="font-medium text-slate-900">
+                                {c.caller_name || '\u2014'}
+                                <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">call</Badge>
+                              </TableCell>
+                              <TableCell className="text-slate-600">{c.caller_number || '\u2014'}</TableCell>
+                              <TableCell className="hidden sm:table-cell text-slate-600">{c.duration ? `${c.duration}s` : '\u2014'}</TableCell>
+                              <TableCell className="hidden md:table-cell text-slate-600">{c.campaign || '\u2014'}</TableCell>
+                              <TableCell className="hidden sm:table-cell text-slate-500 text-sm">{fmtDate(c.created_at)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
 
           {/* SETTINGS */}

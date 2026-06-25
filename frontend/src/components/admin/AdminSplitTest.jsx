@@ -1,73 +1,81 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlaskConical, Copy, Check, Trophy, Save, Home as HomeIcon, FileText } from 'lucide-react';
+import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { DateRangeFilter } from '@/components/admin/DateRangeFilter';
+import { Label } from '@/components/ui/label';
 
-const last30 = () => {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 29);
-  const iso = (d) => {
-    const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-    return z.toISOString().slice(0, 10);
-  };
-  return { start: iso(start), end: iso(end) };
-};
-
-const VARIANTS = [
-  { key: 'home', label: 'Home Page', path: '/', icon: HomeIcon },
-  { key: 'pa', label: 'PA Advertorial', path: '/pa', icon: FileText },
+const BUILTIN_PAGES = [
+  { label: 'Home (Main)', path: '/' },
+  { label: 'PA Advertorial', path: '/pa' },
+  { label: 'Spanish', path: '/sp' },
 ];
 
-function VariantCard({ v, stat, weight, isWinner, isLeading }) {
-  const Icon = v.icon;
+const STATUS_STYLE = {
+  running: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  draft: 'bg-slate-100 text-slate-600 border-slate-200',
+  stopped: 'bg-amber-50 text-amber-700 border-amber-200',
+};
+
+function VariantStatsRow({ v, isWinner }) {
   return (
-    <div
-      className={`rounded-2xl border p-5 bg-white transition-colors ${
-        isLeading ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-slate-200'
-      }`}
-      data-testid={`split-variant-${v.key}`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 font-slab font-bold text-slate-900">
-          <Icon className="h-4 w-4 text-[#0F1B3D]" /> {v.label}
-          <code className="text-xs font-normal text-slate-400">{v.path}</code>
+    <div className={`grid grid-cols-[1.4fr_repeat(4,1fr)] gap-2 items-center px-3 py-2 rounded-lg ${isWinner ? 'bg-emerald-50' : ''}`} data-testid={`exp-variant-${v.label}`}>
+      <div className="font-semibold text-slate-800 text-sm flex items-center gap-1.5 truncate">
+        {isWinner && <Trophy className="h-3.5 w-3.5 text-emerald-600 shrink-0" />}
+        {v.label} <code className="text-[10px] text-slate-400">{v.path}</code>
+      </div>
+      <div className="text-center text-sm text-slate-500">{v.weight}%</div>
+      <div className="text-center text-sm font-semibold text-slate-900">{v.clicks}</div>
+      <div className="text-center text-sm font-semibold text-slate-900">{v.leads}</div>
+      <div className={`text-center text-sm font-bold ${isWinner ? 'text-emerald-600' : 'text-[#0F1B3D]'}`}>{v.conversion_rate}%</div>
+    </div>
+  );
+}
+
+function ExperimentCard({ exp, canEdit, onStart, onStop, onDelete }) {
+  const stats = exp.stats || { variants: [], winner: null };
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid={`experiment-${exp.id}`}>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div className="font-slab font-bold text-slate-900 flex items-center gap-2">
+            {exp.name}
+            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${STATUS_STYLE[exp.status] || STATUS_STYLE.draft}`} data-testid={`exp-status-${exp.id}`}>
+              {exp.status}
+            </span>
+          </div>
+          <div className="text-xs text-slate-400 mt-0.5">Created {new Date(exp.created_at).toLocaleDateString()}</div>
         </div>
-        {isWinner && (
-          <span
-            className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full"
-            data-testid={`split-winner-${v.key}`}
-          >
-            <Trophy className="h-3.5 w-3.5" /> Winning
-          </span>
+        {canEdit && (
+          <div className="flex items-center gap-2">
+            {exp.status !== 'running' ? (
+              <Button size="sm" onClick={() => onStart(exp)} className="rounded-lg bg-emerald-600 hover:bg-emerald-700" data-testid={`exp-start-${exp.id}`}>
+                <Play className="h-3.5 w-3.5 mr-1" /> Start
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => onStop(exp)} className="rounded-lg border-amber-200 text-amber-700" data-testid={`exp-stop-${exp.id}`}>
+                <Square className="h-3.5 w-3.5 mr-1" /> Stop
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => onDelete(exp)} className="rounded-lg border-red-200 text-red-600 px-2" data-testid={`exp-delete-${exp.id}`}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         )}
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-        <div>
-          <div className="text-2xl font-extrabold text-slate-900" data-testid={`split-${v.key}-clicks`}>{stat.clicks}</div>
-          <div className="text-xs text-slate-500 mt-0.5">Visits</div>
+
+      <div className="mt-4">
+        <div className="grid grid-cols-[1.4fr_repeat(4,1fr)] gap-2 px-3 pb-1 text-[11px] uppercase tracking-wide text-slate-400 font-bold">
+          <div>Page</div><div className="text-center">Split</div><div className="text-center">Visits</div><div className="text-center">Leads</div><div className="text-center">Conv.</div>
         </div>
-        <div>
-          <div className="text-2xl font-extrabold text-slate-900" data-testid={`split-${v.key}-leads`}>{stat.leads}</div>
-          <div className="text-xs text-slate-500 mt-0.5">Leads</div>
+        <div className="space-y-1">
+          {stats.variants.map((v) => (
+            <VariantStatsRow key={v.label} v={v} isWinner={stats.winner && stats.winner === v.label} />
+          ))}
         </div>
-        <div>
-          <div
-            className={`text-2xl font-extrabold ${isLeading ? 'text-emerald-600' : 'text-[#0F1B3D]'}`}
-            data-testid={`split-${v.key}-conv`}
-          >
-            {stat.conversion_rate}%
-          </div>
-          <div className="text-xs text-slate-500 mt-0.5">Conv. %</div>
-        </div>
-      </div>
-      <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500">
-        Traffic weight: <span className="font-bold text-slate-700">{weight}%</span>
+        {stats.winner === 'tie' && <p className="mt-2 px-3 text-xs text-amber-600">Variants are tied so far.</p>}
+        {!stats.winner && <p className="mt-2 px-3 text-xs text-slate-400">Need traffic on 2+ variants to call a winner. Stats count only visitors routed through /split.</p>}
       </div>
     </div>
   );
@@ -75,44 +83,37 @@ function VariantCard({ v, stat, weight, isWinner, isLeading }) {
 
 export function AdminSplitTest() {
   const canEdit = canEditFn();
-  const [range, setRange] = useState(last30());
-  const [data, setData] = useState(null);
+  const [experiments, setExperiments] = useState([]);
+  const [pages, setPages] = useState(BUILTIN_PAGES);
   const [loading, setLoading] = useState(true);
-  const [enabled, setEnabled] = useState(false);
-  const [homePct, setHomePct] = useState(50);
-  const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [name, setName] = useState('');
+  const [variants, setVariants] = useState([
+    { label: 'Home (Main)', path: '/', weight: 50 },
+    { label: 'PA Advertorial', path: '/pa', weight: 50 },
+  ]);
+  const [creating, setCreating] = useState(false);
 
   const splitUrl = `${window.location.origin}/split`;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/split-test', { params: { start: range.start, end: range.end } });
-      setData(res.data);
-      setEnabled(!!res.data.enabled);
-      setHomePct(Number(res.data.home_pct ?? 50));
+      const [ex, pg] = await Promise.all([
+        api.get('/admin/experiments'),
+        api.get('/admin/pages').catch(() => ({ data: { custom_pages: [] } })),
+      ]);
+      setExperiments(ex.data.experiments || []);
+      const custom = (pg.data.custom_pages || []).map((p) => ({ label: p.label, path: p.path }));
+      setPages([...BUILTIN_PAGES, ...custom]);
     } catch (e) {
-      toast.error('Failed to load split test');
+      toast.error('Failed to load experiments');
     } finally {
       setLoading(false);
     }
-  }, [range]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await api.put('/admin/split-test', { enabled, home_pct: homePct });
-      toast.success('Split test saved');
-      load();
-    } catch (e) {
-      toast.error('Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const copyUrl = () => {
     navigator.clipboard.writeText(splitUrl);
@@ -120,120 +121,115 @@ export function AdminSplitTest() {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const stats = data?.stats || { home: { clicks: 0, leads: 0, conversion_rate: 0 }, pa: { clicks: 0, leads: 0, conversion_rate: 0 }, winner: null };
-  const winner = stats.winner;
-  const weights = { home: homePct, pa: 100 - homePct };
+  const setVariant = (i, patch) => setVariants((prev) => prev.map((v, idx) => (idx === i ? { ...v, ...patch } : v)));
+  const addVariant = () => setVariants((prev) => [...prev, { label: pages[0].label, path: pages[0].path, weight: 0 }]);
+  const removeVariant = (i) => setVariants((prev) => prev.filter((_, idx) => idx !== i));
+
+  const createTest = async () => {
+    if (variants.length < 2) { toast.error('Add at least 2 pages to test.'); return; }
+    setCreating(true);
+    try {
+      await api.post('/admin/experiments', { name: name.trim() || 'Untitled test', variants });
+      toast.success('Test created');
+      setName('');
+      load();
+    } catch (e) {
+      toast.error('Failed to create test');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const startExp = async (exp) => {
+    try { await api.put(`/admin/experiments/${exp.id}`, { status: 'running' }); toast.success(`"${exp.name}" is live on /split`); load(); }
+    catch (e) { toast.error('Failed to start'); }
+  };
+  const stopExp = async (exp) => {
+    try { await api.put(`/admin/experiments/${exp.id}`, { status: 'stopped' }); toast.success('Test stopped'); load(); }
+    catch (e) { toast.error('Failed to stop'); }
+  };
+  const deleteExp = async (exp) => {
+    if (!window.confirm(`Delete "${exp.name}"? Its results will be lost.`)) return;
+    try { await api.delete(`/admin/experiments/${exp.id}`); toast.success('Deleted'); load(); }
+    catch (e) { toast.error('Failed to delete'); }
+  };
+
+  const running = experiments.filter((e) => e.status === 'running');
 
   return (
     <div className="space-y-6" data-testid="admin-split-test">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-slate-500 flex items-center gap-2">
-          <FlaskConical className="h-4 w-4" /> A/B test your two landing pages and compare conversion %.
+          <FlaskConical className="h-4 w-4" /> A/B test any of your pages. Stats below count ONLY visitors routed through /split.
         </p>
-        <DateRangeFilter value={range} onChange={setRange} />
-      </div>
-
-      {/* Config */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="split-config">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <div className="font-slab font-bold text-slate-900">Auto-splitter</div>
-            <p className="text-sm text-slate-500 mt-1 max-w-md">
-              When ON, visitors to <code>/split</code> are randomly routed to Home or the PA page
-              (stable per visitor). When OFF, everyone goes to Home.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-sm font-semibold ${enabled ? 'text-emerald-600' : 'text-slate-400'}`}>
-              {enabled ? 'Live' : 'Off'}
-            </span>
-            <Switch
-              checked={enabled}
-              onCheckedChange={setEnabled}
-              disabled={!canEdit}
-              data-testid="split-enable-switch"
-            />
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <div className="flex items-center justify-between text-sm font-semibold text-slate-700 mb-2">
-            <span>Home <span className="text-[#0F1B3D]">{homePct}%</span></span>
-            <span>PA <span className="text-[#0F1B3D]">{100 - homePct}%</span></span>
-          </div>
-          <Slider
-            value={[homePct]}
-            min={0}
-            max={100}
-            step={5}
-            onValueChange={(v) => setHomePct(v[0])}
-            disabled={!canEdit}
-            data-testid="split-weight-slider"
-          />
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-xs text-slate-500">Home %</span>
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              value={homePct}
-              onChange={(e) => setHomePct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-              disabled={!canEdit}
-              className="w-24 h-9"
-              data-testid="split-home-pct-input"
-            />
-          </div>
-        </div>
-
-        {canEdit && (
-          <div className="mt-5">
-            <Button onClick={save} disabled={saving} className="rounded-xl bg-[#0F1B3D]" data-testid="split-save-button">
-              <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving…' : 'Save split test'}
-            </Button>
-          </div>
-        )}
-
-        {/* Splitter URL */}
-        <div className="mt-6 pt-5 border-t border-slate-100">
-          <div className="text-sm font-semibold text-slate-700 mb-2">Campaign URL — point Google Ads here:</div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <code className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-800" data-testid="split-url">
-              {splitUrl}
-            </code>
-            <Button variant="outline" onClick={copyUrl} className="rounded-xl" data-testid="split-copy-button">
-              {copied ? <Check className="h-4 w-4 mr-1 text-emerald-600" /> : <Copy className="h-4 w-4 mr-1" />}
-              {copied ? 'Copied' : 'Copy'}
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <code className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-800" data-testid="split-url">{splitUrl}</code>
+          <Button variant="outline" onClick={copyUrl} className="rounded-xl" data-testid="split-copy-button">
+            {copied ? <Check className="h-4 w-4 mr-1 text-emerald-600" /> : <Copy className="h-4 w-4 mr-1" />}{copied ? 'Copied' : 'Copy'}
+          </Button>
         </div>
       </div>
 
-      {/* Comparison */}
-      <div>
-        <div className="font-slab font-bold text-slate-900 mb-3">Performance ({range.start} → {range.end})</div>
-        {loading ? (
-          <div className="p-8 text-center text-slate-500 text-sm">Loading…</div>
-        ) : (
-          <div className="grid sm:grid-cols-2 gap-4">
-            {VARIANTS.map((v) => (
-              <VariantCard
-                key={v.key}
-                v={v}
-                stat={stats[v.key]}
-                weight={weights[v.key]}
-                isWinner={winner === v.key}
-                isLeading={winner === v.key}
-              />
+      {running.length === 0 && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-700" data-testid="split-no-running">
+          No test is currently running — everyone who hits <code>/split</code> goes to Home. Start a test below to begin routing.
+        </div>
+      )}
+
+      {/* Create test */}
+      {canEdit && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="split-create-card">
+          <div className="font-slab font-bold text-slate-900 mb-3 flex items-center gap-2"><Beaker className="h-4 w-4" /> New Test</div>
+          <div className="mb-4">
+            <Label className="text-xs text-slate-500">Test name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Home vs PA — June" className="mt-1 h-10 rounded-xl border-slate-200 max-w-md" data-testid="split-name-input" />
+          </div>
+          <Label className="text-xs text-slate-500">Pages & traffic split</Label>
+          <div className="mt-1 space-y-2">
+            {variants.map((v, i) => (
+              <div key={i} className="flex items-center gap-2" data-testid={`split-variant-row-${i}`}>
+                <select
+                  value={v.path}
+                  onChange={(e) => {
+                    const pg = pages.find((p) => p.path === e.target.value) || { label: e.target.value, path: e.target.value };
+                    setVariant(i, { path: pg.path, label: pg.label });
+                  }}
+                  className="flex-1 h-10 rounded-xl border border-slate-200 px-3 text-sm bg-white"
+                  data-testid={`split-variant-page-${i}`}
+                >
+                  {pages.map((p) => <option key={p.path} value={p.path}>{p.label} ({p.path})</option>)}
+                </select>
+                <div className="flex items-center gap-1">
+                  <Input type="number" min={0} max={100} value={v.weight} onChange={(e) => setVariant(i, { weight: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} className="w-20 h-10 rounded-xl border-slate-200" data-testid={`split-variant-weight-${i}`} />
+                  <span className="text-sm text-slate-400">%</span>
+                </div>
+                {variants.length > 2 && (
+                  <Button variant="outline" size="sm" onClick={() => removeVariant(i)} className="rounded-lg border-slate-200 px-2" data-testid={`split-variant-remove-${i}`}><X className="h-4 w-4" /></Button>
+                )}
+              </div>
             ))}
           </div>
-        )}
-        {!loading && winner === 'tie' && (
-          <p className="mt-3 text-sm text-amber-600" data-testid="split-tie">Both pages are converting at the same rate so far.</p>
-        )}
-        {!loading && !winner && (
-          <p className="mt-3 text-sm text-slate-500" data-testid="split-need-data">
-            Need visits on both pages in this date range to declare a winner.
-          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={addVariant} className="rounded-lg" data-testid="split-add-variant"><Plus className="h-4 w-4 mr-1" /> Add page</Button>
+            <Button onClick={createTest} disabled={creating} className="rounded-xl bg-[#0F1B3D]" data-testid="split-create-button">{creating ? 'Creating…' : 'Create test'}</Button>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">Weights are relative — they don't have to add to 100. Start a test to make it live on /split (only one runs at a time).</p>
+        </div>
+      )}
+
+      {/* Experiments list / history */}
+      <div>
+        <div className="font-slab font-bold text-slate-900 mb-3">Tests & Results</div>
+        {loading ? (
+          <div className="p-8 text-center text-slate-400 text-sm">Loading…</div>
+        ) : experiments.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-slate-400 text-sm" data-testid="experiments-empty">No tests yet. Create one above to get started.</div>
+        ) : (
+          <div className="space-y-4">
+            {experiments.map((exp) => (
+              <ExperimentCard key={exp.id} exp={exp} canEdit={canEdit} onStart={startExp} onStop={stopExp} onDelete={deleteExp} />
+            ))}
+          </div>
         )}
       </div>
     </div>
