@@ -83,6 +83,16 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Phone-call revenue passback (NEW)**: calls captured via CTM webhook (`/calls/webhook?token=...`) now support "Mark as Sold & Send to Google Ads" in the Calls tab — `POST /admin/calls/{id}/sold` + `/conversion/retry`, `_upload_call_conversion` (matches on call gclid + caller phone). Calls tab UI: Revenue column, conversion badge, detail dialog. Curl-verified end-to-end (validated).
 
 ## Implemented (2026-06-25)
+- **Versioned hook editing + history (EN & ES)**: editing a hook variant's copy now
+  ARCHIVES+PAUSES the old version and LAUNCHES a new active variant in its place
+  (POST `/admin/hook-rules/{id}/revise`). Each Hooks-style tab shows a collapsible
+  "Changed / Paused History" with old copy, change date, preserved stats, and a
+  "Re-activate this version" button (`/admin/hook-rules/{id}/reactivate`).
+- **Spanish = full A/B variant manager**: Spanish tab embeds AdminHooks with
+  `lang='es'` (multi-variant, weights, pause/launch, history) + /sp URL + stats.
+  `hook_rules` gained `lang`; `resolve_hooks(lang)` filters by language + excludes
+  archived; `/config/public?lang=es` serves Spanish variants (fallback hook1_es/2_es).
+  EN/ES fully isolated. Verified via testing_agent (8/8 backend, full e2e frontend).
 - **Split Test → Experiments system (rewrite)**: the Split Test tab is now a
   reusable A/B experiment manager. Create a test by picking ANY pages (Home/PA/
   Spanish + custom Pages) with relative weights, Start/Stop (one runs at a time),
