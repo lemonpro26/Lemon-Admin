@@ -6,6 +6,8 @@ export const COMPANY = {
   addressLine2: 'Beverly Hills, CA 90211',
   phone: '844-335-8911',
   phoneHref: 'tel:+18443358911',
+  phoneEs: '866-524-3722',
+  phoneHrefEs: 'tel:+18665243722',
   contactEmail: 'info@thelemonpros.com',
   legalEmail: 'info@thelemonpros.com',
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=9025+Wilshire+Blvd+%23500+Beverly+Hills+CA+90211',

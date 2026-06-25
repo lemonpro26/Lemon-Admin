@@ -20,6 +20,8 @@ export const SiteHeader = () => {
   const { lang } = useFunnel();
   const t = tr(lang);
   const home = lang === 'es' ? '/sp' : '/';
+  const phone = lang === 'es' ? COMPANY.phoneEs : COMPANY.phone;
+  const phoneHref = lang === 'es' ? COMPANY.phoneHrefEs : COMPANY.phoneHref;
 
   const match = location.pathname.match(/^\/flow\/(.+)$/);
   const stepId = match ? match[1] : null;
@@ -70,15 +72,15 @@ export const SiteHeader = () => {
       </button>
 
       <a
-        href={COMPANY.phoneHref}
+        href={phoneHref}
         onClick={trackPhoneCallConversion}
         data-testid="header-call-link"
-        aria-label={`Call Lemon Pros at ${COMPANY.phone}`}
+        aria-label={`Call Lemon Pros at ${phone}`}
         className="flex flex-col items-end leading-none text-white hover:text-[#FACC15] transition-colors group"
       >
         <span className="flex items-center gap-2 text-base sm:text-2xl font-extrabold whitespace-nowrap">
           <Phone className="h-5 w-5 sm:h-6 sm:w-6" />
-          <span className="hidden xs:inline sm:inline">{COMPANY.phone}</span>
+          <span className="hidden xs:inline sm:inline">{phone}</span>
         </span>
         <span
           data-testid="header-call-now-label"
