@@ -9,6 +9,7 @@ import {
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useSortable, SortLabel } from '@/lib/useSortable';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
@@ -29,11 +30,50 @@ const convCell = (r) => (
     {r.conversion_rate}%
   </span>
 );
-const bounceCell = (r) => (
-  <span className={`font-semibold ${r.bounce_rate >= 70 ? 'text-red-500' : r.bounce_rate >= 40 ? 'text-amber-600' : 'text-emerald-600'}`}>
-    {r.bounce_rate}%
-  </span>
-);
+const bounceCell = (r) => {
+  const clicks = r.clicks || 0;
+  const converted = r.leads || 0;
+  const bounced = r.bounced != null ? r.bounced : Math.round((r.bounce_rate || 0) / 100 * clicks);
+  const engaged = Math.max(0, clicks - converted - bounced); // entered funnel, didn't finish
+  const pct = (n) => (clicks ? Math.round((n / clicks) * 1000) / 10 : 0);
+  const Row = ({ color, label, n }) => (
+    <div className="flex items-center justify-between gap-4 text-sm">
+      <span className="flex items-center gap-2 text-slate-600">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />{label}
+      </span>
+      <span className="font-semibold text-slate-900 tabular-nums">{n} <span className="text-slate-400 font-normal">({pct(n)}%)</span></span>
+    </div>
+  );
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          onClick={(e) => e.stopPropagation()}
+          className={`font-semibold underline decoration-dotted underline-offset-4 hover:opacity-80 ${r.bounce_rate >= 70 ? 'text-red-500' : r.bounce_rate >= 40 ? 'text-amber-600' : 'text-emerald-600'}`}
+          data-testid="bounce-breakdown-trigger"
+        >
+          {r.bounce_rate}%
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-4 z-[200]" onClick={(e) => e.stopPropagation()} data-testid="bounce-breakdown-popover">
+        <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Engagement breakdown</div>
+        <div className="text-[11px] text-slate-400 mb-3">{clicks} clicks total</div>
+        {/* Stacked bar */}
+        <div className="flex h-2.5 w-full rounded-full overflow-hidden mb-3 bg-slate-100">
+          <div style={{ width: `${pct(converted)}%`, background: '#10b981' }} />
+          <div style={{ width: `${pct(engaged)}%`, background: '#f59e0b' }} />
+          <div style={{ width: `${pct(bounced)}%`, background: '#ef4444' }} />
+        </div>
+        <div className="space-y-1.5">
+          <Row color="#10b981" label="Converted (lead)" n={converted} />
+          <Row color="#f59e0b" label="Engaged, no lead" n={engaged} />
+          <Row color="#ef4444" label="Bounced" n={bounced} />
+        </div>
+        <p className="text-[11px] text-slate-400 mt-3 leading-snug">Bounced = landed but never entered the funnel. Engaged = started the funnel but didn't submit.</p>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 function DrillTable({ title, columns, rows, onRowClick, testid }) {
   // Default-sorted by most clicks from the top.

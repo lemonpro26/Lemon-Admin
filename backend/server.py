@@ -2312,6 +2312,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             bounced = max(0, min(bounced, c - lc))
             entry["clicks"] = c
             entry["leads"] = lc
+            entry["bounced"] = bounced
             entry["conversion_rate"] = round((lc / c * 100), 1) if c else (100.0 if lc else 0.0)
             entry["bounce_rate"] = round((bounced / c * 100), 1) if c else 0.0
             rows.append(entry)
@@ -2353,7 +2354,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         c, lc, bounced = b["clicks"], b["leads"], b["bounced"]
         bounced = max(0, min(bounced, c - lc))
         return {"campaign_id": "", "kind": kind, "display": display,
-                "clicks": c, "leads": lc,
+                "clicks": c, "leads": lc, "bounced": bounced,
                 "conversion_rate": round((lc / c * 100), 1) if c else (100.0 if lc else 0.0),
                 "bounce_rate": round((bounced / c * 100), 1) if c else 0.0}
 
