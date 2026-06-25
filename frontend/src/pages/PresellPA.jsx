@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Phone, ShieldCheck, CheckCircle2, Scale, Clock, ArrowRight, Star, Award, GraduationCap } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -27,6 +27,48 @@ const SETTLEMENTS = [
   { amount: '$76,500', label: 'Kia Sorento' },
 ];
 
+// Default copy — mirrors backend DEFAULT_PA_CONTENT. The page fetches /pa-content
+// (admin "PA Page" tab overrides) and falls back to this so it never breaks.
+const PA_DEFAULTS = {
+  attorney_eyebrow: 'Meet Your Attorney',
+  attorney_name: 'Michael Saeedian, Esq.',
+  attorney_title: 'Founding Attorney · The Lemon Pros · CA State Bar #265470',
+  attorney_award: 'National Trial Lawyers — Top 40 Under 40',
+  attorney_bio:
+    'Michael Saeedian is a California Lemon Law attorney that auto manufacturers fear. A UCLA graduate with a Juris Doctorate from Loyola Law School, he exclusively practices lemon law — fighting to secure the maximum refund, replacement, or cash settlement for drivers stuck with defective vehicles. When you submit your case, you work directly with a licensed, award-winning attorney, not a call center.',
+  attorney_badges: ['Top 100 Trial Lawyers', '5-Star Rated on Yelp', 'Lead Counsel Rated', 'No Win, No Fee'],
+  attorney_school: 'UCLA · J.D., Loyola Law School, Los Angeles',
+  settlements_eyebrow: 'Recent Settlements',
+  settlements: SETTLEMENTS,
+  settlements_disclaimer: 'Prior results do not guarantee a similar outcome.',
+  settlements_cta: 'See If My Car Qualifies',
+  headline: 'Stuck With a Defective Vehicle? You May Be Owed a Refund, a New Car, or Cash.',
+  subhead:
+    "Thousands of drivers are stuck making payments on cars that spend more time in the shop than on the road. Here's how today's Lemon Laws can force the manufacturer to pay you back — at no cost to you.",
+  body: [
+    "If your vehicle has been in the shop again and again for the same problem — and it's still under the manufacturer's warranty — federal and state Lemon Laws may entitle you to a full refund, a replacement vehicle, or a substantial cash settlement.",
+    "Most consumers have no idea these protections exist. Automakers are required by law to stand behind their vehicles, and when they can't fix a recurring defect within a reasonable number of attempts, the burden shifts to them — not you. That can mean getting back everything you've paid, including your down payment and monthly payments.",
+    'We strongly urge any driver dealing with persistent engine, transmission, electrical, braking, or safety problems to check if they qualify. There is no cost and no obligation to find out, and the entire process takes less than 60 seconds to start.',
+  ],
+  callout_quote:
+    'If your car keeps breaking down under warranty, the manufacturer may be legally required to buy it back — and you could be owed thousands.',
+  callout_cta: 'See If My Car Qualifies',
+  qualify_heading: 'How Do I Qualify?',
+  qualify_intro:
+    'The Lemon Pros network has helped countless consumers hold manufacturers accountable. If you can answer yes to any of the following, you should check your case today:',
+  qualify_items: [
+    'My vehicle has been repaired multiple times for the same issue',
+    'The problem started while it was still under the manufacturer warranty',
+    'My car has spent weeks in the shop or is unsafe to drive',
+    "I'm still making payments on a vehicle I can't rely on",
+  ],
+  step1_label: "Select Your Vehicle's Make",
+  step2_label: 'Answer a few quick questions',
+  step2_text:
+    "Find out in under 60 seconds if you qualify for a refund, replacement, or cash compensation. It's free and there's no obligation.",
+  final_cta: 'Check If Your Car Qualifies',
+};
+
 const POPULAR = ['Toyota', 'Honda', 'Ford', 'Chevrolet', 'Nissan', 'Jeep', 'Hyundai', 'Kia', 'Ram', 'BMW', 'Mercedes-Benz'];
 const TOP_MAKES = POPULAR
   .map((name) => CAR_MAKES.find((m) => m.name === name))
@@ -36,6 +78,13 @@ export default function PresellPA() {
   const navigate = useNavigate();
   const { setAnswer, resetAnswers } = useFunnel();
   const goLegal = (to) => navigate(to);
+  const [c, setC] = useState(PA_DEFAULTS);
+
+  useEffect(() => {
+    api.get('/pa-content')
+      .then((res) => setC({ ...PA_DEFAULTS, ...(res.data || {}) }))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const tracking = captureTracking(window.location.search);
@@ -111,33 +160,26 @@ export default function PresellPA() {
               data-testid="pa-attorney-photo"
             />
             <div className="text-center sm:text-left">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">Meet Your Attorney</p>
-              <h2 className="font-slab font-extrabold text-slate-900 text-2xl mt-1">Michael Saeedian, Esq.</h2>
-              <p className="text-slate-500 text-sm">Founding Attorney · The Lemon Pros · CA State Bar #265470</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">{c.attorney_eyebrow}</p>
+              <h2 className="font-slab font-extrabold text-slate-900 text-2xl mt-1">{c.attorney_name}</h2>
+              <p className="text-slate-500 text-sm">{c.attorney_title}</p>
 
               <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0B2545] text-white px-4 py-1.5 font-bold text-sm" data-testid="pa-attorney-award">
                 <Award className="h-4 w-4 text-[#FACC15]" />
-                National Trial Lawyers — Top 40 Under 40
+                {c.attorney_award}
               </div>
 
-              <p className="mt-3 text-slate-700 leading-relaxed">
-                Michael Saeedian is a California Lemon Law attorney that auto manufacturers fear. A
-                UCLA graduate with a Juris Doctorate from Loyola Law School, he{' '}
-                <strong>exclusively practices lemon law</strong> — fighting to secure the maximum
-                refund, replacement, or cash settlement for drivers stuck with defective vehicles.
-                When you submit your case, you work directly with a licensed, award-winning
-                attorney, not a call center.
-              </p>
+              <p className="mt-3 text-slate-700 leading-relaxed">{c.attorney_bio}</p>
 
               <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
-                {['Top 100 Trial Lawyers', '5-Star Rated on Yelp', 'Lead Counsel Rated', 'No Win, No Fee'].map((b) => (
+                {c.attorney_badges.map((b) => (
                   <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1">
                     {b}
                   </span>
                 ))}
               </div>
               <p className="mt-3 text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1.5">
-                <GraduationCap className="h-4 w-4" /> UCLA · J.D., Loyola Law School, Los Angeles
+                <GraduationCap className="h-4 w-4" /> {c.attorney_school}
               </p>
             </div>
           </div>
@@ -145,22 +187,22 @@ export default function PresellPA() {
 
         {/* Recent settlements */}
         <div className="mb-7" data-testid="pa-settlements">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold mb-3">Recent Settlements</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold mb-3">{c.settlements_eyebrow}</p>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-            {SETTLEMENTS.map((s) => (
-              <div key={s.label} className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
+            {c.settlements.map((s) => (
+              <div key={s.label + s.amount} className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
                 <p className="font-slab font-extrabold text-emerald-600 text-lg">{s.amount}</p>
                 <p className="text-xs text-slate-600 whitespace-nowrap">{s.label}</p>
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1.5">Prior results do not guarantee a similar outcome.</p>
+          <p className="text-[11px] text-slate-400 mt-1.5">{c.settlements_disclaimer}</p>
           <button
             onClick={() => start()}
             className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold px-6 py-3.5 shadow-md shadow-red-500/20 transition-colors"
             data-testid="pa-settlements-cta"
           >
-            See If My Car Qualifies <ArrowRight className="h-4 w-4" />
+            {c.settlements_cta} <ArrowRight className="h-4 w-4" />
           </button>
         </div>
 
@@ -169,12 +211,10 @@ export default function PresellPA() {
           className="font-slab font-extrabold text-slate-900 leading-tight text-3xl sm:text-4xl lg:text-5xl"
           data-testid="pa-headline"
         >
-          Stuck With a Defective Vehicle? You May Be Owed a Refund, a New Car, or Cash.
+          {c.headline}
         </h1>
         <p className="mt-4 text-lg text-slate-600" data-testid="pa-subhead">
-          Thousands of drivers are stuck making payments on cars that spend more time in the shop
-          than on the road. Here&apos;s how today&apos;s Lemon Laws can force the manufacturer to pay
-          you back — at no cost to you.
+          {c.subhead}
         </p>
 
         {/* Hero image */}
@@ -192,23 +232,9 @@ export default function PresellPA() {
 
         {/* Body */}
         <div className="mt-8 space-y-5 text-[17px] leading-relaxed text-slate-700">
-          <p className="font-semibold text-slate-900">
-            If your vehicle has been in the shop again and again for the same problem — and it&apos;s
-            still under the manufacturer&apos;s warranty — federal and state Lemon Laws may entitle
-            you to a full refund, a replacement vehicle, or a substantial cash settlement.
-          </p>
-          <p>
-            Most consumers have no idea these protections exist. Automakers are required by law to
-            stand behind their vehicles, and when they can&apos;t fix a recurring defect within a
-            reasonable number of attempts, the burden shifts to them — not you. That can mean getting
-            back everything you&apos;ve paid, including your down payment and monthly payments.
-          </p>
-          <p>
-            We strongly urge any driver dealing with persistent engine, transmission, electrical,
-            braking, or safety problems to check if they qualify. There is{' '}
-            <strong>no cost and no obligation</strong> to find out, and the entire process takes less
-            than 60 seconds to start.
-          </p>
+          {c.body.map((para, i) => (
+            <p key={i} className={i === 0 ? 'font-semibold text-slate-900' : ''}>{para}</p>
+          ))}
         </div>
 
         {/* Pull-quote CTA */}
@@ -216,34 +242,25 @@ export default function PresellPA() {
           className="my-8 rounded-2xl border-l-4 border-[#E0A800] bg-amber-50 p-6"
           data-testid="pa-callout"
         >
-          <p className="text-lg font-semibold text-slate-900">
-            “If your car keeps breaking down under warranty, the manufacturer may be legally required
-            to buy it back — and you could be owed thousands.”
-          </p>
+          <p className="text-lg font-semibold text-slate-900">“{c.callout_quote}”</p>
           <button
             onClick={() => start()}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold px-6 py-3 transition-colors"
             data-testid="pa-callout-cta"
           >
-            See If My Car Qualifies <ArrowRight className="h-4 w-4" />
+            {c.callout_cta} <ArrowRight className="h-4 w-4" />
           </button>
         </div>
 
         {/* How do I qualify */}
         <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-10" data-testid="pa-section-qualify">
-          How Do I Qualify?
+          {c.qualify_heading}
         </h2>
         <p className="mt-3 text-[17px] text-slate-700 leading-relaxed">
-          The Lemon Pros network has helped countless consumers hold manufacturers accountable. If you
-          can answer <strong>yes</strong> to any of the following, you should check your case today:
+          {c.qualify_intro}
         </p>
         <ul className="mt-4 space-y-3">
-          {[
-            'My vehicle has been repaired multiple times for the same issue',
-            'The problem started while it was still under the manufacturer warranty',
-            'My car has spent weeks in the shop or is unsafe to drive',
-            "I'm still making payments on a vehicle I can't rely on",
-          ].map((t) => (
+          {c.qualify_items.map((t) => (
             <li key={t} className="flex items-start gap-3">
               <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />
               <span className="text-slate-800">{t}</span>
@@ -260,7 +277,7 @@ export default function PresellPA() {
         {/* Step 1 */}
         <div className="mt-10">
           <p className="font-bold text-slate-900 text-lg">
-            <span className="text-[#E0A800]">Step 1:</span> Select Your Vehicle&apos;s Make
+            <span className="text-[#E0A800]">Step 1:</span> {c.step1_label}
           </p>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3" data-testid="pa-make-grid">
             {TOP_MAKES.map((m) => (
@@ -294,18 +311,17 @@ export default function PresellPA() {
         {/* Step 2 + final CTA */}
         <div className="mt-10 rounded-2xl bg-[#0B2545] text-white p-7 text-center" data-testid="pa-final-cta-block">
           <p className="font-bold text-lg">
-            <span className="text-[#FACC15]">Step 2:</span> Answer a few quick questions
+            <span className="text-[#FACC15]">Step 2:</span> {c.step2_label}
           </p>
           <p className="mt-2 text-slate-200">
-            Find out in under 60 seconds if you qualify for a refund, replacement, or cash
-            compensation. It&apos;s free and there&apos;s no obligation.
+            {c.step2_text}
           </p>
           <button
             onClick={() => start()}
             className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold text-lg px-8 py-4 transition-colors w-full sm:w-auto"
             data-testid="pa-final-cta"
           >
-            Check If Your Car Qualifies <ArrowRight className="h-5 w-5" />
+            {c.final_cta} <ArrowRight className="h-5 w-5" />
           </button>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-300">
             <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-emerald-400" /> 100% Free &amp; Confidential</span>

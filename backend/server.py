@@ -115,6 +115,84 @@ DEFAULT_CONFIG = {
     "custom_pages": [],
 }
 
+
+# Editable copy for the /pa advertorial page. Admin "PA Page" tab overrides these;
+# the public page falls back to these defaults for any missing field.
+DEFAULT_PA_CONTENT = {
+    "attorney_eyebrow": "Meet Your Attorney",
+    "attorney_name": "Michael Saeedian, Esq.",
+    "attorney_title": "Founding Attorney · The Lemon Pros · CA State Bar #265470",
+    "attorney_award": "National Trial Lawyers — Top 40 Under 40",
+    "attorney_bio": (
+        "Michael Saeedian is a California Lemon Law attorney that auto manufacturers fear. "
+        "A UCLA graduate with a Juris Doctorate from Loyola Law School, he exclusively practices "
+        "lemon law — fighting to secure the maximum refund, replacement, or cash settlement for "
+        "drivers stuck with defective vehicles. When you submit your case, you work directly with "
+        "a licensed, award-winning attorney, not a call center."
+    ),
+    "attorney_badges": ["Top 100 Trial Lawyers", "5-Star Rated on Yelp", "Lead Counsel Rated", "No Win, No Fee"],
+    "attorney_school": "UCLA · J.D., Loyola Law School, Los Angeles",
+    "settlements_eyebrow": "Recent Settlements",
+    "settlements": [
+        {"amount": "$107,500", "label": "Mercedes GLE"},
+        {"amount": "$98,000", "label": "Tesla Model Y"},
+        {"amount": "$94,500", "label": "Ford F-150"},
+        {"amount": "$89,000", "label": "Jeep Grand Cherokee"},
+        {"amount": "$85,200", "label": "Chevy Silverado"},
+        {"amount": "$79,800", "label": "Hyundai Tucson"},
+        {"amount": "$76,500", "label": "Kia Sorento"},
+    ],
+    "settlements_disclaimer": "Prior results do not guarantee a similar outcome.",
+    "settlements_cta": "See If My Car Qualifies",
+    "headline": "Stuck With a Defective Vehicle? You May Be Owed a Refund, a New Car, or Cash.",
+    "subhead": (
+        "Thousands of drivers are stuck making payments on cars that spend more time in the shop "
+        "than on the road. Here's how today's Lemon Laws can force the manufacturer to pay you "
+        "back — at no cost to you."
+    ),
+    "body": [
+        "If your vehicle has been in the shop again and again for the same problem — and it's still "
+        "under the manufacturer's warranty — federal and state Lemon Laws may entitle you to a full "
+        "refund, a replacement vehicle, or a substantial cash settlement.",
+        "Most consumers have no idea these protections exist. Automakers are required by law to stand "
+        "behind their vehicles, and when they can't fix a recurring defect within a reasonable number "
+        "of attempts, the burden shifts to them — not you. That can mean getting back everything "
+        "you've paid, including your down payment and monthly payments.",
+        "We strongly urge any driver dealing with persistent engine, transmission, electrical, braking, "
+        "or safety problems to check if they qualify. There is no cost and no obligation to find out, "
+        "and the entire process takes less than 60 seconds to start.",
+    ],
+    "callout_quote": (
+        "If your car keeps breaking down under warranty, the manufacturer may be legally required to "
+        "buy it back — and you could be owed thousands."
+    ),
+    "callout_cta": "See If My Car Qualifies",
+    "qualify_heading": "How Do I Qualify?",
+    "qualify_intro": (
+        "The Lemon Pros network has helped countless consumers hold manufacturers accountable. If you "
+        "can answer yes to any of the following, you should check your case today:"
+    ),
+    "qualify_items": [
+        "My vehicle has been repaired multiple times for the same issue",
+        "The problem started while it was still under the manufacturer warranty",
+        "My car has spent weeks in the shop or is unsafe to drive",
+        "I'm still making payments on a vehicle I can't rely on",
+    ],
+    "step1_label": "Select Your Vehicle's Make",
+    "step2_label": "Answer a few quick questions",
+    "step2_text": (
+        "Find out in under 60 seconds if you qualify for a refund, replacement, or cash compensation. "
+        "It's free and there's no obligation."
+    ),
+    "final_cta": "Check If Your Car Qualifies",
+}
+
+
+def _merged_pa_content(cfg: dict) -> dict:
+    """Stored pa_content merged over defaults so missing fields always resolve."""
+    stored = (cfg or {}).get("pa_content") or {}
+    return {**DEFAULT_PA_CONTENT, **stored}
+
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
@@ -474,6 +552,43 @@ async def get_public_config(
         "matched_rule": resolved["matched_rule"],
         "matched_rule_label": resolved["matched_rule_label"],
     }
+
+
+@api_router.get("/pa-content")
+async def get_pa_content_public():
+    """Public: editable copy for the /pa advertorial page (defaults + overrides)."""
+    cfg = await get_or_create_config()
+    return _merged_pa_content(cfg)
+
+
+@api_router.get("/admin/pa-content")
+async def get_pa_content_admin(_: dict = Depends(require_admin)):
+    cfg = await get_or_create_config()
+    return _merged_pa_content(cfg)
+
+
+@api_router.put("/admin/pa-content")
+async def update_pa_content(body: dict, _: dict = Depends(require_editor)):
+    """Save PA-page copy. Only known fields are persisted; lists are sanitized."""
+    allowed = set(DEFAULT_PA_CONTENT.keys())
+    update = {}
+    for k, v in (body or {}).items():
+        if k not in allowed:
+            continue
+        if k == "settlements" and isinstance(v, list):
+            update[k] = [{"amount": str(s.get("amount", "")).strip(), "label": str(s.get("label", "")).strip()}
+                         for s in v if isinstance(s, dict) and (s.get("amount") or s.get("label"))]
+        elif k in ("body", "qualify_items", "attorney_badges") and isinstance(v, list):
+            update[k] = [str(x).strip() for x in v if str(x).strip()]
+        elif isinstance(v, str):
+            update[k] = v.strip()
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {"pa_content": {**DEFAULT_PA_CONTENT, **update}, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    cfg = await get_or_create_config()
+    return _merged_pa_content(cfg)
 
 
 @api_router.post("/track/click")
