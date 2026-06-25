@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker } from 'lucide-react';
+import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -33,18 +33,50 @@ function VariantStatsRow({ v, isWinner }) {
   );
 }
 
-function ExperimentCard({ exp, canEdit, onStart, onStop, onDelete }) {
+function ExperimentCard({ exp, canEdit, onStart, onStop, onDelete, onRename }) {
   const stats = exp.stats || { variants: [], winner: null };
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(exp.name);
+
+  const startEdit = () => { setDraftName(exp.name); setEditing(true); };
+  const cancelEdit = () => setEditing(false);
+  const saveEdit = async () => {
+    const next = draftName.trim();
+    if (!next || next === exp.name) { setEditing(false); return; }
+    await onRename(exp, next);
+    setEditing(false);
+  };
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid={`experiment-${exp.id}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="font-slab font-bold text-slate-900 flex items-center gap-2">
-            {exp.name}
-            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${STATUS_STYLE[exp.status] || STATUS_STYLE.draft}`} data-testid={`exp-status-${exp.id}`}>
-              {exp.status}
-            </span>
-          </div>
+        <div className="min-w-0">
+          {editing ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                autoFocus
+                className="h-9 rounded-lg border-slate-200 w-56"
+                data-testid={`exp-name-input-${exp.id}`}
+              />
+              <Button size="sm" onClick={saveEdit} className="rounded-lg bg-[#0F1B3D] px-2" data-testid={`exp-name-save-${exp.id}`}><Check className="h-4 w-4" /></Button>
+              <Button size="sm" variant="outline" onClick={cancelEdit} className="rounded-lg border-slate-200 px-2" data-testid={`exp-name-cancel-${exp.id}`}><X className="h-4 w-4" /></Button>
+            </div>
+          ) : (
+            <div className="font-slab font-bold text-slate-900 flex items-center gap-2">
+              {exp.name}
+              {canEdit && (
+                <button onClick={startEdit} className="text-slate-400 hover:text-[#0F1B3D] transition-colors" aria-label="Rename test" data-testid={`exp-rename-${exp.id}`}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${STATUS_STYLE[exp.status] || STATUS_STYLE.draft}`} data-testid={`exp-status-${exp.id}`}>
+                {exp.status}
+              </span>
+            </div>
+          )}
           <div className="text-xs text-slate-400 mt-0.5">Created {new Date(exp.created_at).toLocaleDateString()}</div>
         </div>
         {canEdit && (
@@ -148,6 +180,10 @@ export function AdminSplitTest() {
     try { await api.put(`/admin/experiments/${exp.id}`, { status: 'stopped' }); toast.success('Test stopped'); load(); }
     catch (e) { toast.error('Failed to stop'); }
   };
+  const renameExp = async (exp, newName) => {
+    try { await api.put(`/admin/experiments/${exp.id}`, { name: newName }); toast.success('Test renamed'); load(); }
+    catch (e) { toast.error('Failed to rename'); }
+  };
   const deleteExp = async (exp) => {
     if (!window.confirm(`Delete "${exp.name}"? Its results will be lost.`)) return;
     try { await api.delete(`/admin/experiments/${exp.id}`); toast.success('Deleted'); load(); }
@@ -227,7 +263,7 @@ export function AdminSplitTest() {
         ) : (
           <div className="space-y-4">
             {experiments.map((exp) => (
-              <ExperimentCard key={exp.id} exp={exp} canEdit={canEdit} onStart={startExp} onStop={stopExp} onDelete={deleteExp} />
+              <ExperimentCard key={exp.id} exp={exp} canEdit={canEdit} onStart={startExp} onStop={stopExp} onDelete={deleteExp} onRename={renameExp} />
             ))}
           </div>
         )}
