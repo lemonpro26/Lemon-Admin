@@ -8,6 +8,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
+import { AdminHooks } from '@/components/admin/AdminHooks';
 
 function StatCard({ icon: Icon, label, value, testid }) {
   return (
@@ -135,40 +136,10 @@ export function AdminSpanish() {
         </div>
       </div>
 
-      {/* Hooks editor */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="spanish-hooks-card">
-        <div className="font-slab font-bold text-slate-900 mb-3">Spanish Hooks</div>
-        <div className="grid gap-4">
-          <div>
-            <Label className="text-xs text-slate-500">Headline (H1)</Label>
-            <textarea
-              value={hook1}
-              onChange={(e) => setHook1(e.target.value)}
-              disabled={!canEdit}
-              rows={2}
-              className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 disabled:bg-slate-50"
-              data-testid="spanish-hook1-input"
-            />
-          </div>
-          <div>
-            <Label className="text-xs text-slate-500">Subheadline (H2)</Label>
-            <textarea
-              value={hook2}
-              onChange={(e) => setHook2(e.target.value)}
-              disabled={!canEdit}
-              rows={3}
-              className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 disabled:bg-slate-50"
-              data-testid="spanish-hook2-input"
-            />
-          </div>
-          {canEdit && (
-            <div>
-              <Button onClick={save} disabled={saving} className="rounded-xl bg-[#0F1B3D]" data-testid="spanish-save-button">
-                <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving…' : 'Save Spanish hooks'}
-              </Button>
-            </div>
-          )}
-        </div>
+      {/* Spanish hook variants (A/B + versioned history, same as Hooks tab) */}
+      <div data-testid="spanish-hooks-card">
+        <div className="font-slab font-bold text-slate-900 mb-2">Spanish Hook Variants &amp; Performance</div>
+        <AdminHooks canEdit={canEdit} lang="es" />
       </div>
 
       {/* Stats */}

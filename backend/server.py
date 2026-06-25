@@ -209,6 +209,7 @@ class HookRuleBody(BaseModel):
     weight: int = 50
     enabled: bool = True
     hidden: bool = False
+    lang: Optional[str] = "en"
 
 
 class NotificationSettings(BaseModel):
@@ -338,11 +339,14 @@ def _weighted_pick(rules: list, seed: str):
     return rules[-1]
 
 
-async def resolve_hooks(cfg: dict, campaign: str, adgroup: str, ad: str, seed: str = "") -> dict:
-    """A/B-aware hook resolution. Among the enabled rules that match the incoming
-    campaign / ad group / ad, take the most specific bucket and choose one variant
-    weighted by its serving %. Falls back to the default site config."""
-    rules = await db.hook_rules.find({"enabled": True}).to_list(length=500)
+async def resolve_hooks(cfg: dict, campaign: str, adgroup: str, ad: str, seed: str = "", lang: str = "en") -> dict:
+    """A/B-aware hook resolution. Among the enabled (non-archived) rules for this
+    language that match the incoming campaign / ad group / ad, take the most
+    specific bucket and choose one variant weighted by its serving %. Falls back
+    to the default site config (per language)."""
+    lang = "es" if (lang or "en") == "es" else "en"
+    rules = await db.hook_rules.find({"enabled": True, "archived": {"$ne": True}}).to_list(length=500)
+    rules = [r for r in rules if (r.get("lang") or "en") == lang]
     inc = {
         "match_campaign": (campaign or "").strip(),
         "match_adgroup": (adgroup or "").strip(),
@@ -370,9 +374,11 @@ async def resolve_hooks(cfg: dict, campaign: str, adgroup: str, ad: str, seed: s
             "matched_rule": chosen.get("id"),
             "matched_rule_label": chosen.get("label"),
         }
+    dh1 = cfg.get("hook1_es", "") if lang == "es" else cfg["hook1"]
+    dh2 = cfg.get("hook2_es", "") if lang == "es" else cfg["hook2"]
     return {
-        "hook1": cfg["hook1"],
-        "hook2": cfg["hook2"],
+        "hook1": dh1,
+        "hook2": dh2,
         "matched_rule": None,
         "matched_rule_label": None,
     }
@@ -442,17 +448,8 @@ async def get_public_config(
     cfg = await get_or_create_config()
     ip = resolve_client_ip(request.headers)
     geo = lookup_geo(ip, "", "")
-    if (lang or "").lower() == "es":
-        return {
-            "hook1": render_tokens(cfg.get("hook1_es", ""), geo["city"], geo["state"]),
-            "hook2": render_tokens(cfg.get("hook2_es", ""), geo["city"], geo["state"]),
-            "city": geo["city"],
-            "state": geo["state"],
-            "geo_source": geo["source"],
-            "matched_rule": None,
-            "matched_rule_label": "Spanish page",
-        }
-    resolved = await resolve_hooks(cfg, campaign, adgroup, ad, seed=session)
+    page_lang = "es" if (lang or "").lower() == "es" else "en"
+    resolved = await resolve_hooks(cfg, campaign, adgroup, ad, seed=session, lang=page_lang)
     return {
         "hook1": render_tokens(resolved["hook1"], geo["city"], geo["state"]),
         "hook2": render_tokens(resolved["hook2"], geo["city"], geo["state"]),
@@ -1971,9 +1968,11 @@ async def _hook_traffic(s_iso: str, e_iso: str) -> dict:
 
 
 @api_router.get("/admin/hook-rules")
-async def list_hook_rules(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
+async def list_hook_rules(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query(""), lang: str = Query("en")):
+    lang = "es" if (lang or "en") == "es" else "en"
     s_iso, e_iso, _days = _date_range(start, end)
-    rules = await db.hook_rules.find({}, {"_id": 0}).sort("created_at", -1).to_list(length=500)
+    all_rules = await db.hook_rules.find({}, {"_id": 0}).sort("created_at", -1).to_list(length=1000)
+    all_rules = [r for r in all_rules if (r.get("lang") or "en") == lang]
     traffic = await _hook_traffic(s_iso, e_iso)
 
     def _attach(r, key):
@@ -1986,23 +1985,31 @@ async def list_hook_rules(_: dict = Depends(require_admin), start: str = Query("
         r["conversion_rate"] = round((r["leads"] / r["clicks"] * 100), 1) if r["clicks"] else 0.0
         return r
 
-    for r in rules:
+    for r in all_rules:
         _attach(r, r.get("id"))
+
+    # Active variants vs the "Changed / paused history" (archived/superseded).
+    rules = [r for r in all_rules if not r.get("archived")]
+    history = [r for r in all_rules if r.get("archived")]
+    history.sort(key=lambda r: r.get("superseded_at", ""), reverse=True)
 
     cfg = await get_or_create_config()
     default_hook = _attach({
         "id": None, "label": "Home Page (default / catch-all)", "is_default": True,
-        "hook1": cfg.get("hook1", ""), "hook2": cfg.get("hook2", ""),
-        "match_campaign": "", "match_adgroup": "", "match_ad": "", "enabled": True,
+        "hook1": cfg.get("hook1_es", "") if lang == "es" else cfg.get("hook1", ""),
+        "hook2": cfg.get("hook2_es", "") if lang == "es" else cfg.get("hook2", ""),
+        "match_campaign": "", "match_adgroup": "", "match_ad": "", "enabled": True, "lang": lang,
     }, None)
 
-    return {"rules": rules, "default": default_hook,
+    return {"rules": rules, "history": history, "default": default_hook,
             "range": {"start": s_iso, "end": e_iso}}
 
 
 @api_router.post("/admin/hook-rules")
 async def create_hook_rule(body: HookRuleBody, _: dict = Depends(require_editor)):
     rule = body.model_dump()
+    rule["lang"] = "es" if (rule.get("lang") or "en") == "es" else "en"
+    rule["archived"] = False
     rule["id"] = str(uuid.uuid4())
     rule["created_at"] = _now_iso()
     rule["updated_at"] = rule["created_at"]
@@ -2010,9 +2017,46 @@ async def create_hook_rule(body: HookRuleBody, _: dict = Depends(require_editor)
     return serialize_doc(rule)
 
 
+@api_router.post("/admin/hook-rules/{rule_id}/revise")
+async def revise_hook_rule(rule_id: str, body: HookRuleBody, _: dict = Depends(require_editor)):
+    """Versioned edit: archive + pause the old variant (stats preserved) and launch
+    a brand-new active variant in the same place with the updated copy."""
+    old = await db.hook_rules.find_one({"id": rule_id})
+    if not old:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    new = body.model_dump()
+    new["lang"] = old.get("lang") or "en"
+    new["enabled"] = True
+    new["archived"] = False
+    new["id"] = str(uuid.uuid4())
+    new["created_at"] = _now_iso()
+    new["updated_at"] = new["created_at"]
+    new["revised_from"] = rule_id
+    await db.hook_rules.insert_one({**new})
+    await db.hook_rules.update_one(
+        {"id": rule_id},
+        {"$set": {"enabled": False, "archived": True, "superseded_at": _now_iso(), "superseded_by": new["id"]}},
+    )
+    return serialize_doc(new)
+
+
+@api_router.post("/admin/hook-rules/{rule_id}/reactivate")
+async def reactivate_hook_rule(rule_id: str, _: dict = Depends(require_editor)):
+    """Bring a paused/archived (historical) variant back to active serving."""
+    res = await db.hook_rules.update_one(
+        {"id": rule_id},
+        {"$set": {"enabled": True, "archived": False, "updated_at": _now_iso()},
+         "$unset": {"superseded_at": "", "superseded_by": ""}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    return {"success": True}
+
+
 @api_router.put("/admin/hook-rules/{rule_id}")
 async def update_hook_rule(rule_id: str, body: HookRuleBody, _: dict = Depends(require_editor)):
     update = body.model_dump()
+    update.pop("lang", None)  # language is immutable after creation
     update["updated_at"] = _now_iso()
     res = await db.hook_rules.update_one({"id": rule_id}, {"$set": update})
     if res.matched_count == 0:

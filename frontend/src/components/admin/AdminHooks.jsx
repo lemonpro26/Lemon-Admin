@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Megaphone, Plus, Pencil, Trash2, Save, Sparkles, MousePointerClick, Target, FlaskConical,
-  Search, Eye, EyeOff, ArrowRightLeft,
+  Search, Eye, EyeOff, ArrowRightLeft, History, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -45,8 +45,10 @@ const EMPTY_EDIT = {
 };
 const EMPTY_MOVE = { kind: HOME, adgroup: '', ad: '' };
 
-export const AdminHooks = ({ canEdit }) => {
+export const AdminHooks = ({ canEdit, lang = 'en' }) => {
   const [rules, setRules] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [defaultHook, setDefaultHook] = useState(null);
   const [entities, setEntities] = useState({ campaigns: [], adgroups: [] });
   const [loading, setLoading] = useState(true);
@@ -90,15 +92,16 @@ export const AdminHooks = ({ canEdit }) => {
   const loadRules = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/hook-rules', { params: { start: range.start, end: range.end } });
+      const res = await api.get('/admin/hook-rules', { params: { start: range.start, end: range.end, lang } });
       setRules(res.data.rules || []);
+      setHistory(res.data.history || []);
       setDefaultHook(res.data.default || null);
     } catch (e) {
       toast.error('Failed to load hooks.');
     } finally {
       setLoading(false);
     }
-  }, [range]);
+  }, [range, lang]);
 
   useEffect(() => { loadEntities(); }, [loadEntities]);
   useEffect(() => { loadRules(); }, [loadRules]);
@@ -135,7 +138,7 @@ export const AdminHooks = ({ canEdit }) => {
       || `${createTargetLabel()} — ${cForm.hook1.slice(0, 40)}`;
     setCreating(true);
     try {
-      await api.post('/admin/hook-rules', { label, hook1: cForm.hook1, hook2: cForm.hook2, weight: w, enabled: true, ...tgt });
+      await api.post('/admin/hook-rules', { label, hook1: cForm.hook1, hook2: cForm.hook2, weight: w, enabled: true, lang, ...tgt });
       toast.success('Hook saved to A/B variants.');
       setCForm(newCreateForm());
       await loadRules();
@@ -163,18 +166,30 @@ export const AdminHooks = ({ canEdit }) => {
     }
     setBusy(true);
     try {
-      await api.put(`/admin/hook-rules/${dialog.rule.id}`, {
+      // Versioned edit: pauses + archives the old variant and launches the new
+      // copy in the same place (history is preserved).
+      await api.post(`/admin/hook-rules/${dialog.rule.id}/revise`, {
         ...form,
         label: form.label.trim() || form.hook1.slice(0, 40),
         weight: Math.max(1, Math.min(100, Number(form.weight) || 0)),
       });
-      toast.success('Hook updated.');
+      toast.success('New version launched — previous hook moved to history.');
       setDialog(null);
       await loadRules();
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Save failed.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const reactivate = async (r) => {
+    try {
+      await api.post(`/admin/hook-rules/${r.id}/reactivate`);
+      toast.success('Version re-activated.');
+      await loadRules();
+    } catch (e) {
+      toast.error('Could not re-activate.');
     }
   };
 
@@ -529,6 +544,52 @@ export const AdminHooks = ({ canEdit }) => {
             <span className="flex items-center gap-1"><MousePointerClick className="h-3.5 w-3.5" /> {defaultHook.clicks}</span>
             <span className="flex items-center gap-1"><Target className="h-3.5 w-3.5" /> {defaultHook.leads}</span>
             <span className="text-slate-400">(shown only when no home-page variant is live)</span>
+          </div>
+        )}
+      </div>
+
+      {/* Changed / paused history */}
+      <div className="rounded-2xl border border-slate-200 bg-white" data-testid="hooks-history">
+        <button
+          type="button"
+          onClick={() => setHistoryOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-5 py-3 text-left"
+          data-testid="hooks-history-toggle"
+        >
+          <span className="flex items-center gap-2 font-slab font-bold text-slate-900">
+            <History className="h-4 w-4 text-slate-500" /> Changed / Paused History
+            <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200">{history.length}</Badge>
+          </span>
+          {historyOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        </button>
+        {historyOpen && (
+          <div className="px-5 pb-5 space-y-2 border-t border-slate-100 pt-3">
+            {history.length === 0 ? (
+              <p className="text-sm text-slate-400 py-2">No changed or paused hooks yet. When you edit a variant, the previous version lands here with its stats.</p>
+            ) : history.map((h) => (
+              <div key={h.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3" data-testid={`history-item-${h.id}`}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="font-semibold text-slate-700 text-sm flex items-center gap-2">
+                    {h.label}
+                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">paused</Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span className="flex items-center gap-1"><MousePointerClick className="h-3.5 w-3.5" /> {h.clicks}</span>
+                    <span className="flex items-center gap-1"><Target className="h-3.5 w-3.5" /> {h.leads}</span>
+                    <span>{h.conversion_rate}%</span>
+                    {h.superseded_at && <span className="text-slate-400">changed {new Date(h.superseded_at).toLocaleDateString()}</span>}
+                  </div>
+                </div>
+                <div className="mt-1 text-sm text-slate-600 truncate">{h.hook1}</div>
+                {canEdit && (
+                  <div className="mt-2">
+                    <Button variant="outline" size="sm" className="rounded-lg h-7 text-xs" onClick={() => reactivate(h)} data-testid={`history-restore-${h.id}`}>
+                      <Eye className="h-3.5 w-3.5 mr-1" /> Re-activate this version
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

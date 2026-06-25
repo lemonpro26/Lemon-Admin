@@ -1,0 +1,38 @@
+{
+  "summary": "Full backend + UI validation of new versioned hook editing, EN/ES isolation, Spanish multi-variant manager, and /sp serving. All 8 pytest cases pass; full Playwright e2e flow (create → revise → history → reactivate → cleanup; Spanish create → /sp serving check → cleanup) passed end-to-end.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Hook edit / Move dialogs (AdminHooks.jsx)", "issues": ["Radix DialogContent missing Description/aria-describedby — a11y console warnings (non-blocking)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_hook_versioning.py",
+    "/app/test_reports/pytest/iter15_hook_versioning.xml"
+  ],
+  "action_items": [
+    "Optional: add DialogDescription (or aria-describedby) to hook-dialog and hook-move-dialog to silence Radix a11y console warnings."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 2392 lines — should be split into routers (auth, hook_rules, leads, calls, spanish, ads) to stay under ~700 LOC per module.",
+    "POST /api/admin/hook-rules/{id}/revise correctly versions: archives old (enabled=false, archived=true, superseded_at/by) and creates new variant with revised_from link — clean implementation.",
+    "GET /api/admin/hook-rules?lang= properly filters by lang (default 'en') and separates active vs history; default fallback reflects lang-specific hook1/hook2.",
+    "resolve_hooks now filters by lang AND archived!=true — Spanish/English isolation enforced at serving time.",
+    "Reactivate endpoint correctly $unsets superseded_at/superseded_by — good.",
+    "PUT /api/admin/hook-rules/{id} strips lang from update — language is correctly immutable post-create.",
+    "AdminSpanish renders <AdminHooks lang='es'/> inside data-testid='spanish-hooks-card' — testable & isolated."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (full e2e flow)"},
+  "test_credentials": "owner / LemonPros2026!",
+  "seed_data_creation": "All test variants (EN + ES with TEST_ prefix) were created and cleaned up by the tests themselves.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Versioned hook + EN/ES multi-variant feature is working e2e. test_hook_versioning.py covers: login, list w/ lang, create+revise+reactivate flow with cross-lang isolation, /config/public?lang=es serving check, and auth gates. The Playwright UI test in the previous run also verified: 'New version launched' toast, OLD wording disappears from active list, appears in hooks-history with history-restore-<id> button, ES variant ONLY in Spanish tab, /sp hero-hook1 shows ES text, / unaffected. Cleanup is automatic.",
+  "rca of the issue": "N/A — no bugs found."
+}
