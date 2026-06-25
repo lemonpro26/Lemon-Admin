@@ -1,0 +1,31 @@
+{
+  "summary": "End-to-end validation of new Funnel Drop-off tracking feature. Backend: 10/10 pytest pass (auth gate on /api/admin/funnel, full response schema with overall/home/lapa/sp + stages array, /track/step $max advancement, idempotency on lower step, skip on missing session_id, bot-UA skip, step-by-name resolution, analytics+leads regression). Frontend: visitor funnel fires /track/step with proper {session_id, step, index} payload for Year/Make/Model steps; admin Funnel tab renders with page selector (overall/home/lapa/sp), summary cards (views=6, submitted=1, conv=16.7%), and stage bars showing real drop-off (Landing 6 -> Year 4 -> Make 4 -> Model 3 -> Name 3 -> Address 1 -> Phone 1 -> Email 1 -> Submitted 1). Page-tab switching updates data. Analytics and Leads tabs still load (no regression, no console errors, no pageerror events).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "FunnelStep.jsx /track/step useEffect", "issues": ["React StrictMode (dev) double-invokes the effect so /track/step fires twice on the first step (only observed for the very first step entered). Harmless in production because $max is idempotent, but worth noting. Not fixing — main agent's call."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_funnel_dropoff.py",
+    "/app/test_reports/pytest/iter16_funnel.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py line 544-547 contains dead code (docstring + return uuid logic) immediately after track_step's final return — appears to be orphaned content from a deleted helper. Should be removed for clarity.",
+    "server.py is now 2490 lines — still well past the 700-line guideline. Splitting into routers (auth, hooks, leads, calls, spanish, funnel, analytics) is overdue.",
+    "/api/admin/funnel correctly uses $max on funnel_max_step (advance-only semantics) and correctly computes cumulative reached[] by summing histogram >= i — clean implementation.",
+    "Stage labels in stage_names use s.capitalize() so a step like 'lapa' would render odd, but FUNNEL_STEPS is fixed to standard names — fine.",
+    "AdminFunnel.jsx is clean & well-tested (has data-testid on every key element). No issues."
+  ],
+  "updated_files": ["/app/backend/tests/test_funnel_dropoff.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100%"},
+  "test_credentials": "owner / LemonPros2026!",
+  "seed_data_creation": "test_track_step_advances_max created a synthetic clicks doc with session_id prefixed TEST_funnel_<uuid> and walked it through year->make->model->name. The admin /funnel shows this in 'home' page stats. No cleanup needed (tests use unique session_ids; data is just analytics noise that's correctly bucketed under home).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Funnel drop-off feature is fully working end-to-end. test_funnel_dropoff.py covers: auth (401), bad token (401), full schema (overall/home/lapa/sp + 9 stages with count/drop/drop_pct/pct_of_views), date filtering, $max advance, lower-step no-regress, missing-session skip, bad-step skip, step-name-only resolution, and analytics/leads regression. Playwright covered: admin login, Funnel tab renders all testids (admin-funnel, funnel-page-{overall,home,lapa,sp}, funnel-views, funnel-submitted, funnel-conv, funnel-chart, funnel-stage-*), page-tab switching, and visitor flow firing /track/step with correct {session_id, step, index} for year/make/model. One minor observation: /track/step is sent twice for the very first step due to React StrictMode double-effect in dev — harmless because backend uses $max.",
+  "rca of the issue": "N/A — no bugs found."
+}
