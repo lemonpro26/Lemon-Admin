@@ -51,6 +51,11 @@ JWT_EXP_HOURS = 24
 # quality — these hits carry the campaign's tg_ref but NO gclid. We drop known
 # bots at ingestion and can purge any that slipped through.
 import re as _re
+from contextvars import ContextVar
+
+# Client timezone offset (minutes, JS getTimezoneOffset semantics: UTC = local + offset).
+# Set per-request by middleware so _date_range() buckets by the user's LOCAL day.
+_request_tz_offset: ContextVar[int] = ContextVar("_request_tz_offset", default=0)
 _BOT_UA_RE = _re.compile(
     r"(adsbot|googlebot|google-inspectiontool|apis-google|mediapartners|bingbot|"
     r"slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebookexternalhit|"
@@ -259,8 +264,15 @@ def _now_iso():
 
 
 def _date_range(start: str, end: str):
-    """Return (start_iso, end_iso, days) covering full UTC days. Defaults to today."""
-    today = datetime.now(timezone.utc).date()
+    """Return (start_iso, end_iso, days) covering full LOCAL days for the request's
+    timezone (from the client's tz_offset, minutes as per JS getTimezoneOffset).
+    created_at values are stored in UTC, so local-day boundaries are converted to
+    UTC for the query. Defaults to 'today' in the client's local timezone."""
+    offset = _request_tz_offset.get()  # minutes; UTC = local + offset
+    delta = timedelta(minutes=offset)
+    # "Now" in the client's local wall-clock time.
+    local_now = datetime.now(timezone.utc).replace(tzinfo=None) - delta
+    today = local_now.date()
     try:
         s = datetime.fromisoformat(start).date() if start else today
     except Exception:
@@ -271,8 +283,11 @@ def _date_range(start: str, end: str):
         e = today
     if e < s:
         s, e = e, s
-    start_dt = datetime(s.year, s.month, s.day, tzinfo=timezone.utc)
-    end_dt = datetime(e.year, e.month, e.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    # Local-day boundaries → UTC instants.
+    start_local = datetime(s.year, s.month, s.day, 0, 0, 0)
+    end_local = datetime(e.year, e.month, e.day, 23, 59, 59, 999999)
+    start_dt = (start_local + delta).replace(tzinfo=timezone.utc)
+    end_dt = (end_local + delta).replace(tzinfo=timezone.utc)
     return start_dt.isoformat(), end_dt.isoformat(), (e - s).days + 1
 
 
@@ -2445,6 +2460,11 @@ app.include_router(api_router)
 async def no_store_admin(request: Request, call_next):
     """Force admin API responses to never be cached (browser or CDN), so the
     dashboard always reflects the latest hooks/variants/edits immediately."""
+    # Capture the client's timezone offset for local-day date filtering.
+    try:
+        _request_tz_offset.set(int(request.query_params.get("tz_offset", 0)))
+    except (TypeError, ValueError):
+        _request_tz_offset.set(0)
     response = await call_next(request)
     if request.url.path.startswith("/api/admin"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

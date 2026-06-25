@@ -28,6 +28,9 @@ export const clearSession = () => {
 
 api.interceptors.request.use((config) => {
   const url = config.url || '';
+  // Always tell the backend the visitor's timezone offset (minutes) so date
+  // ranges ("Today", etc.) are bucketed by the user's LOCAL day, not UTC.
+  config.params = { ...(config.params || {}), tz_offset: new Date().getTimezoneOffset() };
   const isAdmin = url.includes('/admin/') && !url.includes('/admin/login');
   if (isAdmin) {
     const token = localStorage.getItem(TOKEN_KEY);
