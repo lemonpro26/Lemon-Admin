@@ -65,7 +65,8 @@ export const SiteHeader = () => {
         aria-label="Lemon Pros home"
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 focus:outline-none"
       >
-        <Logo size="md" light />
+        <span className="sm:hidden"><Logo size="sm" light /></span>
+        <span className="hidden sm:inline-flex"><Logo size="md" light /></span>
       </button>
 
       <a

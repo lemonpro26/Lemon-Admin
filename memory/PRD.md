@@ -137,6 +137,11 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
   can never show 100%.
 - **Landing-page A/B Split Test** admin tab + `/split` auto-splitter route.
 
+## Implemented (2026-06-25b)
+- **Funnel Drop-off tracking (verified, iteration_16)**: new admin "Funnel" tab + `GET /api/admin/funnel` + `POST /api/track/step` (advance-only `$max` on `funnel_max_step`). Shows step-by-step drop-off (Landing View → Year → Make → Model → Name → Address → Phone → Email → Submitted) per landing page (overall/home/lapa/sp). 10/10 backend + full frontend e2e pass.
+- **Mobile optimization pass (2026-06-25b)**: (1) SiteHeader logo now `sm` on mobile / `md` on desktop — fixes the centered wordmark overlapping the "CALL NOW"/"LLAME AHORA" call link on `/` and `/sp` (no `xs` Tailwind breakpoint exists). (2) Admin Analytics & Calls toolbars given `flex-wrap` so the date filter + Sync/Refresh buttons no longer overflow the viewport; data tables scroll within their cards. Verified `scrollWidth == clientWidth` on `/sp` and `/admin` analytics at 390px. `/pa`, `/sp`, and all funnel steps confirmed clean on mobile.
+
+
 ## Backlog / Next
 - **`source_page` lead/click tracking (NEW, 2026-06-23)**: leads + clicks tagged `source_page` — `lapa` when entering the funnel from `/pa`, `home` from the homepage. Carries through FunnelContext → /leads, stored + forwarded to Zapier; admin leads show a "PA page" badge + Source field. Verified e2e iteration_11 (100%).
 - **`/pa` advertorial polish (2026-06-23)**: attorney section moved to TOP with real headshot + full bio (UCLA, Loyola J.D., CA Bar #265470) and highlighted "National Trial Lawyers — Top 40 Under 40"; brighter hero; "Recent Settlements" strip added. Law-firm footer + legal pages. Verified iteration_10/11.

@@ -137,7 +137,7 @@ export const AdminCalls = () => {
         <p className="text-sm text-slate-500 flex items-center gap-2">
           <Phone className="h-4 w-4" /> Inbound calls from CallTrackingMetrics, with ad attribution &amp; revenue passback.
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <DateRangeFilter value={range} onChange={setRange} />
           {editable && (
             <Button variant="outline" size="sm" onClick={addTestCall} className="rounded-xl border-slate-200" data-testid="calls-add-test">

@@ -169,7 +169,7 @@ export const AdminAnalytics = () => {
       <p className="text-sm text-slate-500 flex items-center gap-2">
         <BarChart3 className="h-4 w-4" /> Live campaigns — drill in: Campaign → Ad Group → Ad → Keyword.
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap justify-end">
         <DateRangeFilter value={range} onChange={setRange} />
         {data?.google_ads_connected && editable && (
           <Button variant="outline" size="sm" onClick={() => syncGoogle(true)} disabled={syncing} className="rounded-xl border-slate-200" data-testid="analytics-sync-google">
