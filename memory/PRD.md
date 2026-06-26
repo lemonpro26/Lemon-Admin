@@ -142,6 +142,14 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - **Mobile optimization pass (2026-06-25b)**: (1) SiteHeader logo now `sm` on mobile / `md` on desktop — fixes the centered wordmark overlapping the "CALL NOW"/"LLAME AHORA" call link on `/` and `/sp` (no `xs` Tailwind breakpoint exists). (2) Admin Analytics & Calls toolbars given `flex-wrap` so the date filter + Sync/Refresh buttons no longer overflow the viewport; data tables scroll within their cards. Verified `scrollWidth == clientWidth` on `/sp` and `/admin` analytics at 390px. `/pa`, `/sp`, and all funnel steps confirmed clean on mobile.
 
 
+## Implemented (2026-06-26)
+- **Mobile optimization + timezone-correct date filtering**: SiteHeader logo sized down on mobile (no CALL NOW overlap); admin Analytics/Calls toolbars wrap. All admin date ranges now bucket by the admin's LOCAL day (client tz_offset sent on every request; backend `_date_range` converts local-day bounds → UTC) — fixes "yesterday's calls show under Today".
+- **Bounce-rate engagement breakdown**: each Analytics row's Bounce % cell opens a popover with Converted / Engaged-no-lead / Bounced counts + stacked bar (backend now returns per-row `bounced`).
+- **Funnel calls-as-conversion**: Funnel tab adds a Phone Calls box; All-Pages Overall Conversion = (form leads + calls) ÷ views (`/admin/funnel` returns `calls`/`conversions`; calls are total-inbound, not page-attributed).
+- **PA Page content CMS**: new admin "PA Page" tab edits all /pa copy (attorney, settlements list, headline/body, pull-quote, qualify bullets, steps, CTA labels); Save publishes instantly. `pa_content` in site_config; `GET /pa-content` (public), `GET/PUT /admin/pa-content`. Text-only (images unchanged).
+- **Split test**: rename a test after launch (inline pencil); "no test running" banner no longer flashes on load.
+- **Team activity history (master only)**: login history + change history per team member. `db.admin_activity` collection; logins recorded on `/admin/login`; all successful admin mutations logged via middleware (attributed by token). `GET /admin/users/{username}/activity` (owner-only). UI: click a team member row in Settings → Users to view a history dialog (logins w/ IP + change list).
+
 ## Backlog / Next
 - **`source_page` lead/click tracking (NEW, 2026-06-23)**: leads + clicks tagged `source_page` — `lapa` when entering the funnel from `/pa`, `home` from the homepage. Carries through FunnelContext → /leads, stored + forwarded to Zapier; admin leads show a "PA page" badge + Source field. Verified e2e iteration_11 (100%).
 - **`/pa` advertorial polish (2026-06-23)**: attorney section moved to TOP with real headshot + full bio (UCLA, Loyola J.D., CA Bar #265470) and highlighted "National Trial Lawyers — Top 40 Under 40"; brighter hero; "Recent Settlements" strip added. Law-firm footer + legal pages. Verified iteration_10/11.

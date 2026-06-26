@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Users, Plus, Trash2, Shield, Eye, KeyRound, Crown } from 'lucide-react';
+import { Users, Plus, Trash2, Shield, Eye, KeyRound, Crown, History, LogIn, Pencil, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, getRole, getUsername, setSession } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,11 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
+
+const fmtWhen = (iso) => {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+};
 
 const ROLE_META = {
   owner: { label: 'Owner', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Crown },
@@ -39,6 +44,24 @@ export const AdminUsers = ({ canEdit }) => {
   const isOwner = getRole() === 'owner';
   const [oc, setOc] = useState({ current_password: '', new_username: '', new_password: '' });
   const [ocBusy, setOcBusy] = useState(false);
+
+  const [activityUser, setActivityUser] = useState(null);
+  const [activity, setActivity] = useState(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+
+  const openActivity = async (u) => {
+    setActivityUser(u);
+    setActivity(null);
+    setActivityLoading(true);
+    try {
+      const res = await api.get(`/admin/users/${encodeURIComponent(u.username)}/activity`);
+      setActivity(res.data);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Could not load activity.');
+    } finally {
+      setActivityLoading(false);
+    }
+  };
 
   useEffect(() => { setOc((o) => ({ ...o, new_username: getUsername() })); }, []);
 
@@ -193,26 +216,105 @@ export const AdminUsers = ({ canEdit }) => {
         </div>
         <div className="divide-y divide-slate-100">
           {users.map((u) => (
-            <div key={u.username} className="flex items-center justify-between px-5 py-3" data-testid={`user-row-${u.username}`}>
+            <div
+              key={u.username}
+              className={`flex items-center justify-between px-5 py-3 ${isOwner ? 'cursor-pointer hover:bg-slate-50 transition-colors' : ''}`}
+              onClick={isOwner ? () => openActivity(u) : undefined}
+              data-testid={`user-row-${u.username}`}
+            >
               <div className="flex items-center gap-3">
                 <span className="font-medium text-slate-900">{u.username}</span>
                 <RoleBadge role={u.role} />
+                {isOwner && <span className="text-xs text-slate-400 hidden sm:inline">· click to view history</span>}
               </div>
-              {canEdit && !u.is_owner && (
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="rounded-lg border-slate-200" onClick={() => openEdit(u)} data-testid={`user-edit-${u.username}`}>
-                    <KeyRound className="h-4 w-4 mr-1" /> Edit
-                  </Button>
-                  <button onClick={() => remove(u)} className="text-slate-400 hover:text-red-600 transition-colors" data-testid={`user-delete-${u.username}`} aria-label={`Delete ${u.username}`}>
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-              {u.is_owner && <span className="text-xs text-slate-400">Master account</span>}
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                {canEdit && !u.is_owner && (
+                  <>
+                    <Button variant="outline" size="sm" className="rounded-lg border-slate-200" onClick={() => openEdit(u)} data-testid={`user-edit-${u.username}`}>
+                      <KeyRound className="h-4 w-4 mr-1" /> Edit
+                    </Button>
+                    <button onClick={() => remove(u)} className="text-slate-400 hover:text-red-600 transition-colors" data-testid={`user-delete-${u.username}`} aria-label={`Delete ${u.username}`}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+                {u.is_owner && <span className="text-xs text-slate-400">Master account</span>}
+                {isOwner && <ChevronRight className="h-4 w-4 text-slate-300" />}
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Activity history (master only) */}
+      <Dialog open={!!activityUser} onOpenChange={(o) => !o && setActivityUser(null)}>
+        <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto" data-testid="user-activity-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-[#0F1B3D]" /> Activity — {activityUser?.username}
+            </DialogTitle>
+          </DialogHeader>
+          {activityLoading ? (
+            <div className="py-8 text-center text-slate-400 text-sm">Loading…</div>
+          ) : activity ? (
+            <div className="space-y-5">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-slate-200 p-3 text-center">
+                  <div className="text-xs text-slate-500">Logins</div>
+                  <div className="text-xl font-extrabold text-[#0F1B3D]" data-testid="activity-login-count">{activity.login_count}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-3 text-center">
+                  <div className="text-xs text-slate-500">Changes</div>
+                  <div className="text-xl font-extrabold text-[#0F1B3D]" data-testid="activity-change-count">{activity.change_count}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-3 text-center">
+                  <div className="text-xs text-slate-500">Last login</div>
+                  <div className="text-[11px] font-semibold text-slate-700 mt-1">{fmtWhen(activity.last_login)}</div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5">
+                  <LogIn className="h-3.5 w-3.5" /> Login History
+                </div>
+                {activity.logins.length === 0 ? (
+                  <p className="text-sm text-slate-400" data-testid="activity-no-logins">No logins recorded yet.</p>
+                ) : (
+                  <div className="space-y-1.5" data-testid="activity-logins">
+                    {activity.logins.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between text-sm border-b border-slate-50 pb-1.5">
+                        <span className="text-slate-700">{fmtWhen(r.at)}</span>
+                        <span className="text-xs text-slate-400 truncate max-w-[180px]" title={r.user_agent}>{r.ip || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5">
+                  <Pencil className="h-3.5 w-3.5" /> Change History
+                </div>
+                {activity.changes.length === 0 ? (
+                  <p className="text-sm text-slate-400" data-testid="activity-no-changes">No changes recorded yet.</p>
+                ) : (
+                  <div className="space-y-1.5" data-testid="activity-changes">
+                    {activity.changes.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between gap-3 text-sm border-b border-slate-50 pb-1.5">
+                        <span className="text-slate-800 font-medium">{r.action}</span>
+                        <span className="text-xs text-slate-400 whitespace-nowrap">{fmtWhen(r.at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActivityUser(null)} className="rounded-lg">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent data-testid="user-edit-dialog">

@@ -513,6 +513,74 @@ def require_owner(user: dict = Depends(require_admin)) -> dict:
     return user
 
 
+# ----------------------------- Activity / audit log -----------------------------
+async def _record_activity(username: str, kind: str, action: str, request: Request = None, detail: str = ""):
+    """Append a row to the admin activity log (login + change history)."""
+    try:
+        ip = resolve_client_ip(request.headers) if request else ""
+        ua = request.headers.get("user-agent", "") if request else ""
+        await db.admin_activity.insert_one({
+            "id": str(uuid.uuid4()),
+            "username": username or "",
+            "kind": kind,            # 'login' | 'change'
+            "action": action,        # human-readable label
+            "detail": detail,        # e.g. "PUT /admin/hook-rules/123"
+            "ip": ip,
+            "user_agent": ua,
+            "at": _now_iso(),
+        })
+    except Exception as e:
+        logger.warning("activity log failed: %s", e)
+
+
+def _username_from_request(request: Request) -> str:
+    """Best-effort decode of the bearer token to attribute a change to a user."""
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return ""
+    try:
+        payload = jwt.decode(auth.split(" ", 1)[1], JWT_SECRET, algorithms=[JWT_ALG])
+        return payload.get("sub", "")
+    except Exception:
+        return ""
+
+
+# Friendly labels for change-history entries, derived from method + path.
+_CHANGE_RULES = [
+    ("PUT", r"/admin/pa-content$", "Edited PA page content"),
+    ("PUT", r"/admin/config$", "Updated settings"),
+    ("PUT", r"/admin/spanish$", "Edited Spanish hooks"),
+    ("PUT", r"/admin/pages$", "Updated pages directory"),
+    ("PUT", r"/admin/owner-credentials$", "Changed master login"),
+    ("PUT", r"/admin/notifications$", "Updated notifications"),
+    ("PUT", r"/admin/email-template$", "Edited email template"),
+    ("POST", r"/admin/hook-rules/[^/]+/revise$", "Revised a hook"),
+    ("POST", r"/admin/hook-rules/[^/]+/reactivate$", "Reactivated a hook version"),
+    ("POST", r"/admin/hook-rules$", "Created a hook"),
+    ("PUT", r"/admin/hook-rules/[^/]+$", "Updated a hook"),
+    ("DELETE", r"/admin/hook-rules/[^/]+$", "Deleted a hook"),
+    ("POST", r"/admin/experiments$", "Created a split test"),
+    ("PUT", r"/admin/experiments/[^/]+$", "Updated a split test"),
+    ("DELETE", r"/admin/experiments/[^/]+$", "Deleted a split test"),
+    ("POST", r"/admin/users$", "Created a team member"),
+    ("PUT", r"/admin/users/[^/]+$", "Updated a team member"),
+    ("DELETE", r"/admin/users/[^/]+$", "Removed a team member"),
+    ("POST", r"/admin/calls/[^/]+/sold$", "Marked a call as sold"),
+    ("POST", r"/admin/leads/[^/]+/sold$", "Marked a lead as sold"),
+    ("DELETE", r"/admin/calls/[^/]+$", "Deleted a call"),
+    ("DELETE", r"/admin/leads/[^/]+$", "Deleted a lead"),
+    ("POST", r"/admin/ad-labels$", "Updated ad labels"),
+]
+
+
+def _change_label(method: str, path: str) -> str:
+    for m, pat, label in _CHANGE_RULES:
+        if m == method and _re.search(pat, path):
+            return label
+    tail = path.replace("/api/admin/", "").split("?")[0] or "resource"
+    return f"{method} {tail}"
+
+
 async def get_owner_account() -> dict:
     """Custom owner username/password stored in DB (overrides the env default
     once the owner changes their credentials in Settings)."""
@@ -977,7 +1045,7 @@ async def contact_form(body: ContactBody, background_tasks: BackgroundTasks):
 
 # ----------------------------- Auth + users -----------------------------
 @api_router.post("/admin/login")
-async def admin_login(body: LoginRequest):
+async def admin_login(body: LoginRequest, request: Request):
     uname = (body.username or "").strip()
     owner = await get_owner_account()
     owner_username = (owner.get("username") or "owner")
@@ -990,9 +1058,11 @@ async def admin_login(body: LoginRequest):
         elif body.password == ADMIN_PASSWORD:
             ok = True  # env password = bootstrap + recovery
         if ok:
+            await _record_activity(owner_username, "login", "Signed in", request)
             return {"token": create_token(owner_username, "owner"), "username": owner_username, "role": "owner"}
     user = await db.admin_users.find_one({"username": uname})
     if user and _verify_pw(body.password, user.get("password_hash", "")):
+        await _record_activity(uname, "login", "Signed in", request)
         return {"token": create_token(uname, user["role"]), "username": uname, "role": user["role"]}
     raise HTTPException(status_code=401, detail="Incorrect username or password")
 
@@ -1008,6 +1078,19 @@ async def list_users(user: dict = Depends(require_admin)):
     owner_acct = await get_owner_account()
     owner = {"username": owner_acct.get("username") or "owner", "role": "owner", "is_owner": True}
     return {"users": [owner] + users, "current": user}
+
+
+@api_router.get("/admin/users/{username}/activity")
+async def user_activity(username: str, _: dict = Depends(require_owner), limit: int = Query(50)):
+    """Master-only: login history + change history for a team member."""
+    limit = max(1, min(int(limit or 50), 200))
+    cur = db.admin_activity.find({"username": username}, {"_id": 0}).sort("at", -1).limit(limit * 2)
+    rows = await cur.to_list(limit * 2)
+    logins = [r for r in rows if r.get("kind") == "login"][:limit]
+    changes = [r for r in rows if r.get("kind") == "change"][:limit]
+    last_login = logins[0]["at"] if logins else None
+    return {"username": username, "logins": logins, "changes": changes,
+            "login_count": len(logins), "change_count": len(changes), "last_login": last_login}
 
 
 @api_router.put("/admin/owner-credentials")
@@ -2590,10 +2673,19 @@ async def no_store_admin(request: Request, call_next):
     except (TypeError, ValueError):
         _request_tz_offset.set(0)
     response = await call_next(request)
-    if request.url.path.startswith("/api/admin"):
+    path = request.url.path
+    if path.startswith("/api/admin"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+        # Change history: log successful mutating admin actions (skip login + owner self-creds is logged too).
+        if (request.method in ("POST", "PUT", "DELETE", "PATCH")
+                and response.status_code < 400
+                and not path.endswith("/admin/login")):
+            uname = _username_from_request(request)
+            if uname:
+                await _record_activity(uname, "change", _change_label(request.method, path),
+                                       request, detail=f"{request.method} {path.replace('/api', '')}")
     return response
 
 
