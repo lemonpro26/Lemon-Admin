@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical } from 'lucide-react';
+import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -47,20 +47,30 @@ export const AdminCalls = () => {
   const [saleCurrency, setSaleCurrency] = useState('USD');
   const [marking, setMarking] = useState(false);
   const [gaStatus, setGaStatus] = useState(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     try {
-      const res = await api.get('/admin/calls', { params: { start: range.start, end: range.end } });
+      const q = debouncedSearch.trim();
+      // Search looks across ALL calls (ignores the date range), like the Leads tab.
+      const params = q ? { search: q } : { start: range.start, end: range.end };
+      const res = await api.get('/admin/calls', { params });
       setCalls(res.data?.calls || []);
     } catch (e) {
       if (!silent) toast.error('Failed to load calls.');
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [range]);
+  }, [range, debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
   useLivePoll(() => load({ silent: true }), { intervalMs: 30000 });
@@ -137,11 +147,26 @@ export const AdminCalls = () => {
     <div className="grid gap-4" data-testid="admin-calls">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-slate-500 flex items-center gap-2">
-          <Phone className="h-4 w-4" /> Inbound calls from CallTrackingMetrics, with ad attribution &amp; revenue passback.
-          <LiveBadge />
+          <Phone className="h-4 w-4" /> {debouncedSearch.trim() ? `Search results for "${debouncedSearch.trim()}" — all calls` : 'Inbound calls from CallTrackingMetrics, with ad attribution & revenue passback.'}
+          {!debouncedSearch.trim() && <LiveBadge />}
         </p>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <DateRangeFilter value={range} onChange={setRange} />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search calls by number, name, city…"
+              className="pl-9 pr-8 h-9 w-64 rounded-xl border-slate-200"
+              data-testid="calls-search"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" data-testid="calls-search-clear" aria-label="Clear search">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {!debouncedSearch.trim() && <DateRangeFilter value={range} onChange={setRange} />}
           {editable && (
             <Button variant="outline" size="sm" onClick={addTestCall} className="rounded-xl border-slate-200" data-testid="calls-add-test">
               <Plus className="h-4 w-4 mr-2" /> Test call
