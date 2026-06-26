@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Filter, ArrowDown, TrendingDown, PhoneCall } from 'lucide-react';
+import { Filter, ArrowDown, TrendingDown, PhoneCall, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
@@ -43,6 +43,8 @@ export function AdminFunnel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState('overall');
+  const [campaigns, setCampaigns] = useState(null);
+  const [campLoading, setCampLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,6 +59,17 @@ export function AdminFunnel() {
   }, [range]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Campaigns feeding the selected page's traffic.
+  useEffect(() => {
+    let active = true;
+    setCampLoading(true);
+    api.get('/admin/funnel/campaigns', { params: { page, start: range.start, end: range.end } })
+      .then((res) => { if (active) setCampaigns(res.data); })
+      .catch(() => { if (active) setCampaigns(null); })
+      .finally(() => { if (active) setCampLoading(false); });
+    return () => { active = false; };
+  }, [page, range]);
 
   const cur = data?.[page] || { views: 0, submitted: 0, calls: 0, conversions: 0, conversion_rate: 0, stages: [] };
   const topCount = cur.stages?.[0]?.count || 0;
@@ -126,6 +139,48 @@ export function AdminFunnel() {
             {cur.stages.map((s, i) => (
               <StageBar key={s.stage} stage={s} topCount={topCount} isLast={i === cur.stages.length - 1} />
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Campaigns feeding this page */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="funnel-campaigns">
+        <div className="flex items-center gap-2 mb-3">
+          <Megaphone className="h-4 w-4 text-[#0F1B3D]" />
+          <h3 className="font-slab font-bold text-slate-900">
+            Campaigns feeding {PAGES.find((p) => p.key === page)?.label || 'this page'}
+          </h3>
+        </div>
+        {campLoading ? (
+          <div className="p-6 text-center text-slate-400 text-sm">Loading…</div>
+        ) : !campaigns?.campaigns?.length ? (
+          <div className="p-6 text-center text-slate-400 text-sm" data-testid="funnel-campaigns-empty">
+            No campaign traffic for this page in the selected range.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-slate-400 border-b border-slate-100">
+                  <th className="py-2 pr-3">Campaign</th>
+                  <th className="py-2 px-3 text-right">Visits</th>
+                  <th className="py-2 px-3 text-right">% of traffic</th>
+                  <th className="py-2 px-3 text-right">Leads</th>
+                  <th className="py-2 pl-3 text-right">Conv.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.campaigns.map((c) => (
+                  <tr key={c.campaign_id || 'direct'} className="border-b border-slate-50" data-testid={`funnel-campaign-row`}>
+                    <td className="py-2 pr-3 font-medium text-slate-800">{c.campaign}</td>
+                    <td className="py-2 px-3 text-right tabular-nums font-bold text-[#0F1B3D]">{c.clicks}</td>
+                    <td className="py-2 px-3 text-right tabular-nums text-slate-500">{c.pct_of_traffic}%</td>
+                    <td className="py-2 px-3 text-right tabular-nums text-emerald-600 font-semibold">{c.leads}</td>
+                    <td className="py-2 pl-3 text-right tabular-nums text-slate-700">{c.conversion_rate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FileText, Save, Plus, X, ExternalLink } from 'lucide-react';
+import { FileText, Save, Plus, X, ExternalLink, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,8 @@ export function AdminPAContent() {
   const [c, setC] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,6 +93,7 @@ export function AdminPAContent() {
     try {
       const res = await api.put('/admin/pa-content', c);
       setC(res.data);
+      setPreviewKey((k) => k + 1); // refresh the live preview after save
       toast.success('PA page updated — live now');
     } catch (e) {
       toast.error('Failed to save');
@@ -112,6 +115,14 @@ export function AdminPAContent() {
           <FileText className="h-4 w-4" /> Edit the /pa advertorial page. Saving publishes instantly.
         </p>
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          <Button
+            variant="outline"
+            onClick={() => { setShowPreview((v) => !v); setPreviewKey((k) => k + 1); }}
+            className="rounded-xl border-slate-200"
+            data-testid="pa-content-preview-toggle"
+          >
+            <Eye className="h-4 w-4 mr-2" /> {showPreview ? 'Hide preview' : 'See page'}
+          </Button>
           <a href={paUrl} target="_blank" rel="noreferrer" className="text-sm inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50" data-testid="pa-content-open">
             <ExternalLink className="h-4 w-4" /> Open /pa
           </a>
@@ -122,6 +133,21 @@ export function AdminPAContent() {
           )}
         </div>
       </div>
+
+      {showPreview && (
+        <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white" data-testid="pa-content-preview">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50">
+            <span className="text-xs font-semibold text-slate-500">Live preview — {paUrl}</span>
+            <Button variant="ghost" size="sm" onClick={() => setPreviewKey((k) => k + 1)} className="h-7 text-xs" data-testid="pa-preview-refresh">Refresh</Button>
+          </div>
+          <iframe
+            key={previewKey}
+            title="PA page preview"
+            src={paUrl}
+            className="w-full h-[640px] bg-white"
+          />
+        </div>
+      )}
 
       <Section title="Attorney">
         <div className="grid sm:grid-cols-2 gap-4">

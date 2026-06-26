@@ -126,14 +126,14 @@ export function AdminSplitTest() {
     { label: 'PA Advertorial', path: '/pa', weight: 50 },
   ]);
   const [creating, setCreating] = useState(false);
-  const [range, setRange] = useState(null); // null = all time
+  const [range, setRange] = useState(todayRange());
 
   const splitUrl = `${window.location.origin}/split`;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = range ? { start: range.start, end: range.end } : {};
+      const params = { start: range.start, end: range.end };
       const [ex, pg] = await Promise.all([
         api.get('/admin/experiments', { params }),
         api.get('/admin/pages').catch(() => ({ data: { custom_pages: [] } })),
@@ -212,17 +212,8 @@ export function AdminSplitTest() {
       {/* Stats date filter */}
       <div className="flex items-center gap-2 flex-wrap" data-testid="split-date-filter">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 mr-1">Stats period</span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setRange(null)}
-          className={`rounded-xl ${range === null ? 'bg-[#0F1B3D] text-white border-[#0F1B3D] hover:bg-[#0F1B3D]' : 'border-slate-200'}`}
-          data-testid="split-alltime-button"
-        >
-          <CalendarRange className="h-4 w-4 mr-1.5" /> All time
-        </Button>
-        <DateRangeFilter value={range || todayRange()} onChange={setRange} />
-        {range && <span className="text-xs text-slate-500" data-testid="split-range-label">Showing {range.start === range.end ? range.start : `${range.start} → ${range.end}`}</span>}
+        <DateRangeFilter value={range} onChange={setRange} />
+        <span className="text-xs text-slate-400">Counts only visitors routed through /split</span>
       </div>
 
       {!loading && running.length === 0 && (

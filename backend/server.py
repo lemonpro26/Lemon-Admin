@@ -1427,6 +1427,50 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
     return result
 
 
+@api_router.get("/admin/funnel/campaigns")
+async def admin_funnel_campaigns(page: str = Query("overall"), _: dict = Depends(require_admin),
+                                 start: str = Query(""), end: str = Query("")):
+    """Campaigns feeding a landing page's traffic, with clicks/leads per campaign.
+    `page` is one of: overall | home | lapa | sp."""
+    s_iso, e_iso, _d = _date_range(start, end)
+    cfg = await get_or_create_config()
+    ad_labels = cfg.get("ad_labels") or {}
+    page_map = {"home": "home", "lapa": "lapa", "sp": "sp"}
+
+    click_match = {"first_seen": {"$gte": s_iso, "$lte": e_iso}}
+    lead_match = {"created_at": {"$gte": s_iso, "$lte": e_iso}}
+    if page in page_map:
+        click_match["source_page"] = page_map[page]
+        lead_match["source_page"] = page_map[page]
+
+    clicks = {}
+    async for row in db.clicks.aggregate([
+        {"$match": click_match},
+        {"$group": {"_id": "$campaign_id", "n": {"$sum": 1}}},
+    ]):
+        clicks[row["_id"] or ""] = row["n"]
+    leads = {}
+    async for row in db.leads.aggregate([
+        {"$match": lead_match},
+        {"$group": {"_id": "$campaign_id", "n": {"$sum": 1}}},
+    ]):
+        leads[row["_id"] or ""] = row["n"]
+
+    total_clicks = sum(clicks.values())
+    rows = []
+    for cid in set(clicks) | set(leads):
+        c, lc = clicks.get(cid, 0), leads.get(cid, 0)
+        name = ad_labels.get(cid) or ad_labels.get(str(cid)) or (cid if cid else "Direct / Untracked")
+        rows.append({
+            "campaign_id": cid, "campaign": name, "clicks": c, "leads": lc,
+            "conversion_rate": round((lc / c * 100), 1) if c else (100.0 if lc else 0.0),
+            "pct_of_traffic": round((c / total_clicks * 100), 1) if total_clicks else 0.0,
+        })
+    rows.sort(key=lambda r: (r["clicks"], r["leads"]), reverse=True)
+    return {"page": page, "total_clicks": total_clicks, "campaigns": rows}
+
+
+
 @api_router.get("/admin/spanish")
 async def get_spanish(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
     """Spanish-page (`/sp`, source_page='sp') control panel: editable hooks +
