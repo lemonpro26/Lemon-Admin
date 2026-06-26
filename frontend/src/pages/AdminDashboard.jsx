@@ -572,6 +572,7 @@ export default function AdminDashboard() {
                   ['Ad ID', selected.ad_id, 'lead-detail-ad'],
                   ['Keyword', selected.keyword, 'lead-detail-keyword'],
                   ['GCLID', selected.gclid, 'lead-detail-gclid'],
+                  ['IP Address', selected.ip, 'lead-detail-ip'],
                   ['Submitted', fmtDate(selected.created_at), 'lead-detail-date'],
                 ].map(([label, value, tid]) => (
                   <div key={tid} className="flex justify-between gap-4 border-b border-slate-100 py-1.5">
