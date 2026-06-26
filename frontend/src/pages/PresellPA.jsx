@@ -130,12 +130,12 @@ export default function PresellPA() {
             href={COMPANY.phoneHref}
             onClick={trackPhoneCallConversion}
             data-testid="pa-header-call"
-            className="flex flex-col items-end leading-none text-slate-900 hover:text-[#E0A800] transition-colors group"
+            className="flex flex-col items-center justify-center leading-none rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white px-2.5 py-1.5 sm:px-5 sm:py-2 transition-colors shadow-sm"
           >
-            <span className="flex items-center gap-1.5 text-sm sm:text-lg font-extrabold">
+            <span className="flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-xl font-extrabold whitespace-nowrap">
               <Phone className="h-4 w-4 sm:h-5 sm:w-5" /> {COMPANY.phone}
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#E0A800] group-hover:text-slate-900">
+            <span className="mt-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.15em] text-white/90">
               Call Now
             </span>
           </a>
@@ -171,14 +171,14 @@ export default function PresellPA() {
 
               <p className="mt-3 text-slate-700 leading-relaxed">{c.attorney_bio}</p>
 
-              <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
+              <div className="mt-4 flex flex-wrap sm:flex-nowrap justify-center sm:justify-start gap-2">
                 {c.attorney_badges.map((b) => (
-                  <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1">
+                  <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 whitespace-nowrap">
                     {b}
                   </span>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1.5">
+              <p className="mt-3 text-xs font-bold text-slate-600 flex items-center justify-center sm:justify-start gap-1.5">
                 <GraduationCap className="h-4 w-4" /> {c.attorney_school}
               </p>
             </div>

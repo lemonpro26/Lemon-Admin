@@ -65,9 +65,9 @@ export const SiteHeader = () => {
         onClick={() => navigate(home)}
         data-testid="site-header-logo"
         aria-label="Lemon Pros home"
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 focus:outline-none"
+        className="static translate-x-0 translate-y-0 whitespace-nowrap sm:absolute sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 focus:outline-none"
       >
-        <span className="sm:hidden"><Logo size="sm" light /></span>
+        <span className="sm:hidden"><Logo size="xs" light hideSubtitle={lang === 'es'} /></span>
         <span className="hidden sm:inline-flex"><Logo size="md" light /></span>
       </button>
 
@@ -76,15 +76,15 @@ export const SiteHeader = () => {
         onClick={trackPhoneCallConversion}
         data-testid="header-call-link"
         aria-label={`Call Lemon Pros at ${phone}`}
-        className="flex flex-col items-end leading-none text-white hover:text-[#FACC15] transition-colors group"
+        className="flex flex-col items-center justify-center leading-none rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white px-2.5 py-1.5 sm:px-5 sm:py-2 transition-colors shadow-sm"
       >
-        <span className="flex items-center gap-2 text-base sm:text-2xl font-extrabold whitespace-nowrap">
-          <Phone className="h-5 w-5 sm:h-6 sm:w-6" />
-          <span className="hidden xs:inline sm:inline">{phone}</span>
+        <span className="flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-xl font-extrabold whitespace-nowrap">
+          <Phone className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span>{phone}</span>
         </span>
         <span
           data-testid="header-call-now-label"
-          className="mt-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-[#FACC15] group-hover:text-white"
+          className="mt-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.15em] text-white/90"
         >
           {t.header.callNow}
         </span>
