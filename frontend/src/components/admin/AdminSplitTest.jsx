@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker, Pencil } from 'lucide-react';
+import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker, Pencil, CalendarRange } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 const BUILTIN_PAGES = [
   { label: 'Home (Main)', path: '/' },
@@ -125,14 +126,16 @@ export function AdminSplitTest() {
     { label: 'PA Advertorial', path: '/pa', weight: 50 },
   ]);
   const [creating, setCreating] = useState(false);
+  const [range, setRange] = useState(null); // null = all time
 
   const splitUrl = `${window.location.origin}/split`;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const params = range ? { start: range.start, end: range.end } : {};
       const [ex, pg] = await Promise.all([
-        api.get('/admin/experiments'),
+        api.get('/admin/experiments', { params }),
         api.get('/admin/pages').catch(() => ({ data: { custom_pages: [] } })),
       ]);
       setExperiments(ex.data.experiments || []);
@@ -143,7 +146,7 @@ export function AdminSplitTest() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -198,12 +201,28 @@ export function AdminSplitTest() {
         <p className="text-sm text-slate-500 flex items-center gap-2">
           <FlaskConical className="h-4 w-4" /> A/B test any of your pages. Stats below count ONLY visitors routed through /split.
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <code className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-800" data-testid="split-url">{splitUrl}</code>
           <Button variant="outline" onClick={copyUrl} className="rounded-xl" data-testid="split-copy-button">
             {copied ? <Check className="h-4 w-4 mr-1 text-emerald-600" /> : <Copy className="h-4 w-4 mr-1" />}{copied ? 'Copied' : 'Copy'}
           </Button>
         </div>
+      </div>
+
+      {/* Stats date filter */}
+      <div className="flex items-center gap-2 flex-wrap" data-testid="split-date-filter">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 mr-1">Stats period</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setRange(null)}
+          className={`rounded-xl ${range === null ? 'bg-[#0F1B3D] text-white border-[#0F1B3D] hover:bg-[#0F1B3D]' : 'border-slate-200'}`}
+          data-testid="split-alltime-button"
+        >
+          <CalendarRange className="h-4 w-4 mr-1.5" /> All time
+        </Button>
+        <DateRangeFilter value={range || todayRange()} onChange={setRange} />
+        {range && <span className="text-xs text-slate-500" data-testid="split-range-label">Showing {range.start === range.end ? range.start : `${range.start} → ${range.end}`}</span>}
       </div>
 
       {!loading && running.length === 0 && (

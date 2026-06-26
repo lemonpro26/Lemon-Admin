@@ -1211,19 +1211,25 @@ class ExperimentBody(BaseModel):
     variants: List[ExperimentVariant]
 
 
-async def _experiment_stats(exp: dict) -> dict:
+async def _experiment_stats(exp: dict, s_iso: str = "", e_iso: str = "") -> dict:
     """Per-variant clicks/leads/conversion for an experiment — counts ONLY traffic
-    that was routed through /split (stamped with this experiment id)."""
+    that was routed through /split (stamped with this experiment id). When a date
+    range is given, only clicks/leads within it are counted."""
     eid = exp["id"]
+    click_match = {"split_experiment_id": eid}
+    lead_match = {"split_experiment_id": eid}
+    if s_iso and e_iso:
+        click_match["first_seen"] = {"$gte": s_iso, "$lte": e_iso}
+        lead_match["created_at"] = {"$gte": s_iso, "$lte": e_iso}
     clicks = {}
     async for c in db.clicks.aggregate([
-        {"$match": {"split_experiment_id": eid}},
+        {"$match": click_match},
         {"$group": {"_id": "$split_variant", "n": {"$sum": 1}}},
     ]):
         clicks[c["_id"] or ""] = c["n"]
     leads = {}
     async for l in db.leads.aggregate([
-        {"$match": {"split_experiment_id": eid}},
+        {"$match": lead_match},
         {"$group": {"_id": "$split_variant", "n": {"$sum": 1}}},
     ]):
         leads[l["_id"] or ""] = l["n"]
@@ -1249,10 +1255,13 @@ async def _experiment_stats(exp: dict) -> dict:
 
 
 @api_router.get("/admin/experiments")
-async def list_experiments(_: dict = Depends(require_admin)):
+async def list_experiments(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
     docs = await db.experiments.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    s_iso, e_iso = ("", "")
+    if start or end:
+        s_iso, e_iso, _d = _date_range(start, end)
     for d in docs:
-        d["stats"] = await _experiment_stats(d)
+        d["stats"] = await _experiment_stats(d, s_iso, e_iso)
     return {"experiments": docs}
 
 
