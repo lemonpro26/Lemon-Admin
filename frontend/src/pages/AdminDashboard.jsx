@@ -20,6 +20,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Logo } from '@/components/Logo';
 import { useSortable, SortLabel } from '@/lib/useSortable';
+import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
 import { AdminHooks } from '@/components/admin/AdminHooks';
 import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { AdminCalls } from '@/components/admin/AdminCalls';
@@ -109,8 +110,8 @@ export default function AdminDashboard() {
     navigate('/admin');
   }, [navigate]);
 
-  const loadLeads = useCallback(async () => {
-    setLoading(true);
+  const loadLeads = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const q = debouncedSearch.trim();
       const params = q ? { search: q } : { start: range.start, end: range.end };
@@ -130,11 +131,11 @@ export default function AdminDashboard() {
     } catch (e) {
       if (e?.response?.status === 401) {
         logout();
-      } else {
+      } else if (!silent) {
         toast.error('Failed to load leads.');
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [range, logout, debouncedSearch]);
 
@@ -161,6 +162,13 @@ export default function AdminDashboard() {
   useEffect(() => { loadGaStatus(); }, [loadGaStatus]);
   useEffect(() => { loadLeads(); }, [loadLeads]);
   useEffect(() => { loadStats(); }, [loadStats]);
+
+  // Live auto-refresh: silently pull new leads + stats every 30s while the
+  // Leads tab is open and the browser tab is visible.
+  useLivePoll(
+    () => { loadLeads({ silent: true }); loadStats(); },
+    { intervalMs: 30000, enabled: activeTab === 'leads' },
+  );
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -336,6 +344,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
               <p className="text-sm text-slate-500 flex items-center gap-2">
                 <Users className="h-4 w-4" /> {debouncedSearch.trim() ? `Search results for "${debouncedSearch.trim()}" — leads & calls` : 'Leads submitted in the selected range.'}
+                {!debouncedSearch.trim() && <LiveBadge />}
               </p>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="relative">

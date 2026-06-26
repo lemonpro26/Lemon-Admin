@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 import { useSortable, SortLabel } from '@/lib/useSortable';
+import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
 
 const fmtDuration = (s) => {
   const n = Number(s) || 0;
@@ -49,19 +50,20 @@ export const AdminCalls = () => {
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.get('/admin/calls', { params: { start: range.start, end: range.end } });
       setCalls(res.data?.calls || []);
     } catch (e) {
-      toast.error('Failed to load calls.');
+      if (!silent) toast.error('Failed to load calls.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [range]);
 
   useEffect(() => { load(); }, [load]);
+  useLivePoll(() => load({ silent: true }), { intervalMs: 30000 });
 
   useEffect(() => {
     api.get('/admin/google-ads/status').then((r) => setGaStatus(r.data)).catch(() => {});
@@ -136,6 +138,7 @@ export const AdminCalls = () => {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-slate-500 flex items-center gap-2">
           <Phone className="h-4 w-4" /> Inbound calls from CallTrackingMetrics, with ad attribution &amp; revenue passback.
+          <LiveBadge />
         </p>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <DateRangeFilter value={range} onChange={setRange} />
@@ -144,7 +147,7 @@ export const AdminCalls = () => {
               <Plus className="h-4 w-4 mr-2" /> Test call
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={load} className="rounded-xl border-slate-200" data-testid="calls-refresh">
+          <Button variant="outline" size="sm" onClick={() => load()} className="rounded-xl border-slate-200" data-testid="calls-refresh">
             <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
         </div>
