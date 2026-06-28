@@ -108,3 +108,10 @@ Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
 - P1 Spanish active hooks summary: AdminSpanish "Active Spanish Hooks" card fetches /admin/hook-rules?lang=es,
   lists enabled non-archived ES hooks + default catch-all with weight/visits/leads/conv%.
 - Verified via testing_agent iteration_18.json: backend 4/4, frontend 19/19 pass. No issues.
+
+## 2026-06-28 (pm) — Pages editing hub, Home/Spanish CMS, per-URL split tests
+- Pages tab is now the editing hub: click Home / PA / Spanish to edit content with live iframe preview + instant Save & Publish. Removed the standalone "PA Page" top tab (localStorage 'pacontent' falls back to 'pages').
+- New editable content model for Home (`/`) & Spanish (`/sp`): CTA button, tooltip, 3 trust badges. Backend GET /api/page-content/{home|sp} (public) + GET/PUT /api/admin/page-content/{page}. Landing.jsx consumes it (headline/subhead still in Hooks/Spanish tabs).
+- New component AdminPageContent.jsx; AdminPages.jsx rebuilt with click-to-edit + back nav (renders AdminPAContent for PA).
+- Split tests now each have their own entry URL: auto-generated slug (split, split2, split3…), editable + sanitized + uniqueness 409. Multiple tests can run simultaneously (removed one-at-a-time constraint). split_decide(slug=...) matches by slug; startup backfills slugs on legacy experiments. SplitEntry.jsx reads /:splitSlug; App.js adds catch-all '/:splitSlug' (last). Unknown/non-running slugs redirect to '/'.
+- Verified via testing_agent iteration_19.json: backend 10/10, frontend 100%, no issues. Test experiments + temp Home copy cleaned up.
