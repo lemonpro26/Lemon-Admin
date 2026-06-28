@@ -1,0 +1,111 @@
+{
+  "design_blueprint": {
+    "project": "The Lemon Pros Admin Dashboard",
+    "theme_and_archetype": {
+      "theme": "Light Theme with Dark Sidebar",
+      "archetype": "Archetype 4 (Swiss & High-Contrast) + Control Room Grid"
+    },
+    "core_philosophy": "Transform the generic flat UI into a high-end, high-density SaaS 'Command Center'. Replace the cluttered 9 horizontal top tabs with a scalable dark-themed left sidebar. Use pure white data surfaces with delicate 1px borders on a zinc-50 canvas to maximize clarity and readability for legal/marketing operations.",
+    "typography": {
+      "headings": {
+        "family": "Outfit or Manrope",
+        "weights": ["font-medium", "font-semibold"],
+        "usage": "Page titles, card headers, section dividers.",
+        "classes": "font-sans tracking-tight text-zinc-950"
+      },
+      "body": {
+        "family": "IBM Plex Sans or Inter",
+        "weights": ["font-normal", "font-medium"],
+        "classes": "font-sans text-zinc-600 leading-relaxed"
+      },
+      "data_and_metrics": {
+        "family": "JetBrains Mono or IBM Plex Mono",
+        "usage": "Use strictly for all table numbers, revenue, stats, percentages, and phone numbers to ensure vertical alignment and quick scanning.",
+        "classes": "font-mono tracking-tight"
+      }
+    },
+    "color_system": {
+      "background": "bg-zinc-50 (#FAFAFA)",
+      "surface": "bg-white (#FFFFFF)",
+      "sidebar": "bg-zinc-950 (#09090B) with white/zinc-300 text to create a striking, sleek premium contrast.",
+      "borders": "border-zinc-200 (light surfaces) / border-zinc-800 (sidebar)",
+      "primary_brand": "bg-[#0A1128] text-white (Deep Obsidian Navy - modernized from the legacy #0F1B3D)",
+      "primary_hover": "hover:bg-[#15234E]",
+      "accent_danger": "bg-rose-600 text-white (Modernized, elegant version of flat red #EF4444)",
+      "accent_success": "bg-emerald-600 text-white",
+      "status_pills": {
+        "live_running": "bg-emerald-100 text-emerald-800 border-emerald-200",
+        "draft_stopped": "bg-zinc-100 text-zinc-800 border-zinc-200",
+        "warning": "bg-amber-100 text-amber-800 border-amber-200",
+        "info_new": "bg-sky-100 text-sky-800 border-sky-200"
+      }
+    },
+    "layout_strategy": {
+      "paradigm_shift": "Eliminate the 9 top tabs. Implement a Fixed Left Sidebar (w-64) for all primary navigation to improve scalability.",
+      "sidebar_navigation": {
+        "header": "Top of sidebar: 'The Lemon Pros' text with a lucide-react Lemon/Scale icon. Sleek white text.",
+        "groups": [
+          {
+            "name": "OVERVIEW",
+            "items": ["Analytics", "Leads", "Calls"]
+          },
+          {
+            "name": "FUNNELS & MARKETING",
+            "items": ["Funnel", "Hooks", "Split Test", "Spanish", "Pages"]
+          },
+          {
+            "name": "SYSTEM",
+            "items": ["Settings"]
+          }
+        ],
+        "footer": "Pin the current username and Role Badge (Owner/Editor/View Only) at the absolute bottom of the sidebar with a Logout action."
+      },
+      "top_header": {
+        "type": "Sticky top header (h-16).",
+        "style": "bg-white/80 backdrop-blur-md border-b border-zinc-200 z-40",
+        "contents": "Left: Dynamic Page Breadcrumbs / Page Title. Right: Global controls like Date-Range Filter pills."
+      },
+      "spacing_density": "Use p-8 for main page containers. Use tight gap-4 or gap-6 for bento grid dashboard layouts."
+    },
+    "component_styling": {
+      "cards": "Flat background (bg-white), rounded-lg (max 8px radius), border border-zinc-200, shadow-sm. NO heavy drop shadows or generic float effects.",
+      "stat_cards": "Bento Grid styling. Include a subtle sparkline or trend indicator (e.g., '+12%'). Value must be in large font-mono text-3xl or 4xl.",
+      "tables": "Shadcn Table customized. Tight padding (py-3 px-4). Hover state explicitly defined (hover:bg-zinc-50/70). Sticky headers. Empty states must have a centered icon and text.",
+      "badges": "rounded-full px-2.5 py-0.5 text-xs font-medium border",
+      "buttons": "rounded-md. Primary: bg-[#0A1128]. Secondary: bg-white border border-zinc-200 text-zinc-800 hover:bg-zinc-50. Ghost: hover:bg-zinc-100."
+    },
+    "feature_specific_designs": {
+      "analytics": {
+        "warning_banner": "When Google Ads is disconnected: Full-width banner injected directly below the header. Style: bg-amber-50 border-y border-amber-200 text-amber-800 py-3 px-6 flex items-center gap-3. Add a pulsing warning icon.",
+        "data_tables": "Google Ads tables (Campaign -> Ad Group -> Keyword) should utilize Shadcn tables with sorting carets. Keep numbers strictly mono-spaced."
+      },
+      "funnel": {
+        "visualization": "Use Shadcn/Recharts to render a horizontal step chart or bar chart visualizing drop-off (Landing -> 7 steps -> Submitted). Apply a gradient or color scale from Navy (Start) to Emerald (Converted)."
+      },
+      "split_test": {
+        "layout": "Display as a Bento grid of dense cards. Each card contains the test name, status pill, entry URL with a copy button, and a mini stats table comparing Variant A vs B. Highlight the winner with a subtle border glow (ring-1 ring-amber-400)."
+      },
+      "pages_cms": {
+        "layout": "Two-column split view (grid-cols-12). Left (col-span-4 or 5): Dense Shadcn Form fields for editing copy/hooks. Right (col-span-7 or 8): Sticky live iframe preview of the landing page wrapper inside a generic rounded browser-chrome frame (border-8 border-zinc-100 bg-white rounded-xl)."
+      },
+      "leads": {
+        "interaction_critical": "Clicking a lead DOES NOT open a standard modal/dialog (which blocks context). It opens a right-side Shadcn Sheet (Drawer) (w-[500px] or wider). This allows the user to see the table while interacting with the lead.",
+        "revenue_panel": "Inside the Lead Sheet: A distinct highlighted card (bg-zinc-50 border border-zinc-200 p-4 rounded-lg) containing the 'Mark as Sold & Send Conversion' action. Use an Emerald CTA button."
+      },
+      "calls": {
+        "live_badge": "Next to the Calls title, inject a pulsing UI indicator: a small dot with an outer ping animation (animate-ping absolute bg-sky-400 opacity-75, inside relative bg-sky-500) labeled 'LIVE'."
+      }
+    },
+    "motion_and_microinteractions": {
+      "hover_states": "Every interactive element must explicitly define its hover state (e.g. hover:text-zinc-900). Avoid default gray-on-gray bleeding.",
+      "transitions": "Use transition-all duration-200 ease-in-out on buttons, table rows, and sidebar links.",
+      "toasts": "Integrate Sonner for toasts. Position bottom-right. Use sleek white toasts with a left colored border based on the event type (emerald for save success, rose for error)."
+    },
+    "testing_and_implementation_rules": {
+      "file_format": "Strictly use .js and .jsx extensions. DO NOT use .ts or .tsx.",
+      "data_testid": "ALL interactive elements, tabs, buttons, forms, metric displays, and table rows MUST have a stable `data-testid` attribute in kebab-case based on their role (e.g., `data-testid='leads-table-row'`, `data-testid='google-ads-warning'`).",
+      "icons": "Use lucide-react exclusively. Set stroke width to 1.5 for a sharper, sleeker aesthetic.",
+      "components": "Use and heavily customize Shadcn UI primitives. Modify classes directly in the component to match this sleek zinc-based guideline instead of relying on default generic styles."
+    }
+  }
+}
