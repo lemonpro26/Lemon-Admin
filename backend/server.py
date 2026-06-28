@@ -193,6 +193,32 @@ def _merged_pa_content(cfg: dict) -> dict:
     stored = (cfg or {}).get("pa_content") or {}
     return {**DEFAULT_PA_CONTENT, **stored}
 
+
+# Editable copy for the Home (`/`) and Spanish (`/sp`) landing pages. The big
+# headline/subhead are managed by the Hooks/Spanish tabs (A/B + geo macros);
+# these cover the CTA button, tooltip and trust-line badges.
+DEFAULT_HOME_CONTENT = {
+    "tooltip": "Takes 60 seconds — see if you qualify!",
+    "cta": "Check If Your Car Qualifies",
+    "rated": "5-Star Rated",
+    "free_consult": "100% Free Consultation",
+    "no_win_no_fee": "No Win, No Fee",
+}
+DEFAULT_SP_CONTENT = {
+    "tooltip": "Toma 60 segundos — ¡vea si califica!",
+    "cta": "Verifique Si Su Auto Califica",
+    "rated": "Calificación 5 Estrellas",
+    "free_consult": "Consulta 100% Gratis",
+    "no_win_no_fee": "Si No Gana, No Paga",
+}
+PAGE_CONTENT_DEFAULTS = {"home": DEFAULT_HOME_CONTENT, "sp": DEFAULT_SP_CONTENT}
+
+
+def _merged_page_content(cfg: dict, page: str) -> dict:
+    defaults = PAGE_CONTENT_DEFAULTS[page]
+    stored = (cfg or {}).get(f"{page}_content") or {}
+    return {**defaults, **{k: v for k, v in stored.items() if k in defaults}}
+
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
@@ -554,6 +580,7 @@ def _username_from_request(request: Request) -> str:
 # Friendly labels for change-history entries, derived from method + path.
 _CHANGE_RULES = [
     ("PUT", r"/admin/pa-content$", "Edited PA page content"),
+    ("PUT", r"/admin/page-content/[^/]+$", "Edited page content"),
     ("PUT", r"/admin/config$", "Updated settings"),
     ("PUT", r"/admin/spanish$", "Edited Spanish hooks"),
     ("PUT", r"/admin/pages$", "Updated pages directory"),
@@ -666,6 +693,40 @@ async def update_pa_content(body: dict, _: dict = Depends(require_editor)):
     return _merged_pa_content(cfg)
 
 
+@api_router.get("/page-content/{page}")
+async def get_page_content_public(page: str):
+    """Public: editable copy (CTA, tooltip, trust badges) for the Home/Spanish page."""
+    if page not in PAGE_CONTENT_DEFAULTS:
+        raise HTTPException(status_code=404, detail="Unknown page")
+    cfg = await get_or_create_config()
+    return _merged_page_content(cfg, page)
+
+
+@api_router.get("/admin/page-content/{page}")
+async def get_page_content_admin(page: str, _: dict = Depends(require_admin)):
+    if page not in PAGE_CONTENT_DEFAULTS:
+        raise HTTPException(status_code=404, detail="Unknown page")
+    cfg = await get_or_create_config()
+    return _merged_page_content(cfg, page)
+
+
+@api_router.put("/admin/page-content/{page}")
+async def update_page_content(page: str, body: dict, _: dict = Depends(require_editor)):
+    if page not in PAGE_CONTENT_DEFAULTS:
+        raise HTTPException(status_code=404, detail="Unknown page")
+    defaults = PAGE_CONTENT_DEFAULTS[page]
+    update = {k: v.strip() for k, v in (body or {}).items()
+              if k in defaults and isinstance(v, str)}
+    merged = {**defaults, **update}
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {f"{page}_content": merged, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    cfg = await get_or_create_config()
+    return _merged_page_content(cfg, page)
+
+
 @api_router.post("/track/click")
 async def track_click(body: ClickTrack, request: Request):
     """Record a click/visit, de-duplicated per session_id. Captures full Google
@@ -765,12 +826,15 @@ def _weighted_variant(variants: list, seed: str) -> dict:
 
 
 @api_router.get("/split/decide")
-async def split_decide(session: str = Query("", description="visitor session id")):
-    """Decide which page a visitor should see for the currently RUNNING experiment.
-    Stable per session. When no experiment is running, everyone goes Home. The
-    returned experiment_id + variant are stamped on the visitor's click/lead so
-    the Split Test stats count ONLY traffic that came through /split."""
-    exp = await db.experiments.find_one({"status": "running"})
+async def split_decide(slug: str = Query("split", description="split entry slug"),
+                       session: str = Query("", description="visitor session id")):
+    """Decide which page a visitor should see for the RUNNING experiment bound to
+    this entry slug (e.g. /split, /split2). Stable per session. When no experiment
+    is running on this slug, everyone goes Home. The returned experiment_id +
+    variant are stamped on the visitor's click/lead so Split Test stats count
+    ONLY traffic that came through that split URL."""
+    slug = (slug or "split").strip().lower() or "split"
+    exp = await db.experiments.find_one({"status": "running", "slug": slug})
     if not exp:
         return {"running": False, "target": "/", "experiment_id": "", "variant": ""}
     variants = exp.get("variants", [])
@@ -1299,6 +1363,20 @@ async def _experiment_stats(exp: dict, s_iso: str = "", e_iso: str = "") -> dict
     return {"variants": variants, "winner": winner}
 
 
+async def _next_split_slug() -> str:
+    """First free split entry slug: split, split2, split3, …"""
+    used = set()
+    async for e in db.experiments.find({}, {"slug": 1}):
+        if e.get("slug"):
+            used.add(e["slug"])
+    if "split" not in used:
+        return "split"
+    n = 2
+    while f"split{n}" in used:
+        n += 1
+    return f"split{n}"
+
+
 @api_router.get("/admin/experiments")
 async def list_experiments(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
     docs = await db.experiments.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -1316,7 +1394,7 @@ async def create_experiment(body: ExperimentBody, _: dict = Depends(require_edit
                  "path": "/" + v.path.strip().lstrip("/"),
                  "weight": max(0, int(v.weight))} for v in body.variants]
     exp = {"id": str(uuid.uuid4()), "name": body.name.strip() or "Untitled test",
-           "variants": variants, "status": "draft",
+           "variants": variants, "status": "draft", "slug": await _next_split_slug(),
            "created_at": _now_iso(), "stopped_at": ""}
     await db.experiments.insert_one(dict(exp))
     return exp
@@ -1330,15 +1408,22 @@ async def update_experiment(exp_id: str, body: dict, _: dict = Depends(require_e
     update = {"updated_at": _now_iso()}
     if "name" in body:
         update["name"] = str(body["name"]).strip() or exp.get("name")
+    if "slug" in body:
+        raw = str(body["slug"] or "").strip().lower().lstrip("/")
+        slug = _re.sub(r"[^a-z0-9-]+", "-", raw).strip("-")
+        if not slug:
+            raise HTTPException(status_code=400, detail="The URL slug can't be empty.")
+        clash = await db.experiments.find_one({"slug": slug, "id": {"$ne": exp_id}})
+        if clash:
+            raise HTTPException(status_code=409, detail="That URL is already used by another test.")
+        update["slug"] = slug
     if "variants" in body and isinstance(body["variants"], list):
         update["variants"] = [{"label": (v.get("label") or v.get("path") or "").strip(),
                                "path": "/" + str(v.get("path", "")).strip().lstrip("/"),
                                "weight": max(0, int(v.get("weight", 0)))} for v in body["variants"]]
     if "status" in body and body["status"] in ("draft", "running", "stopped"):
         new_status = body["status"]
-        if new_status == "running":
-            # Only one experiment runs at a time.
-            await db.experiments.update_many({"status": "running"}, {"$set": {"status": "stopped", "stopped_at": _now_iso()}})
+        # Each test runs on its OWN entry URL, so multiple tests can run at once.
         if new_status == "stopped":
             update["stopped_at"] = _now_iso()
         update["status"] = new_status
@@ -2834,6 +2919,30 @@ async def startup():
             )
     except Exception as e:
         logger.error("caller_digits backfill failed: %s", e)
+    # One-time backfill: give every experiment its own split entry slug
+    # (split, split2, …), preferring the running one for the bare "/split".
+    try:
+        missing = await db.experiments.find(
+            {"slug": {"$exists": False}}, {"id": 1, "created_at": 1, "status": 1}).to_list(length=1000)
+        if missing:
+            used = set()
+            async for e in db.experiments.find({"slug": {"$exists": True}}, {"slug": 1}):
+                if e.get("slug"):
+                    used.add(e["slug"])
+
+            def _gen():
+                if "split" not in used:
+                    used.add("split"); return "split"
+                n = 2
+                while f"split{n}" in used:
+                    n += 1
+                used.add(f"split{n}"); return f"split{n}"
+
+            missing.sort(key=lambda d: (d.get("status") != "running", d.get("created_at") or ""))
+            for d in missing:
+                await db.experiments.update_one({"id": d["id"]}, {"$set": {"slug": _gen()}})
+    except Exception as e:
+        logger.error("experiment slug backfill failed: %s", e)
     logger.info("Lemon Pros API started")
 
 

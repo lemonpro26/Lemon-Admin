@@ -18,6 +18,13 @@ export default function Landing({ sourcePage = 'home', pageLang = 'en' }) {
     hook1: t.landing.defaultHook1,
     hook2: t.landing.defaultHook2,
   });
+  const [content, setContent] = useState({
+    tooltip: t.landing.tooltip,
+    cta: t.landing.cta,
+    rated: t.landing.rated,
+    free_consult: t.landing.freeConsult,
+    no_win_no_fee: t.landing.noWinNoFee,
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -64,6 +71,10 @@ export default function Landing({ sourcePage = 'home', pageLang = 'en' }) {
       .catch(() => {
         if (mounted) setLoaded(true);
       });
+    api
+      .get(`/page-content/${sourcePage === 'sp' ? 'sp' : 'home'}`)
+      .then((res) => { if (mounted && res.data) setContent((prev) => ({ ...prev, ...res.data })); })
+      .catch(() => {});
     return () => {
       mounted = false;
     };
@@ -98,20 +109,20 @@ export default function Landing({ sourcePage = 'home', pageLang = 'en' }) {
       <div className="mt-7 sm:mt-9 mx-auto w-full max-w-xl">
         <div className="relative bg-white rounded-2xl shadow-[0_18px_50px_rgba(15,27,61,0.18)] px-5 pt-7 pb-5">
           <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#EF4444] text-white text-sm font-bold px-4 py-1.5 rounded-lg whitespace-nowrap shadow-md after:content-[''] after:absolute after:left-1/2 after:-bottom-1.5 after:-translate-x-1/2 after:border-x-8 after:border-x-transparent after:border-t-8 after:border-t-[#EF4444]">
-            {t.landing.tooltip}
+            {content.tooltip}
           </span>
           <button
             onClick={start}
             className="group h-14 w-full px-7 rounded-xl font-bold text-lg bg-[#EF4444] hover:bg-[#DC2626] text-white shadow-[0_10px_24px_rgba(239,68,68,0.35)] transition-colors flex items-center justify-center gap-2"
             data-testid="hero-get-started-button"
           >
-            {t.landing.cta}
+            {content.cta}
             <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
           </button>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-xs sm:text-sm text-slate-500" data-testid="hero-trust-line">
-            <span className="flex items-center gap-1.5"><Star className="h-4 w-4 text-amber-400 fill-amber-400" /> {t.landing.rated}</span>
-            <span className="flex items-center gap-1.5" data-testid="hero-badge-free-consultation"><ShieldCheck className="h-4 w-4 text-emerald-500" /> {t.landing.freeConsult}</span>
-            <span className="flex items-center gap-1.5"><Scale className="h-4 w-4 text-blue-500" /> {t.landing.noWinNoFee}</span>
+            <span className="flex items-center gap-1.5"><Star className="h-4 w-4 text-amber-400 fill-amber-400" /> {content.rated}</span>
+            <span className="flex items-center gap-1.5" data-testid="hero-badge-free-consultation"><ShieldCheck className="h-4 w-4 text-emerald-500" /> {content.free_consult}</span>
+            <span className="flex items-center gap-1.5"><Scale className="h-4 w-4 text-blue-500" /> {content.no_win_no_fee}</span>
           </div>
         </div>
       </div>

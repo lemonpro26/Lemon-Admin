@@ -28,7 +28,6 @@ import { AdminSettings } from '@/components/admin/AdminSettings';
 import { AdminSplitTest } from '@/components/admin/AdminSplitTest';
 import { AdminSpanish } from '@/components/admin/AdminSpanish';
 import { AdminPages } from '@/components/admin/AdminPages';
-import { AdminPAContent } from '@/components/admin/AdminPAContent';
 import { AdminFunnel } from '@/components/admin/AdminFunnel';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
@@ -98,7 +97,10 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [matchedCalls, setMatchedCalls] = useState([]);
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('admin_active_tab') || 'hooks');
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem('admin_active_tab');
+    return saved === 'pacontent' ? 'pages' : (saved || 'hooks');
+  });
 
   const onTabChange = useCallback((v) => {
     setActiveTab(v);
@@ -318,7 +320,6 @@ export default function AdminDashboard() {
             <TabsTrigger value="split" data-testid="admin-tab-split"><FlaskConical className="h-4 w-4 mr-2" /> Split Test</TabsTrigger>
             <TabsTrigger value="spanish" data-testid="admin-tab-spanish"><Languages className="h-4 w-4 mr-2" /> Spanish</TabsTrigger>
             <TabsTrigger value="pages" data-testid="admin-tab-pages"><LayoutGrid className="h-4 w-4 mr-2" /> Pages</TabsTrigger>
-            <TabsTrigger value="pacontent" data-testid="admin-tab-pacontent"><FileText className="h-4 w-4 mr-2" /> PA Page</TabsTrigger>
             <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.total_calls ?? 0})</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
@@ -354,11 +355,6 @@ export default function AdminDashboard() {
           {/* PAGES */}
           <TabsContent value="pages">
             <AdminPages />
-          </TabsContent>
-
-          {/* PA PAGE CONTENT */}
-          <TabsContent value="pacontent">
-            <AdminPAContent />
           </TabsContent>
 
           {/* CALLS */}

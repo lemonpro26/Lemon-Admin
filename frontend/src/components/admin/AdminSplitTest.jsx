@@ -34,10 +34,15 @@ function VariantStatsRow({ v, isWinner }) {
   );
 }
 
-function ExperimentCard({ exp, canEdit, onStart, onStop, onDelete, onRename }) {
+function ExperimentCard({ exp, origin, canEdit, onStart, onStop, onDelete, onRename, onEditSlug }) {
   const stats = exp.stats || { variants: [], winner: null };
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(exp.name);
+  const [slugEditing, setSlugEditing] = useState(false);
+  const [slugDraft, setSlugDraft] = useState(exp.slug || 'split');
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const url = `${origin}/${exp.slug || 'split'}`;
 
   const startEdit = () => { setDraftName(exp.name); setEditing(true); };
   const cancelEdit = () => setEditing(false);
@@ -46,6 +51,21 @@ function ExperimentCard({ exp, canEdit, onStart, onStop, onDelete, onRename }) {
     if (!next || next === exp.name) { setEditing(false); return; }
     await onRename(exp, next);
     setEditing(false);
+  };
+
+  const startSlugEdit = () => { setSlugDraft(exp.slug || 'split'); setSlugEditing(true); };
+  const cancelSlugEdit = () => setSlugEditing(false);
+  const saveSlugEdit = async () => {
+    const next = (slugDraft || '').trim().toLowerCase();
+    if (!next || next === exp.slug) { setSlugEditing(false); return; }
+    await onEditSlug(exp, next);
+    setSlugEditing(false);
+  };
+
+  const copyUrl = () => {
+    navigator.clipboard.writeText(url);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 1500);
   };
 
   return (
@@ -98,6 +118,38 @@ function ExperimentCard({ exp, canEdit, onStart, onStop, onDelete, onRename }) {
         )}
       </div>
 
+      {/* Per-test entry URL (editable) */}
+      <div className="mt-3 flex items-center gap-2 flex-wrap" data-testid={`exp-url-row-${exp.id}`}>
+        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Entry URL</span>
+        {slugEditing ? (
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-slate-400">{origin}/</span>
+            <Input
+              value={slugDraft}
+              onChange={(e) => setSlugDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveSlugEdit(); if (e.key === 'Escape') cancelSlugEdit(); }}
+              autoFocus
+              className="h-8 w-44 rounded-lg border-slate-200"
+              data-testid={`exp-slug-input-${exp.id}`}
+            />
+            <Button size="sm" onClick={saveSlugEdit} className="rounded-lg bg-[#0F1B3D] px-2 h-8" data-testid={`exp-slug-save-${exp.id}`}><Check className="h-4 w-4" /></Button>
+            <Button size="sm" variant="outline" onClick={cancelSlugEdit} className="rounded-lg border-slate-200 px-2 h-8" data-testid={`exp-slug-cancel-${exp.id}`}><X className="h-4 w-4" /></Button>
+          </div>
+        ) : (
+          <>
+            <code className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-800" data-testid={`exp-url-${exp.id}`}>{url}</code>
+            <Button size="sm" variant="outline" onClick={copyUrl} className="rounded-lg border-slate-200 h-8 px-2" data-testid={`exp-url-copy-${exp.id}`}>
+              {copiedUrl ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+            </Button>
+            {canEdit && (
+              <button onClick={startSlugEdit} className="text-slate-400 hover:text-[#0F1B3D] transition-colors" aria-label="Edit URL" data-testid={`exp-slug-edit-${exp.id}`}>
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
       <div className="mt-4">
         <div className="grid grid-cols-[1.4fr_repeat(4,1fr)] gap-2 px-3 pb-1 text-[11px] uppercase tracking-wide text-slate-400 font-bold">
           <div>Page</div><div className="text-center">Split</div><div className="text-center">Visits</div><div className="text-center">Leads</div><div className="text-center">Conv.</div>
@@ -108,7 +160,7 @@ function ExperimentCard({ exp, canEdit, onStart, onStop, onDelete, onRename }) {
           ))}
         </div>
         {stats.winner === 'tie' && <p className="mt-2 px-3 text-xs text-amber-600">Variants are tied so far.</p>}
-        {!stats.winner && <p className="mt-2 px-3 text-xs text-slate-400">Need traffic on 2+ variants to call a winner. Stats count only visitors routed through /split.</p>}
+        {!stats.winner && <p className="mt-2 px-3 text-xs text-slate-400">Need traffic on 2+ variants to call a winner. Stats count only visitors routed through this test's entry URL.</p>}
       </div>
     </div>
   );
@@ -119,7 +171,6 @@ export function AdminSplitTest() {
   const [experiments, setExperiments] = useState([]);
   const [pages, setPages] = useState(BUILTIN_PAGES);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [name, setName] = useState('');
   const [variants, setVariants] = useState([
     { label: 'Home (Main)', path: '/', weight: 50 },
@@ -128,7 +179,7 @@ export function AdminSplitTest() {
   const [creating, setCreating] = useState(false);
   const [range, setRange] = useState(todayRange());
 
-  const splitUrl = `${window.location.origin}/split`;
+  const origin = window.location.origin;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -150,12 +201,6 @@ export function AdminSplitTest() {
 
   useEffect(() => { load(); }, [load]);
 
-  const copyUrl = () => {
-    navigator.clipboard.writeText(splitUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
   const setVariant = (i, patch) => setVariants((prev) => prev.map((v, idx) => (idx === i ? { ...v, ...patch } : v)));
   const addVariant = () => setVariants((prev) => [...prev, { label: pages[0].label, path: pages[0].path, weight: 0 }]);
   const removeVariant = (i) => setVariants((prev) => prev.filter((_, idx) => idx !== i));
@@ -164,8 +209,8 @@ export function AdminSplitTest() {
     if (variants.length < 2) { toast.error('Add at least 2 pages to test.'); return; }
     setCreating(true);
     try {
-      await api.post('/admin/experiments', { name: name.trim() || 'Untitled test', variants });
-      toast.success('Test created');
+      const res = await api.post('/admin/experiments', { name: name.trim() || 'Untitled test', variants });
+      toast.success(`Test created — entry URL: /${res.data?.slug || 'split'}`);
       setName('');
       load();
     } catch (e) {
@@ -187,6 +232,10 @@ export function AdminSplitTest() {
     try { await api.put(`/admin/experiments/${exp.id}`, { name: newName }); toast.success('Test renamed'); load(); }
     catch (e) { toast.error('Failed to rename'); }
   };
+  const editSlug = async (exp, newSlug) => {
+    try { await api.put(`/admin/experiments/${exp.id}`, { slug: newSlug }); toast.success('Entry URL updated'); load(); }
+    catch (e) { toast.error(e?.response?.data?.detail || 'Failed to update URL'); }
+  };
   const deleteExp = async (exp) => {
     if (!window.confirm(`Delete "${exp.name}"? Its results will be lost.`)) return;
     try { await api.delete(`/admin/experiments/${exp.id}`); toast.success('Deleted'); load(); }
@@ -199,26 +248,20 @@ export function AdminSplitTest() {
     <div className="space-y-6" data-testid="admin-split-test">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-slate-500 flex items-center gap-2">
-          <FlaskConical className="h-4 w-4" /> A/B test any of your pages. Stats below count ONLY visitors routed through /split.
+          <FlaskConical className="h-4 w-4" /> A/B test any of your pages. Each test has its own entry URL (e.g. <code>/split</code>, <code>/split2</code>) — point a Google Ads campaign at it. Many tests can run at once.
         </p>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <code className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-800" data-testid="split-url">{splitUrl}</code>
-          <Button variant="outline" onClick={copyUrl} className="rounded-xl" data-testid="split-copy-button">
-            {copied ? <Check className="h-4 w-4 mr-1 text-emerald-600" /> : <Copy className="h-4 w-4 mr-1" />}{copied ? 'Copied' : 'Copy'}
-          </Button>
-        </div>
       </div>
 
       {/* Stats date filter */}
       <div className="flex items-center gap-2 flex-wrap" data-testid="split-date-filter">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 mr-1">Stats period</span>
         <DateRangeFilter value={range} onChange={setRange} />
-        <span className="text-xs text-slate-400">Counts only visitors routed through /split</span>
+        <span className="text-xs text-slate-400">Counts only visitors routed through each test's entry URL</span>
       </div>
 
       {!loading && running.length === 0 && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-700" data-testid="split-no-running">
-          No test is currently running — everyone who hits <code>/split</code> goes to Home. Start a test below to begin routing.
+          No tests are running yet. Each test below has its own entry URL — start one to begin routing visitors who hit that URL.
         </div>
       )}
 
@@ -259,7 +302,7 @@ export function AdminSplitTest() {
             <Button variant="outline" size="sm" onClick={addVariant} className="rounded-lg" data-testid="split-add-variant"><Plus className="h-4 w-4 mr-1" /> Add page</Button>
             <Button onClick={createTest} disabled={creating} className="rounded-xl bg-[#0F1B3D]" data-testid="split-create-button">{creating ? 'Creating…' : 'Create test'}</Button>
           </div>
-          <p className="mt-2 text-xs text-slate-400">Weights are relative — they don't have to add to 100. Start a test to make it live on /split (only one runs at a time).</p>
+          <p className="mt-2 text-xs text-slate-400">Weights are relative — they don't have to add to 100. Each test gets its own entry URL (auto-generated, e.g. <code>/split2</code>) which you can rename. Start a test to make it live; multiple tests can run at once.</p>
         </div>
       )}
 
@@ -273,7 +316,7 @@ export function AdminSplitTest() {
         ) : (
           <div className="space-y-4">
             {experiments.map((exp) => (
-              <ExperimentCard key={exp.id} exp={exp} canEdit={canEdit} onStart={startExp} onStop={stopExp} onDelete={deleteExp} onRename={renameExp} />
+              <ExperimentCard key={exp.id} exp={exp} origin={origin} canEdit={canEdit} onStart={startExp} onStop={stopExp} onDelete={deleteExp} onRename={renameExp} onEditSlug={editSlug} />
             ))}
           </div>
         )}

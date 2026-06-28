@@ -1,42 +1,58 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { LayoutGrid, Copy, Check, ExternalLink, Plus, Trash2, Save, Home as HomeIcon, FileText, Languages, FlaskConical, Link as LinkIcon } from 'lucide-react';
+import { LayoutGrid, Copy, Check, ExternalLink, Plus, Trash2, Save, Home as HomeIcon, FileText, Languages, FlaskConical, Link as LinkIcon, Pencil, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AdminPAContent } from '@/components/admin/AdminPAContent';
+import { AdminPageContent } from '@/components/admin/AdminPageContent';
 
-// Built-in pages that ship with the app (real routes).
+// Built-in pages that ship with the app (real routes). `editor` marks pages with
+// an inline content CMS (preview + publish).
 const BUILTINS = [
-  { key: 'home', label: 'Home (Main Landing)', path: '/', icon: HomeIcon, desc: 'Primary English landing page.' },
-  { key: 'pa', label: 'PA Advertorial', path: '/pa', icon: FileText, desc: 'Presell / advertorial page (source = lapa).' },
-  { key: 'sp', label: 'Spanish Landing', path: '/sp', icon: Languages, desc: 'Full Spanish funnel (source = sp).' },
-  { key: 'split', label: 'A/B Split Test Entry', path: '/split', icon: FlaskConical, desc: 'Routes visitors between Home & PA by your split weight.' },
+  { key: 'home', label: 'Home (Main Landing)', path: '/', icon: HomeIcon, desc: 'Primary English landing page.', editor: 'home' },
+  { key: 'pa', label: 'PA Advertorial', path: '/pa', icon: FileText, desc: 'Presell / advertorial page (source = lapa).', editor: 'pa' },
+  { key: 'sp', label: 'Spanish Landing', path: '/sp', icon: Languages, desc: 'Full Spanish funnel (source = sp).', editor: 'sp' },
+  { key: 'split', label: 'A/B Split Test Entry', path: '/split', icon: FlaskConical, desc: 'Routes visitors between pages by your split weight (managed in the Split Test tab).' },
 ];
 
-function PageRow({ icon: Icon, label, desc, path, origin, onDelete, testid }) {
+function PageRow({ icon: Icon, label, desc, path, origin, onDelete, onEdit, canEdit, testid }) {
   const [copied, setCopied] = useState(false);
   const url = `${origin}${path}`;
-  const copy = () => {
+  const copy = (e) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4" data-testid={testid}>
+    <div
+      className={`flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 ${onEdit ? 'cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all' : ''}`}
+      onClick={onEdit || undefined}
+      data-testid={testid}
+    >
       <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
         <Icon className="h-5 w-5 text-[#0F1B3D]" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="font-slab font-bold text-slate-900 truncate">{label}</div>
+        <div className="font-slab font-bold text-slate-900 truncate flex items-center gap-2">
+          {label}
+          {onEdit && <span className="text-[10px] font-sans font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">Editable</span>}
+        </div>
         {desc && <div className="text-xs text-slate-500 truncate">{desc}</div>}
         <code className="text-xs text-slate-600 break-all">{url}</code>
       </div>
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {onEdit && canEdit && (
+          <Button variant="outline" size="sm" className="rounded-lg border-slate-200" onClick={onEdit} data-testid={`${testid}-edit`}>
+            <Pencil className="h-4 w-4 mr-1.5" /> Edit
+          </Button>
+        )}
         <Button variant="outline" size="sm" className="rounded-lg border-slate-200" onClick={copy} data-testid={`${testid}-copy`}>
           {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
         </Button>
-        <a href={url} target="_blank" rel="noreferrer" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50" data-testid={`${testid}-open`} title="Open page">
+        <a href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50" data-testid={`${testid}-open`} title="Open page">
           <ExternalLink className="h-4 w-4" />
         </a>
         {onDelete && (
@@ -57,6 +73,7 @@ export function AdminPages() {
   const [saving, setSaving] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newPath, setNewPath] = useState('');
+  const [editing, setEditing] = useState(null); // BUILTINS entry being edited
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,10 +112,29 @@ export function AdminPages() {
 
   const removePage = (id) => persist(custom.filter((p) => p.id !== id));
 
+  // ---- Editor sub-view ----
+  if (editing) {
+    return (
+      <div className="space-y-5" data-testid="admin-pages-editor">
+        <button
+          onClick={() => setEditing(null)}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+          data-testid="pages-editor-back"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to all pages
+        </button>
+        <div className="font-slab font-bold text-xl text-slate-900 flex items-center gap-2">
+          <editing.icon className="h-5 w-5 text-[#0F1B3D]" /> Editing: {editing.label}
+        </div>
+        {editing.editor === 'pa' ? <AdminPAContent /> : <AdminPageContent page={editing.editor} />}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" data-testid="admin-pages">
       <p className="text-sm text-slate-500 flex items-center gap-2">
-        <LayoutGrid className="h-4 w-4" /> All your page links in one place. Copy a URL to use as a Google Ads final URL or to share.
+        <LayoutGrid className="h-4 w-4" /> Edit a page's content, copy its URL for Google Ads, or save extra links.
       </p>
 
       {/* Built-in pages */}
@@ -106,7 +142,17 @@ export function AdminPages() {
         <div className="font-slab font-bold text-slate-900 mb-3">Live Pages</div>
         <div className="grid gap-3">
           {BUILTINS.map((p) => (
-            <PageRow key={p.key} icon={p.icon} label={p.label} desc={p.desc} path={p.path} origin={origin} testid={`page-builtin-${p.key}`} />
+            <PageRow
+              key={p.key}
+              icon={p.icon}
+              label={p.label}
+              desc={p.desc}
+              path={p.path}
+              origin={origin}
+              canEdit={canEdit}
+              onEdit={p.editor ? () => setEditing(p) : null}
+              testid={`page-builtin-${p.key}`}
+            />
           ))}
         </div>
       </div>

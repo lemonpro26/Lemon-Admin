@@ -51,6 +51,9 @@ function App() {
           <Route path="/do-not-sell" element={<LegalPage />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          {/* Split-test entry slugs: /split, /split2, /split3, or custom. Must stay
+              last so all explicit routes above take precedence. */}
+          <Route path="/:splitSlug" element={<SplitEntry />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-center" richColors />

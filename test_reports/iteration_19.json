@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 19 batch (Pages as editing hub + multi-running Split Tests with per-URL slugs) verified end-to-end. Backend: 10/10 pytest pass — GET /api/page-content/{home|sp} return all 5 string fields (cta/tooltip/rated/free_consult/no_win_no_fee), /api/page-content/bogus returns 404, admin endpoint requires auth, PUT /admin/page-content/home round-trips (public GET reflects change, restore confirmed); /admin/pa-content GET still works (regression); split slug auto-gen produces unique sequential slugs (split, split2), PUT /admin/experiments slug accepts sanitized custom value (test-iter19-…), rejects clash with 409 ‘That URL is already used by another test.’, rejects empty slug with 400; both experiments transition to status=running simultaneously and /api/split/decide?slug=<each> returns running=true with correct experiment_id and target ∈ variants, unknown slug returns {running:false, target:'/'}. Frontend (Playwright): PA top-level tab REMOVED (admin-tab-pacontent count=0), Pages tab opens admin-pages with all 4 rows (page-builtin-home/pa/sp/split), Editable badge + Edit button on home/pa/sp (page-builtin-home-edit/-pa-edit/-sp-edit), split row has NO edit button; clicking Edit on Home opens admin-page-content-home with all 5 fields, preview toggle, Save & Publish; changing CTA to ‘TEST CTA 123’ + Save shows toast ‘Home page updated — live now’ and the public ‘/’ hero-get-started-button reflects the new CTA, then restoration to ‘Check If Your Car Qualifies’ verified; PA editor renders admin-pa-content + pa-content-save inside Pages hub; Spanish editor renders admin-page-content-sp with all 5 fields. Split Test: created 2 tests, both show unique URLs (/split, /split2), both started → both show ‘Running’ badge & Stop button simultaneously; slug edit (exp-slug-edit/-input/-save) to custom value surfaces ‘Entry URL updated’ toast; setting the same slug on the second test shows clash toast ‘That URL is already used by another test.’ without crash; public visit to the custom slug redirects to a variant page (landed on ‘/’ with se/sv query params), unknown path /zzznope-iter19 redirects to ‘/’ with hero-get-started-button rendered (not blank); direct nav to /, /pa, /sp all still load (catch-all does not shadow). Cleanup: all TEST_ experiments deleted (via API), Home CTA restored to canonical ‘Check If Your Car Qualifies’.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminSplitTest.jsx line ~289", "issues": ["React hydration warning carried over from iter17: <span style='display:contents'> injected inside <option> in the page-target <select>. Harmless at runtime; dev-only annotation. Already documented in iter17 report."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration19_features.py",
+    "/app/test_reports/pytest/iter19_features.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 2952 lines — router split (auth/hooks/leads/calls/spanish/funnel/analytics/pa-content/page-content/users/split/google-ads) is still overdue. Repeated from prior iterations.",
+    "_next_split_slug scans the whole experiments collection on every create (O(n)). Fine at current scale; if experiments ever grow large, consider an index on slug + a small counter doc.",
+    "/admin/page-content PUT silently drops keys not present in PAGE_CONTENT_DEFAULTS — good defensive behavior; just worth a unit test if defaults change.",
+    "Frontend AdminPages.jsx — clicking on a row body triggers onEdit; clicks on inner buttons correctly stopPropagation. The 'A/B Split Test Entry' row is not clickable (onEdit=null) — confirmed by data-testid presence/absence.",
+    "Catch-all route '/:splitSlug' is correctly placed last in App.js; all explicit routes (/, /pa, /sp, /admin) take precedence — confirmed by direct navigation test."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration19_features.py",
+    "/app/test_reports/iteration_19.json"
+  ],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (all spec items verified)"},
+  "test_credentials": "owner / LemonPros2026!  (unchanged)",
+  "seed_data_creation": "Created 2 TEST_iter19_* split experiments via UI, exercised slug edit + clash + multi-run + public routing flows, then deleted both via API at the end (verified 0 TEST_ experiments remain). Home CTA was temporarily set to 'TEST CTA 123' and restored to 'Check If Your Car Qualifies' (verified via public GET /api/page-content/home). No residual test data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iteration19_features.py is a clean regression for: (a) public + admin /page-content endpoints with home/sp + restoration pattern, (b) PA content regression, (c) split slug auto-gen + edit + uniqueness 409 + empty 400, (d) multi-run experiments via PUT status=running, (e) /split/decide per-slug routing + unknown-slug behavior. Reuse as-is. Frontend Playwright covered every testid in the spec: admin-tab-pacontent absent, page-builtin-home/pa/sp/split + corresponding -edit buttons (split has none), admin-page-content-home/sp + all 5 page-field-{page}-{key}, page-content-save-{page}, page-content-preview-toggle-{page}, pages-editor-back, admin-pa-content + pa-content-save inside Pages hub, hero-get-started-button reflects CMS, exp-url-<id>, exp-start-<id>, exp-slug-edit/-input/-save-<id>, exp-delete-<id>, plus public catch-all redirect to '/' for unknown slugs and variant pages for running slugs. NOTE: backend lists experiments newest-first, so when iterating exp-url-* elements the most recently created comes first; tests should not assume index order maps to creation order beyond that.",
+  "rca of the issue": "N/A — no bugs found. All features in the iter-19 batch work end-to-end on the preview environment."
+}
