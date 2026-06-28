@@ -166,7 +166,6 @@ export const AdminCalls = () => {
               </button>
             )}
           </div>
-          {!debouncedSearch.trim() && <DateRangeFilter value={range} onChange={setRange} />}
           {editable && (
             <Button variant="outline" size="sm" onClick={addTestCall} className="rounded-xl border-slate-200" data-testid="calls-add-test">
               <Plus className="h-4 w-4 mr-2" /> Test call
@@ -175,6 +174,7 @@ export const AdminCalls = () => {
           <Button variant="outline" size="sm" onClick={() => load()} className="rounded-xl border-slate-200" data-testid="calls-refresh">
             <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
+          {!debouncedSearch.trim() && <DateRangeFilter value={range} onChange={setRange} />}
         </div>
       </div>
 
