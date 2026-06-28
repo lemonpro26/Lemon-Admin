@@ -31,6 +31,29 @@ def is_configured() -> bool:
                 c["refresh_token"], c["customer_id"]])
 
 
+def check_connection() -> dict:
+    """Verify the OAuth refresh token can still mint an access token. Used by the
+    admin dashboard to warn early if Google Ads has disconnected (token revoked
+    or expired) instead of failing with a raw error later."""
+    if not is_configured():
+        return {"connected": False, "configured": False, "reason": "not_configured"}
+    try:
+        _access_token(_cfg())
+        return {"connected": True, "configured": True, "reason": ""}
+    except requests.HTTPError as e:
+        body = ""
+        try:
+            body = e.response.text or ""
+        except Exception:
+            body = ""
+        reason = "invalid_grant" if "invalid_grant" in body else "auth_error"
+        logger.warning("Google Ads connection check failed: %s", body[:200])
+        return {"connected": False, "configured": True, "reason": reason}
+    except Exception as e:
+        logger.warning("Google Ads connection check error: %s", e)
+        return {"connected": False, "configured": True, "reason": "network_error"}
+
+
 def _access_token(c) -> str:
     resp = requests.post(_TOKEN_URL, data={
         "client_id": c["client_id"],

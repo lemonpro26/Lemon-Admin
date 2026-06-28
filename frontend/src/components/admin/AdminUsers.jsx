@@ -45,6 +45,10 @@ export const AdminUsers = ({ canEdit }) => {
   const [oc, setOc] = useState({ current_password: '', new_username: '', new_password: '' });
   const [ocBusy, setOcBusy] = useState(false);
 
+  // Non-owner self-service login change.
+  const [mc, setMc] = useState({ current_password: '', new_username: '', new_password: '' });
+  const [mcBusy, setMcBusy] = useState(false);
+
   const [activityUser, setActivityUser] = useState(null);
   const [activity, setActivity] = useState(null);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -64,6 +68,28 @@ export const AdminUsers = ({ canEdit }) => {
   };
 
   useEffect(() => { setOc((o) => ({ ...o, new_username: getUsername() })); }, []);
+  useEffect(() => { setMc((m) => ({ ...m, new_username: getUsername() })); }, []);
+
+  const saveMyCreds = async () => {
+    if (!mc.current_password) { toast.error('Enter your current password to confirm.'); return; }
+    const body = { current_password: mc.current_password };
+    const u = (mc.new_username || '').trim();
+    if (u && u !== getUsername()) body.new_username = u;
+    if (mc.new_password) body.new_password = mc.new_password;
+    if (!body.new_username && !body.new_password) { toast.error('Change the username or password first.'); return; }
+    setMcBusy(true);
+    try {
+      const res = await api.put('/admin/my-credentials', body);
+      if (res.data?.token) setSession({ token: res.data.token, role: res.data.role || getRole(), username: res.data.username });
+      toast.success('Your login was updated.');
+      setMc({ current_password: '', new_username: res.data?.username || getUsername(), new_password: '' });
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Could not update your login.');
+    } finally {
+      setMcBusy(false);
+    }
+  };
 
   const saveOwnerCreds = async () => {
     if (!oc.current_password) { toast.error('Enter your current password to confirm.'); return; }
@@ -174,6 +200,35 @@ export const AdminUsers = ({ canEdit }) => {
           <div className="mt-4">
             <Button onClick={saveOwnerCreds} disabled={ocBusy} className="h-10 rounded-lg bg-amber-500 hover:bg-amber-600 text-white" data-testid="owner-creds-save">
               <KeyRound className="h-4 w-4 mr-2" /> {ocBusy ? 'Saving\u2026' : 'Update Master Login'}
+            </Button>
+          </div>
+        </div>
+      )}
+      {!isOwner && (
+        <div className="bg-white rounded-2xl border border-sky-200 shadow-sm p-6" data-testid="my-creds-card">
+          <h2 className="font-slab font-bold text-lg text-slate-900 flex items-center gap-2">
+            <KeyRound className="h-5 w-5 text-sky-500" /> My Login
+          </h2>
+          <p className="text-sm text-slate-500 mt-1 mb-4">
+            Change your own username and password. Enter your current password to confirm. You stay signed in after saving.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-3 items-end">
+            <div>
+              <Label className="text-xs text-slate-600">New username</Label>
+              <Input value={mc.new_username} onChange={(e) => setMc({ ...mc, new_username: e.target.value })} placeholder="username" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="my-new-username" />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-600">New password (leave blank to keep)</Label>
+              <Input type="text" value={mc.new_password} onChange={(e) => setMc({ ...mc, new_password: e.target.value })} placeholder="new password" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="my-new-password" />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-600">Current password</Label>
+              <Input type="password" value={mc.current_password} onChange={(e) => setMc({ ...mc, current_password: e.target.value })} placeholder="confirm current" className="mt-1 h-10 rounded-lg border-slate-200" data-testid="my-current-password" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <Button onClick={saveMyCreds} disabled={mcBusy} className="h-10 rounded-lg bg-sky-600 hover:bg-sky-700 text-white" data-testid="my-creds-save">
+              <KeyRound className="h-4 w-4 mr-2" /> {mcBusy ? 'Saving\u2026' : 'Update My Login'}
             </Button>
           </div>
         </div>

@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 18 batch (P0 Google Ads disconnect handling, P1 non-owner self-service credentials, P1 Spanish active hooks summary) verified end-to-end. Backend: 4/4 pytest pass — GET /api/admin/google-ads/health returns {connected:bool, configured:bool, reason} (token currently connected, banner correctly hidden in UI); PUT /api/admin/my-credentials rejects owners (400 'Master Admin Credentials'), rejects wrong current_password (401 'Current password is incorrect.'), and on correct current_password re-issues a JWT with the new password (old pw → 401, new pw → 200). Frontend: 19/19 Playwright checks pass — ga-disconnect-banner NOT visible while connected=true (correct), Spanish tab shows spanish-active-hooks card with spanish-active-hooks-count ('0 live') and the default catch-all row spanish-active-hook-default with Visits/Leads/Conv% columns. Owner sees owner-creds-card and does NOT see my-creds-card. Non-owner editor (created via UI as TEST user) sees my-creds-card with all four required testids (my-new-username, my-new-password, my-current-password, my-creds-save) and does NOT see owner-creds-card. Wrong current-password attempt produces toast 'Current password is incorrect.' and does NOT change credentials (old password still logs in). Correct current-password attempt shows 'Your login was updated.', then logout → login with the new password succeeds, and the OLD password is rejected. Test user fully deleted as owner at end (Team Members now shows only owner). No raw error toasts observed on Analytics regression path.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration18_features.py",
+    "/app/test_reports/pytest/iter18_features.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 2843 lines — splitting into routers (auth, hooks, leads, calls, spanish, funnel, analytics, pa-content, users, split, google-ads) is still recommended. Echoes prior iteration's review.",
+    "MyCredsUpdate / OwnerCredsUpdate are duplicated Pydantic models — could be unified or DRY'd, since only the role gate differs in the handlers.",
+    "google-ads/health uses a 5-minute in-memory cache (_ga_health_cache). Fine for single-instance, but will diverge across pods if the backend ever scales horizontally. Acceptable for current scope; just flagging.",
+    "Frontend AdminUsers.jsx — toast IDs are inferred from generic <li> selectors in test; the implementation correctly uses sonner toasts and surfaces backend detail messages verbatim ('Current password is incorrect.', 'Your login was updated.')."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration18_features.py",
+    "/app/test_reports/iteration_18.json"
+  ],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100% (19/19)"},
+  "test_credentials": "owner / LemonPros2026!  (per /app/memory/test_credentials.md, unchanged)",
+  "seed_data_creation": "Created one test editor account ('testiter18uied') via UI as owner, exercised wrong-pw and correct-pw flows on /admin/my-credentials, then deleted via the user-delete-testiter18uied button (confirmed by 'Removed testiter18uied' toast and absence of the row in Team Members). Backend pytest also creates+deletes the same logical user under a separate username 'TEST_iter18_editor' via /api/admin/users CRUD. No residual test users remain (only 'owner').",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iteration18_features.py is a clean regression for: (a) google-ads/health response shape, (b) PUT /admin/my-credentials owner-forbidden, wrong-current-password rejection, and correct-current-password change-and-relogin flow. Reuse as-is. Frontend Playwright covered every testid in the spec: ga-disconnect-banner (hidden when health.connected=true), spanish-active-hooks/-count/-default, owner-creds-card vs my-creds-card role-based visibility, my-new-username/my-new-password/my-current-password/my-creds-save, plus end-to-end logout/relogin with new password. Note: Settings tab opens to the 'integrations' sub-tab by default; click settings-tab-users to reveal the Users panel containing the cred cards. Google Ads OAuth refresh token is still connected (connected=true) so the disconnect banner is correctly suppressed.",
+  "rca of the issue": "N/A — no bugs found. All three features in the iteration-18 batch work end-to-end on the preview environment."
+}

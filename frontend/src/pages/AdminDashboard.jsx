@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid, Filter,
-  FileText, Percent, Sigma, Search, X,
+  FileText, Percent, Sigma, Search, X, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, TOKEN_KEY, clearSession, canEdit as canEditFn, getRole, getUsername } from '@/lib/api';
@@ -88,6 +88,8 @@ export default function AdminDashboard() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [gaStatus, setGaStatus] = useState(null);
+  const [gaHealth, setGaHealth] = useState(null);
+  const [gaBannerDismissed, setGaBannerDismissed] = useState(false);
   const [saleAmount, setSaleAmount] = useState('');
   const [saleCurrency, setSaleCurrency] = useState('USD');
   const [marking, setMarking] = useState(false);
@@ -146,6 +148,13 @@ export default function AdminDashboard() {
     } catch (e) { /* non-blocking */ }
   }, []);
 
+  const loadGaHealth = useCallback(async () => {
+    try {
+      const g = await api.get('/admin/google-ads/health');
+      setGaHealth(g.data);
+    } catch (e) { /* non-blocking */ }
+  }, []);
+
   const loadStats = useCallback(async () => {
     try {
       const res = await api.get('/admin/stats', { params: { start: range.start, end: range.end } });
@@ -160,6 +169,7 @@ export default function AdminDashboard() {
   }, [navigate]);
 
   useEffect(() => { loadGaStatus(); }, [loadGaStatus]);
+  useEffect(() => { loadGaHealth(); }, [loadGaHealth]);
   useEffect(() => { loadLeads(); }, [loadLeads]);
   useEffect(() => { loadStats(); }, [loadStats]);
 
@@ -283,6 +293,23 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        {gaHealth && gaHealth.connected === false && gaHealth.configured === true && !gaBannerDismissed && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="ga-disconnect-banner">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm text-amber-900">
+              <span className="font-semibold">Google Ads is disconnected.</span>{' '}
+              Conversion uploads and live campaign-name syncing are paused. Reconnect by refreshing the Google Ads OAuth token in the backend, then redeploy. Your leads &amp; calls are still being captured normally.
+            </div>
+            <button
+              onClick={() => setGaBannerDismissed(true)}
+              className="text-amber-500 hover:text-amber-800 transition-colors shrink-0"
+              data-testid="ga-disconnect-banner-dismiss"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <Tabs value={activeTab} onValueChange={onTabChange}>
           <TabsList className="mb-6 flex-wrap h-auto">
             <TabsTrigger value="hooks" data-testid="admin-tab-hooks"><Megaphone className="h-4 w-4 mr-2" /> Hooks</TabsTrigger>

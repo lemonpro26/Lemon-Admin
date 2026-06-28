@@ -185,10 +185,12 @@ export const AdminAnalytics = () => {
           toast.success('Campaign names are already up to date.');
         }
       } else if (res.data?.error) {
-        toast.error('Google sync: ' + res.data.error);
+        // Stay silent — the dashboard's Google Ads disconnect banner surfaces this.
+        console.warn('Google sync skipped:', res.data.error);
       }
     } catch (e) {
-      toast.error('Could not sync names from Google Ads.');
+      // Silent: a disconnected token shows a graceful banner, not a red error popup.
+      console.warn('Google sync failed:', e?.message);
     } finally {
       setSyncing(false);
     }

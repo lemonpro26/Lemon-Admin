@@ -1,5 +1,22 @@
 
 
+## 2026-06-28 — Post-redeploy verification (iteration_17, 100% pass)
+Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
+- Header red Call CTA (#EF4444) with phone + CALL NOW/LLAME AHORA on Home/PA/Spanish, desktop+mobile; number visible on mobile; Spanish mobile hides "LEMON LAW HELP" subtitle (Logo hideSubtitle when lang=es); xs non-absolute logo => no overlap at 360/390px. PA header (pa-header-call) updated to match.
+- PA page: attorney badges one-line on desktop; school line bold; red "See If My Car Qualifies" CTA under settlements.
+- Google Ads reconnected: regenerated OAuth refresh token; consent screen set to "In production" (stops 7-day expiry). google_ads_connected=true; sync pulls 6 campaigns/12 adgroups/17 ads/34 sitelinks. NOTE: production GOOGLE_ADS_REFRESH_TOKEN must be set via deployment settings (separate from preview .env).
+- Funnel: Phone Calls box; All-Pages conversion=(leads+calls)/views; per-page "Campaigns feeding [page]" (GET /admin/funnel/campaigns).
+- Split Test: date filter defaults Today; "All time" removed; inline rename after launch; no banner flash.
+- Calls tab: search across all calls (ignores date); Live auto-refresh badge. Leads: Live auto-refresh; IP Address in View Lead (POST /leads stores `ip`).
+- Analytics: per-row Bounce% breakdown popover (Converted/Engaged-no-lead/Bounced); backend returns per-row `bounced`.
+- PA Page CMS tab edits all /pa copy + "See page" preview iframe. Team activity history (owner-only): db.admin_activity; GET /admin/users/{username}/activity. Admin tab persistence (localStorage). Timezone-correct date filtering (client tz_offset).
+
+### Deferred / Known
+- DEFERRED: self-service username/password change for team members in Settings (started, paused; integration_expert consulted; plan: unified /admin/me/credentials PBKDF2+JWT + Settings UI).
+- Dev-only console warning in Split Test (`<span>` in `<select>` editor annotation) — harmless, prod unaffected.
+- server.py ~2779 lines — router refactor pending.
+
+
 ## 2026-06-22 — New bindright-style design shipped to the MAIN site
 - Approved mockup ported to real public pages. Shared chrome updated: SiteHeader
   (navy, centered light lemon logo, "safe & secure" white text, big phone with

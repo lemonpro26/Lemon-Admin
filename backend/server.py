@@ -231,6 +231,12 @@ class OwnerCredsUpdate(BaseModel):
     new_password: Optional[str] = None
 
 
+class MyCredsUpdate(BaseModel):
+    current_password: str
+    new_username: Optional[str] = None
+    new_password: Optional[str] = None
+
+
 class LeadCreate(BaseModel):
     model_config = ConfigDict(extra="ignore")
     zip: Optional[str] = ""
@@ -552,6 +558,7 @@ _CHANGE_RULES = [
     ("PUT", r"/admin/spanish$", "Edited Spanish hooks"),
     ("PUT", r"/admin/pages$", "Updated pages directory"),
     ("PUT", r"/admin/owner-credentials$", "Changed master login"),
+    ("PUT", r"/admin/my-credentials$", "Changed own login"),
     ("PUT", r"/admin/notifications$", "Updated notifications"),
     ("PUT", r"/admin/email-template$", "Edited email template"),
     ("POST", r"/admin/hook-rules/[^/]+/revise$", "Revised a hook"),
@@ -1121,6 +1128,44 @@ async def update_owner_credentials(body: OwnerCredsUpdate, user: dict = Depends(
     final_username = update.get("username") or owner.get("username") or "owner"
     # Re-issue token because the username (token subject) may have changed.
     return {"success": True, "username": final_username, "token": create_token(final_username, "owner")}
+
+
+@api_router.put("/admin/my-credentials")
+async def update_my_credentials(body: MyCredsUpdate, request: Request, user: dict = Depends(require_admin)):
+    """Self-service: any logged-in team member changes their OWN username and/or
+    password. Requires the current password. The owner uses /owner-credentials."""
+    if user.get("role") == "owner":
+        raise HTTPException(status_code=400, detail="Owners use the Master Admin Credentials card.")
+    acct = await db.admin_users.find_one({"username": user["username"]})
+    if not acct:
+        raise HTTPException(status_code=404, detail="Your account was not found.")
+    if not _verify_pw(body.current_password, acct.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Current password is incorrect.")
+
+    update = {}
+    new_username = (body.new_username or "").strip()
+    if new_username and new_username.lower() != user["username"].lower():
+        if new_username.lower() == "owner":
+            raise HTTPException(status_code=400, detail="'owner' is reserved.")
+        owner = await get_owner_account()
+        if new_username.lower() == (owner.get("username") or "owner").lower():
+            raise HTTPException(status_code=409, detail="That username is taken.")
+        if await db.admin_users.find_one({"username": new_username}):
+            raise HTTPException(status_code=409, detail="That username is taken.")
+        update["username"] = new_username
+    if body.new_password:
+        if len(body.new_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+        update["password_hash"] = _hash_pw(body.new_password)
+    if not update:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
+
+    update["updated_at"] = _now_iso()
+    await db.admin_users.update_one({"username": user["username"]}, {"$set": update})
+    final_username = update.get("username") or user["username"]
+    # Re-issue token because the username (token subject) may have changed.
+    return {"success": True, "username": final_username,
+            "token": create_token(final_username, user["role"]), "role": user["role"]}
 
 
 @api_router.post("/admin/users")
@@ -2239,6 +2284,25 @@ async def _upload_lead_conversion(lead: dict, sale: SaleBody) -> dict:
 @api_router.get("/admin/google-ads/status")
 async def google_ads_status(_: dict = Depends(require_admin)):
     return dm.status()
+
+
+_ga_health_cache = {"at": None, "val": None}
+
+
+@api_router.get("/admin/google-ads/health")
+async def google_ads_health(force: bool = False, _: dict = Depends(require_admin)):
+    """Lightweight check that the Google Ads OAuth refresh token still works, so
+    the dashboard can warn early if it disconnected. Cached 5 min to avoid
+    hammering the token endpoint on each banner poll."""
+    now = datetime.now(timezone.utc)
+    cached = _ga_health_cache["val"]
+    if (not force and cached is not None and _ga_health_cache["at"]
+            and (now - _ga_health_cache["at"]).total_seconds() < 300):
+        return cached
+    val = await asyncio.to_thread(gnames.check_connection)
+    _ga_health_cache["at"] = now
+    _ga_health_cache["val"] = val
+    return val
 
 
 @api_router.get("/admin/google-ads/sitelinks")

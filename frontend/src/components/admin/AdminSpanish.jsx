@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Languages, Copy, Check, Save, MousePointerClick, Users, TrendingUp } from 'lucide-react';
+import { Languages, Copy, Check, Save, MousePointerClick, Users, TrendingUp, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -70,6 +70,8 @@ export function AdminSpanish() {
   const [range, setRange] = useState(todayRange());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeHooks, setActiveHooks] = useState([]);
+  const [defaultHook, setDefaultHook] = useState(null);
   const [hook1, setHook1] = useState('');
   const [hook2, setHook2] = useState('');
   const [saving, setSaving] = useState(false);
@@ -84,6 +86,11 @@ export function AdminSpanish() {
       setData(res.data);
       setHook1(res.data.hook1_es || '');
       setHook2(res.data.hook2_es || '');
+      try {
+        const hr = await api.get('/admin/hook-rules', { params: { start: range.start, end: range.end, lang: 'es' } });
+        setActiveHooks((hr.data.rules || []).filter((r) => r.enabled !== false && !r.archived));
+        setDefaultHook(hr.data.default || null);
+      } catch (e) { setActiveHooks([]); setDefaultHook(null); }
     } catch (e) {
       toast.error('Failed to load Spanish page data');
     } finally {
@@ -134,6 +141,63 @@ export function AdminSpanish() {
             {copied ? 'Copied' : 'Copy'}
           </Button>
         </div>
+      </div>
+
+      {/* Active Spanish hooks — at-a-glance summary + performance */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" data-testid="spanish-active-hooks">
+        <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2">
+          <Megaphone className="h-5 w-5 text-[#EF4444]" /> Active Spanish Hooks
+          <span className="ml-1 text-xs font-sans font-medium text-slate-500 bg-slate-100 rounded-full px-2 py-0.5" data-testid="spanish-active-hooks-count">
+            {loading ? '—' : `${activeHooks.length} live`}
+          </span>
+        </div>
+        {loading ? (
+          <div className="p-8 text-center text-slate-400 text-sm">Loading…</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Hook</TableHead>
+                  <TableHead className="text-right">Weight</TableHead>
+                  <TableHead className="text-right">Visits</TableHead>
+                  <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="text-right">Conv. %</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activeHooks.map((r) => (
+                  <TableRow key={r.id} data-testid={`spanish-active-hook-${r.id}`}>
+                    <TableCell className="max-w-md">
+                      <div className="font-medium text-slate-900 truncate">{r.label || '(untitled)'}</div>
+                      <div className="text-xs text-slate-400 truncate">{r.hook1}</div>
+                    </TableCell>
+                    <TableCell className="text-right text-slate-600">{r.weight}%</TableCell>
+                    <TableCell className="text-right">{r.clicks}</TableCell>
+                    <TableCell className="text-right">{r.leads}</TableCell>
+                    <TableCell className={`text-right font-semibold ${r.conversion_rate >= 20 ? 'text-emerald-600' : r.conversion_rate > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                      {r.conversion_rate}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {defaultHook && (
+                  <TableRow className="bg-slate-50/60" data-testid="spanish-active-hook-default">
+                    <TableCell className="max-w-md">
+                      <div className="font-medium text-slate-700 truncate">{defaultHook.label}</div>
+                      <div className="text-xs text-slate-400 truncate">{defaultHook.hook1}</div>
+                    </TableCell>
+                    <TableCell className="text-right text-slate-400">—</TableCell>
+                    <TableCell className="text-right">{defaultHook.clicks}</TableCell>
+                    <TableCell className="text-right">{defaultHook.leads}</TableCell>
+                    <TableCell className={`text-right font-semibold ${defaultHook.conversion_rate >= 20 ? 'text-emerald-600' : defaultHook.conversion_rate > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                      {defaultHook.conversion_rate}%
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       {/* Spanish hook variants (A/B + versioned history, same as Hooks tab) */}
