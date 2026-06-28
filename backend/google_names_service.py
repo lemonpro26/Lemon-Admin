@@ -42,16 +42,30 @@ def check_connection() -> dict:
         return {"connected": True, "configured": True, "reason": ""}
     except requests.HTTPError as e:
         body = ""
+        status = None
         try:
             body = e.response.text or ""
+            status = e.response.status_code
         except Exception:
-            body = ""
-        reason = "invalid_grant" if "invalid_grant" in body else "auth_error"
-        logger.warning("Google Ads connection check failed: %s", body[:200])
-        return {"connected": False, "configured": True, "reason": reason}
+            pass
+        # Only a genuine OAuth auth failure means the token is actually dead.
+        # 5xx / transient errors must NOT raise a false "disconnected" alarm.
+        is_auth_failure = (
+            status in (400, 401, 403)
+            or "invalid_grant" in body
+            or "invalid_client" in body
+            or "unauthorized" in body
+        )
+        if is_auth_failure:
+            reason = "invalid_grant" if "invalid_grant" in body else "auth_error"
+            logger.warning("Google Ads connection check failed (auth): %s", body[:200])
+            return {"connected": False, "configured": True, "reason": reason}
+        logger.warning("Google Ads connection check transient error (%s): %s", status, body[:200])
+        return {"connected": True, "configured": True, "reason": "transient"}
     except Exception as e:
-        logger.warning("Google Ads connection check error: %s", e)
-        return {"connected": False, "configured": True, "reason": "network_error"}
+        # Network blip / timeout — fail OPEN so a momentary hiccup never shows the banner.
+        logger.warning("Google Ads connection check transient error: %s", e)
+        return {"connected": True, "configured": True, "reason": "transient"}
 
 
 def _access_token(c) -> str:

@@ -150,12 +150,26 @@ export default function AdminDashboard() {
     } catch (e) { /* non-blocking */ }
   }, []);
 
-  const loadGaHealth = useCallback(async () => {
+  const loadGaHealth = useCallback(async (force = false) => {
     try {
-      const g = await api.get('/admin/google-ads/health');
+      const g = await api.get(`/admin/google-ads/health${force ? '?force=true' : ''}`);
       setGaHealth(g.data);
+      return g.data;
     } catch (e) { /* non-blocking */ }
   }, []);
+
+  const [gaRechecking, setGaRechecking] = useState(false);
+  const recheckGa = async () => {
+    setGaRechecking(true);
+    const res = await loadGaHealth(true);
+    setGaRechecking(false);
+    if (res && res.connected) {
+      setGaBannerDismissed(true);
+      toast.success('Google Ads is connected.');
+    } else {
+      toast.error('Still disconnected — production OAuth token/credentials need updating.');
+    }
+  };
 
   const loadStats = useCallback(async () => {
     try {
@@ -302,6 +316,14 @@ export default function AdminDashboard() {
               <span className="font-semibold">Google Ads is disconnected.</span>{' '}
               Conversion uploads and live campaign-name syncing are paused. Reconnect by refreshing the Google Ads OAuth token in the backend, then redeploy. Your leads &amp; calls are still being captured normally.
             </div>
+            <button
+              onClick={recheckGa}
+              disabled={gaRechecking}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-white transition-colors disabled:opacity-60"
+              data-testid="ga-disconnect-banner-recheck"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${gaRechecking ? 'animate-spin' : ''}`} /> {gaRechecking ? 'Checking…' : 'Re-check'}
+            </button>
             <button
               onClick={() => setGaBannerDismissed(true)}
               className="text-amber-500 hover:text-amber-800 transition-colors shrink-0"
