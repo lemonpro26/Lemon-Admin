@@ -98,3 +98,13 @@ Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
 - Verified via testing_agent iteration_3.json: 7/7 frontend checks pass.
 - NOTE: user must ensure Google Ads tracking template includes feeditemid={feeditemid} & extensionid={extensionid} for sitelink data.
 - STILL PENDING: user's SMTP credentials for own-server lead emails; CallTrackingMetrics webhook URL paste (needs CTM Admin/Manager role).
+
+## 2026-06-28 — Self-service logins, Google Ads disconnect banner, Spanish hooks summary
+- P0 Graceful Google Ads disconnect: GET /api/admin/google-ads/health (gnames.check_connection, 5-min cache)
+  returns {connected, configured, reason}. AdminDashboard shows a dismissible amber "Google Ads is disconnected"
+  banner only when connected=false & configured=true. AdminAnalytics no longer shows raw red toast on sync failure (silent/console).
+- P1 Non-owner self-service credentials: PUT /api/admin/my-credentials (require_admin; verifies current password,
+  optional new username uniqueness check, new password >=6 chars, re-issues JWT). AdminUsers "My Login" card shown to non-owners only.
+- P1 Spanish active hooks summary: AdminSpanish "Active Spanish Hooks" card fetches /admin/hook-rules?lang=es,
+  lists enabled non-archived ES hooks + default catch-all with weight/visits/leads/conv%.
+- Verified via testing_agent iteration_18.json: backend 4/4, frontend 19/19 pass. No issues.
