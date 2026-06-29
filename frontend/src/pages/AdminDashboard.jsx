@@ -97,6 +97,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [matchedCalls, setMatchedCalls] = useState([]);
+  const [leadSeg, setLeadSeg] = useState('all');
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem('admin_active_tab');
     return saved === 'pacontent' ? 'pages' : (saved || 'hooks');
@@ -108,6 +109,21 @@ export default function AdminDashboard() {
   }, []);
 
   const { sorted: sortedLeads, sortKey, sortDir, toggle } = useSortable(leads, 'created_at', 'desc');
+
+  // Source-page segmentation for the Leads table (Spanish = sp + Spanish PA;
+  // PA = English PA + Spanish PA).
+  const inLeadSeg = (seg, sp) => {
+    const s = (sp || '').toLowerCase();
+    if (seg === 'spanish') return s === 'sp' || s === 'laspa';
+    if (seg === 'pa') return s === 'lapa' || s === 'laspa';
+    return true;
+  };
+  const leadCounts = {
+    all: leads.length,
+    spanish: leads.filter((l) => inLeadSeg('spanish', l.source_page)).length,
+    pa: leads.filter((l) => inLeadSeg('pa', l.source_page)).length,
+  };
+  const shownLeads = sortedLeads.filter((l) => inLeadSeg(leadSeg, l.source_page));
 
   const logout = useCallback(() => {
     clearSession();
@@ -447,12 +463,35 @@ export default function AdminDashboard() {
               ))}
             </div>
 
+            {/* Source segment filters + per-segment counters */}
+            <div className="flex items-center gap-2 flex-wrap mb-4" data-testid="lead-segment-filters">
+              {[
+                { key: 'all', label: 'All', count: leadCounts.all },
+                { key: 'spanish', label: 'Spanish', count: leadCounts.spanish },
+                { key: 'pa', label: 'PA Page', count: leadCounts.pa },
+              ].map((seg) => (
+                <button
+                  key={seg.key}
+                  onClick={() => setLeadSeg(seg.key)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadSeg === seg.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+                  data-testid={`lead-seg-${seg.key}`}
+                >
+                  {seg.label}
+                  <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{seg.count}</span>
+                </button>
+              ))}
+            </div>
+
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               {loading ? (
                 <div className="p-12 text-center text-slate-500" data-testid="admin-leads-loading">Loading leads…</div>
               ) : leads.length === 0 ? (
                 <div className="p-12 text-center text-slate-500" data-testid="admin-leads-empty">
                   No leads in this date range. Adjust the date filter or submit a test lead.
+                </div>
+              ) : shownLeads.length === 0 ? (
+                <div className="p-12 text-center text-slate-500" data-testid="admin-leads-seg-empty">
+                  No {leadSeg === 'spanish' ? 'Spanish' : 'PA page'} leads in this range.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -470,7 +509,7 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedLeads.map((lead) => (
+                      {shownLeads.map((lead) => (
                         <TableRow key={lead.id} data-testid={`admin-lead-row-${lead.id}`}>
                           <TableCell className="font-medium text-slate-900">
                             {lead.full_name}
@@ -482,6 +521,9 @@ export default function AdminDashboard() {
                             )}
                             {lead.source_page === 'sp' && (
                               <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`lead-source-sp-${lead.id}`}>Spanish</Badge>
+                            )}
+                            {lead.source_page === 'laspa' && (
+                              <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`lead-source-laspa-${lead.id}`}>Spanish · PA</Badge>
                             )}
                             {lead.crm_duplicate_skipped && (
                               <Badge variant="outline" className="ml-2 bg-rose-50 text-rose-700 border-rose-200 text-[10px]" data-testid={`lead-crm-dup-${lead.id}`}>Duplicate · not sent to CRM</Badge>

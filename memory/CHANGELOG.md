@@ -127,3 +127,8 @@ Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
 - Created Spanish split test (draft): "Spanish: Landing vs Advertorial" routing /sp vs /spa.
 - Calls tab: _enrich_calls_with_hooks now adds source_page + is_spanish (true for sp/laspa); AdminCalls shows an "ES · Spanish" pill next to the caller name for Spanish-page callers.
 - Verified: /spa public renders from content API, Spanish PA editor opens & saves, split test visible. No leads/test calls created.
+
+## 2026-06-29 (eve) — Source-page segment filters + counters in Calls & Leads
+- Added segment filter chips (All / Spanish / PA Page) with per-segment count badges to both the Leads tab (AdminDashboard) and Calls tab (AdminCalls). Spanish = sp+laspa; PA Page = lapa+laspa. Client-side filtering over loaded rows.
+- Leads: added 'Spanish · PA' badge for source_page=laspa.
+- Both rely on source_page already present on leads + enriched onto calls.

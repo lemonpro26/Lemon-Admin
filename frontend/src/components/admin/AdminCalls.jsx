@@ -49,8 +49,23 @@ export const AdminCalls = () => {
   const [gaStatus, setGaStatus] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [seg, setSeg] = useState('all');
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
+
+  // Source-page segmentation (Spanish = sp + Spanish PA; PA = English PA + Spanish PA).
+  const inSeg = (s, sp) => {
+    const p = (sp || '').toLowerCase();
+    if (s === 'spanish') return p === 'sp' || p === 'laspa';
+    if (s === 'pa') return p === 'lapa' || p === 'laspa';
+    return true;
+  };
+  const segCounts = {
+    all: calls.length,
+    spanish: calls.filter((c) => inSeg('spanish', c.source_page)).length,
+    pa: calls.filter((c) => inSeg('pa', c.source_page)).length,
+  };
+  const shownCalls = sortedCalls.filter((c) => inSeg(seg, c.source_page));
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -178,6 +193,24 @@ export const AdminCalls = () => {
         </div>
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap" data-testid="call-segment-filters">
+        {[
+          { key: 'all', label: 'All', count: segCounts.all },
+          { key: 'spanish', label: 'Spanish', count: segCounts.spanish },
+          { key: 'pa', label: 'PA Page', count: segCounts.pa },
+        ].map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSeg(s.key)}
+            className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${seg === s.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+            data-testid={`call-seg-${s.key}`}
+          >
+            {s.label}
+            <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${seg === s.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`call-seg-count-${s.key}`}>{s.count}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         <Table>
           <TableHeader>
@@ -198,7 +231,9 @@ export const AdminCalls = () => {
               <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10">Loading…</TableCell></TableRow>
             ) : calls.length === 0 ? (
               <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
-            ) : sortedCalls.map((c) => (
+            ) : shownCalls.length === 0 ? (
+              <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-seg-empty">No {seg === 'spanish' ? 'Spanish' : 'PA page'} calls in this period.</TableCell></TableRow>
+            ) : shownCalls.map((c) => (
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
                 <TableCell className="font-medium text-slate-900">
                   <div className="flex items-center gap-2">
