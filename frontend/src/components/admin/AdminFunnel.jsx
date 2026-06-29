@@ -8,6 +8,7 @@ const PAGES = [
   { key: 'overall', label: 'All Pages' },
   { key: 'home', label: 'Home' },
   { key: 'lapa', label: 'PA Page' },
+  { key: 'laspa', label: 'PA (Spanish)' },
   { key: 'sp', label: 'Spanish' },
 ];
 

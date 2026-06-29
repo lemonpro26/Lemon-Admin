@@ -886,7 +886,8 @@ def _post_lead_to_crm(lead: dict):
     payload["source"] = "google ppc form"
     # Tag the landing page so the CRM/Zapier knows which funnel the lead came from:
     # Spanish (/sp) vs everything else (/pa).
-    slug = "sp" if (lead.get("source_page") or "").lower() == "sp" else "pa"
+    sp_page = (lead.get("source_page") or "").lower()
+    slug = "sp" if sp_page in ("sp", "laspa") else "pa"
     payload["landing_page"] = f"apply.thelemonpros.com/{slug}"
     try:
         resp = requests.post(CRM_WEBHOOK_URL, json=payload, timeout=10)
@@ -1492,7 +1493,7 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
 
     def _page(sp):
         key = (sp or "home").lower()
-        if key not in ("home", "lapa", "sp"):
+        if key not in ("home", "lapa", "sp", "laspa"):
             key = "home"
         return key
 
@@ -1514,7 +1515,7 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
         p = _page(row["_id"])
         pages.setdefault(p, {"views": 0, "hist": {}, "converted": 0})["converted"] += row["n"]
 
-    labels = {"home": "Home", "lapa": "PA Page", "sp": "Spanish"}
+    labels = {"home": "Home", "lapa": "PA Page", "sp": "Spanish", "laspa": "PA (Spanish)"}
     stage_names = ["Landing View"] + [s.capitalize() for s in FUNNEL_STEPS] + ["Submitted"]
 
     def build(d, calls=0):
@@ -1568,7 +1569,7 @@ async def admin_funnel_campaigns(page: str = Query("overall"), _: dict = Depends
     s_iso, e_iso, _d = _date_range(start, end)
     cfg = await get_or_create_config()
     ad_labels = cfg.get("ad_labels") or {}
-    page_map = {"home": "home", "lapa": "lapa", "sp": "sp"}
+    page_map = {"home": "home", "lapa": "lapa", "sp": "sp", "laspa": "laspa"}
 
     click_match = {"first_seen": {"$gte": s_iso, "$lte": e_iso}}
     lead_match = {"created_at": {"$gte": s_iso, "$lte": e_iso}}

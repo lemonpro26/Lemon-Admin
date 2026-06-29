@@ -14,6 +14,7 @@ import Contact from '@/pages/Contact';
 import MockupHome from '@/pages/MockupHome';
 import MockupFunnel from '@/pages/MockupFunnel';
 import PresellPA from '@/pages/PresellPA';
+import PresellSPA from '@/pages/PresellSPA';
 import SplitEntry from '@/pages/SplitEntry';
 import { trackPageView } from '@/lib/analytics';
 
@@ -44,6 +45,7 @@ function App() {
           <Route path="/mockup" element={<MockupHome />} />
           <Route path="/mockup/funnel" element={<MockupFunnel />} />
           <Route path="/pa" element={<PresellPA />} />
+          <Route path="/spa" element={<PresellSPA />} />
           <Route path="/split" element={<SplitEntry />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/terms" element={<LegalPage />} />

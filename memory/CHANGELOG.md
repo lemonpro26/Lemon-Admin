@@ -115,3 +115,9 @@ Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
 - New component AdminPageContent.jsx; AdminPages.jsx rebuilt with click-to-edit + back nav (renders AdminPAContent for PA).
 - Split tests now each have their own entry URL: auto-generated slug (split, split2, split3…), editable + sanitized + uniqueness 409. Multiple tests can run simultaneously (removed one-at-a-time constraint). split_decide(slug=...) matches by slug; startup backfills slugs on legacy experiments. SplitEntry.jsx reads /:splitSlug; App.js adds catch-all '/:splitSlug' (last). Unknown/non-running slugs redirect to '/'.
 - Verified via testing_agent iteration_19.json: backend 10/10, frontend 100%, no issues. Test experiments + temp Home copy cleaned up.
+
+## 2026-06-29 — Spanish PA advertorial page (/spa)
+- New /spa route: Spanish translation of the /pa advertorial (PresellSPA.jsx), Spanish phone (866-524-3722), sets funnel lang='es' so the whole funnel renders in Spanish.
+- Tracked as source_page='laspa'. CRM/Zapier landing_page: Spanish pages (sp, laspa) -> apply.thelemonpros.com/sp, others -> /pa.
+- Added 'laspa' as a recognized analytics bucket ("PA (Spanish)") in funnel _page()/labels/page_map + AdminFunnel page selector. Listed in Pages tab (link-only).
+- Verified: page renders, funnel goes Spanish, CRM mapping logic correct. No test leads submitted.
