@@ -887,7 +887,7 @@ def _post_lead_to_crm(lead: dict):
     # Tag the landing page so the CRM/Zapier knows which funnel the lead came from:
     # Spanish (/sp) vs everything else (/pa).
     slug = "sp" if (lead.get("source_page") or "").lower() == "sp" else "pa"
-    payload["landing_page"] = f"apply.lemonpros.com/{slug}"
+    payload["landing_page"] = f"apply.thelemonpros.com/{slug}"
     try:
         resp = requests.post(CRM_WEBHOOK_URL, json=payload, timeout=10)
         if resp.status_code >= 400:
