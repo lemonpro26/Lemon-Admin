@@ -14,6 +14,7 @@ import {
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 import { useSortable, SortLabel } from '@/lib/useSortable';
 import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
+import { Badge } from '@/components/ui/badge';
 
 const fmtDuration = (s) => {
   const n = Number(s) || 0;
@@ -236,12 +237,16 @@ export const AdminCalls = () => {
             ) : shownCalls.map((c) => (
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
                 <TableCell className="font-medium text-slate-900">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span>{c.caller_name || '—'}</span>
-                    {c.is_spanish && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap" data-testid={`call-spanish-${c.id}`} title="Caller came from the Spanish page">
-                        ES · Spanish
-                      </span>
+                    {c.source_page === 'lapa' && (
+                      <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`call-source-lapa-${c.id}`}>PA page</Badge>
+                    )}
+                    {c.source_page === 'sp' && (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-source-sp-${c.id}`}>Spanish</Badge>
+                    )}
+                    {c.source_page === 'laspa' && (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-source-laspa-${c.id}`}>Spanish · PA</Badge>
                     )}
                   </div>
                 </TableCell>
