@@ -121,3 +121,9 @@ Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
 - Tracked as source_page='laspa'. CRM/Zapier landing_page: Spanish pages (sp, laspa) -> apply.thelemonpros.com/sp, others -> /pa.
 - Added 'laspa' as a recognized analytics bucket ("PA (Spanish)") in funnel _page()/labels/page_map + AdminFunnel page selector. Listed in Pages tab (link-only).
 - Verified: page renders, funnel goes Spanish, CRM mapping logic correct. No test leads submitted.
+
+## 2026-06-29 (pm) — Spanish PA editable + Spanish split test + Spanish call labels
+- Made /spa editable in Pages tab: backend spa_content model (DEFAULT_SPA_CONTENT) + GET /spa-content, GET/PUT /admin/spa-content. Generalized AdminPAContent to take page='pa'|'spa' prop (parametrized endpoint/url/testids). PresellSPA now fetches /spa-content over defaults.
+- Created Spanish split test (draft): "Spanish: Landing vs Advertorial" routing /sp vs /spa.
+- Calls tab: _enrich_calls_with_hooks now adds source_page + is_spanish (true for sp/laspa); AdminCalls shows an "ES · Spanish" pill next to the caller name for Spanish-page callers.
+- Verified: /spa public renders from content API, Spanish PA editor opens & saves, split test visible. No leads/test calls created.

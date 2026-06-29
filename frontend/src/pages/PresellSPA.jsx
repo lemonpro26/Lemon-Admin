@@ -23,8 +23,8 @@ const SETTLEMENTS = [
   { amount: '$76,500', label: 'Kia Sorento' },
 ];
 
-// Spanish advertorial copy — mirrors the English /pa page, translated.
-const C = {
+// Spanish advertorial copy — defaults; live overrides come from /spa-content.
+const SPA_DEFAULTS = {
   attorney_eyebrow: 'Conozca a Su Abogado',
   attorney_name: 'Michael Saeedian, Esq.',
   attorney_title: 'Abogado Fundador · The Lemon Pros · Colegio de Abogados de CA #265470',
@@ -71,6 +71,13 @@ export default function PresellSPA() {
   const navigate = useNavigate();
   const { setAnswer, resetAnswers, setLang } = useFunnel();
   const goLegal = (to) => navigate(to);
+  const [c, setC] = useState(SPA_DEFAULTS);
+
+  useEffect(() => {
+    api.get('/spa-content')
+      .then((res) => setC({ ...SPA_DEFAULTS, ...(res.data || {}) }))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const tracking = captureTracking(window.location.search);
@@ -139,66 +146,66 @@ export default function PresellSPA() {
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
             <img src={ATTORNEY_PHOTO} alt="Michael Saeedian, Esq." className="h-32 w-32 rounded-2xl object-cover ring-2 ring-[#E0A800] shrink-0" data-testid="spa-attorney-photo" />
             <div className="text-center sm:text-left">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">{C.attorney_eyebrow}</p>
-              <h2 className="font-slab font-extrabold text-slate-900 text-2xl mt-1">{C.attorney_name}</h2>
-              <p className="text-slate-500 text-sm">{C.attorney_title}</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">{c.attorney_eyebrow}</p>
+              <h2 className="font-slab font-extrabold text-slate-900 text-2xl mt-1">{c.attorney_name}</h2>
+              <p className="text-slate-500 text-sm">{c.attorney_title}</p>
               <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0B2545] text-white px-4 py-1.5 font-bold text-sm" data-testid="spa-attorney-award">
                 <Award className="h-4 w-4 text-[#FACC15]" />
-                {C.attorney_award}
+                {c.attorney_award}
               </div>
-              <p className="mt-3 text-slate-700 leading-relaxed">{C.attorney_bio}</p>
+              <p className="mt-3 text-slate-700 leading-relaxed">{c.attorney_bio}</p>
               <div className="mt-4 flex flex-wrap sm:flex-nowrap justify-center sm:justify-start gap-2">
-                {C.attorney_badges.map((b) => (
+                {c.attorney_badges.map((b) => (
                   <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 whitespace-nowrap">{b}</span>
                 ))}
               </div>
               <p className="mt-3 text-xs font-bold text-slate-600 flex items-center justify-center sm:justify-start gap-1.5">
-                <GraduationCap className="h-4 w-4" /> {C.attorney_school}
+                <GraduationCap className="h-4 w-4" /> {c.attorney_school}
               </p>
             </div>
           </div>
         </div>
 
         <div className="mb-7" data-testid="spa-settlements">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold mb-3">{C.settlements_eyebrow}</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold mb-3">{c.settlements_eyebrow}</p>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-            {C.settlements.map((s) => (
+            {c.settlements.map((s) => (
               <div key={s.label + s.amount} className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
                 <p className="font-slab font-extrabold text-emerald-600 text-lg">{s.amount}</p>
                 <p className="text-xs text-slate-600 whitespace-nowrap">{s.label}</p>
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1.5">{C.settlements_disclaimer}</p>
+          <p className="text-[11px] text-slate-400 mt-1.5">{c.settlements_disclaimer}</p>
           <button onClick={() => start()} className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold px-6 py-3.5 shadow-md shadow-red-500/20 transition-colors" data-testid="spa-settlements-cta">
-            {C.settlements_cta} <ArrowRight className="h-4 w-4" />
+            {c.settlements_cta} <ArrowRight className="h-4 w-4" />
           </button>
         </div>
 
-        <h1 className="font-slab font-extrabold text-slate-900 leading-tight text-3xl sm:text-4xl lg:text-5xl" data-testid="spa-headline">{C.headline}</h1>
-        <p className="mt-4 text-lg text-slate-600" data-testid="spa-subhead">{C.subhead}</p>
+        <h1 className="font-slab font-extrabold text-slate-900 leading-tight text-3xl sm:text-4xl lg:text-5xl" data-testid="spa-headline">{c.headline}</h1>
+        <p className="mt-4 text-lg text-slate-600" data-testid="spa-subhead">{c.subhead}</p>
 
         <button onClick={() => start()} className="block w-full mt-6 rounded-2xl overflow-hidden shadow-lg group" data-testid="spa-hero-image-cta">
           <img src={HERO_PA} alt="Conductor varado con un vehículo averiado" className="w-full h-56 sm:h-80 object-cover transition-transform duration-500 group-hover:scale-105" />
         </button>
 
         <div className="mt-8 space-y-5 text-[17px] leading-relaxed text-slate-700">
-          {C.body.map((para, i) => (
+          {c.body.map((para, i) => (
             <p key={i} className={i === 0 ? 'font-semibold text-slate-900' : ''}>{para}</p>
           ))}
         </div>
 
         <div className="my-8 rounded-2xl border-l-4 border-[#E0A800] bg-amber-50 p-6" data-testid="spa-callout">
-          <p className="text-lg font-semibold text-slate-900">“{C.callout_quote}”</p>
+          <p className="text-lg font-semibold text-slate-900">“{c.callout_quote}”</p>
           <button onClick={() => start()} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold px-6 py-3 transition-colors" data-testid="spa-callout-cta">
-            {C.callout_cta} <ArrowRight className="h-4 w-4" />
+            {c.callout_cta} <ArrowRight className="h-4 w-4" />
           </button>
         </div>
 
-        <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-10" data-testid="spa-section-qualify">{C.qualify_heading}</h2>
-        <p className="mt-3 text-[17px] text-slate-700 leading-relaxed">{C.qualify_intro}</p>
+        <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-10" data-testid="spa-section-qualify">{c.qualify_heading}</h2>
+        <p className="mt-3 text-[17px] text-slate-700 leading-relaxed">{c.qualify_intro}</p>
         <ul className="mt-4 space-y-3">
-          {C.qualify_items.map((t) => (
+          {c.qualify_items.map((t) => (
             <li key={t} className="flex items-start gap-3">
               <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />
               <span className="text-slate-800">{t}</span>
@@ -209,7 +216,7 @@ export default function PresellSPA() {
         <img src={LOT_PA} alt="Fila de vehículos en un concesionario" className="w-full h-44 sm:h-56 object-cover rounded-2xl shadow-md mt-6" />
 
         <div className="mt-10">
-          <p className="font-bold text-slate-900 text-lg"><span className="text-[#E0A800]">Paso 1:</span> {C.step1_label}</p>
+          <p className="font-bold text-slate-900 text-lg"><span className="text-[#E0A800]">Paso 1:</span> {c.step1_label}</p>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3" data-testid="spa-make-grid">
             {TOP_MAKES.map((m) => (
               <button key={m.slug} onClick={() => start(m.name)} data-testid={`spa-make-${m.slug}`} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-[#E0A800] hover:shadow-md transition-all text-left">
@@ -224,10 +231,10 @@ export default function PresellSPA() {
         </div>
 
         <div className="mt-10 rounded-2xl bg-[#0B2545] text-white p-7 text-center" data-testid="spa-final-cta-block">
-          <p className="font-bold text-lg"><span className="text-[#FACC15]">Paso 2:</span> {C.step2_label}</p>
-          <p className="mt-2 text-slate-200">{C.step2_text}</p>
+          <p className="font-bold text-lg"><span className="text-[#FACC15]">Paso 2:</span> {c.step2_label}</p>
+          <p className="mt-2 text-slate-200">{c.step2_text}</p>
           <button onClick={() => start()} className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold text-lg px-8 py-4 transition-colors w-full sm:w-auto" data-testid="spa-final-cta">
-            {C.final_cta} <ArrowRight className="h-5 w-5" />
+            {c.final_cta} <ArrowRight className="h-5 w-5" />
           </button>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-300">
             <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-emerald-400" /> 100% Gratis y Confidencial</span>

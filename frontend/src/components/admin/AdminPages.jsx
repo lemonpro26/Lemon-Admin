@@ -13,7 +13,7 @@ import { AdminPageContent } from '@/components/admin/AdminPageContent';
 const BUILTINS = [
   { key: 'home', label: 'Home (Main Landing)', path: '/', icon: HomeIcon, desc: 'Primary English landing page.', editor: 'home' },
   { key: 'pa', label: 'PA Advertorial', path: '/pa', icon: FileText, desc: 'Presell / advertorial page (source = lapa).', editor: 'pa' },
-  { key: 'spa', label: 'PA Advertorial (Spanish)', path: '/spa', icon: Languages, desc: 'Spanish presell / advertorial page (source = laspa).' },
+  { key: 'spa', label: 'PA Advertorial (Spanish)', path: '/spa', icon: Languages, desc: 'Spanish presell / advertorial page (source = laspa).', editor: 'spa' },
   { key: 'sp', label: 'Spanish Landing', path: '/sp', icon: Languages, desc: 'Full Spanish funnel (source = sp).', editor: 'sp' },
   { key: 'split', label: 'A/B Split Test Entry', path: '/split', icon: FlaskConical, desc: 'Routes visitors between pages by your split weight (managed in the Split Test tab).' },
 ];
@@ -127,7 +127,9 @@ export function AdminPages() {
         <div className="font-slab font-bold text-xl text-slate-900 flex items-center gap-2">
           <editing.icon className="h-5 w-5 text-[#0F1B3D]" /> Editing: {editing.label}
         </div>
-        {editing.editor === 'pa' ? <AdminPAContent /> : <AdminPageContent page={editing.editor} />}
+        {editing.editor === 'pa' || editing.editor === 'spa'
+          ? <AdminPAContent page={editing.editor} />
+          : <AdminPageContent page={editing.editor} />}
       </div>
     );
   }

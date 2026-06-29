@@ -200,7 +200,16 @@ export const AdminCalls = () => {
               <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
             ) : sortedCalls.map((c) => (
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
-                <TableCell className="font-medium text-slate-900">{c.caller_name || '—'}</TableCell>
+                <TableCell className="font-medium text-slate-900">
+                  <div className="flex items-center gap-2">
+                    <span>{c.caller_name || '—'}</span>
+                    {c.is_spanish && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap" data-testid={`call-spanish-${c.id}`} title="Caller came from the Spanish page">
+                        ES · Spanish
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="text-slate-700">{c.caller_number || '—'}</TableCell>
                 <TableCell className="text-slate-700">{fmtDuration(c.duration)}</TableCell>
                 <TableCell className="hidden md:table-cell text-slate-600">{c.campaign || '—'}</TableCell>

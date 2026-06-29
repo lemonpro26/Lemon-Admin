@@ -194,6 +194,83 @@ def _merged_pa_content(cfg: dict) -> dict:
     return {**DEFAULT_PA_CONTENT, **stored}
 
 
+# Spanish advertorial (/spa) — same field shape as DEFAULT_PA_CONTENT, translated.
+DEFAULT_SPA_CONTENT = {
+    "attorney_eyebrow": "Conozca a Su Abogado",
+    "attorney_name": "Michael Saeedian, Esq.",
+    "attorney_title": "Abogado Fundador · The Lemon Pros · Colegio de Abogados de CA #265470",
+    "attorney_award": "National Trial Lawyers — Top 40 Menores de 40",
+    "attorney_bio": (
+        "Michael Saeedian es un abogado de la Ley Limón de California a quien los fabricantes de "
+        "autos temen. Graduado de UCLA con un Doctorado en Derecho de Loyola Law School, se dedica "
+        "exclusivamente a la Ley Limón — luchando para conseguir el máximo reembolso, reemplazo o "
+        "acuerdo en efectivo para los conductores atrapados con vehículos defectuosos. Cuando envía "
+        "su caso, trabaja directamente con un abogado licenciado y galardonado, no con un centro de llamadas."
+    ),
+    "attorney_badges": ["Top 100 Abogados Litigantes", "Calificación 5 Estrellas en Yelp", "Lead Counsel Rated", "Si No Gana, No Paga"],
+    "attorney_school": "UCLA · Doctorado en Derecho, Loyola Law School, Los Ángeles",
+    "settlements_eyebrow": "Acuerdos Recientes",
+    "settlements": [
+        {"amount": "$107,500", "label": "Mercedes GLE"},
+        {"amount": "$98,000", "label": "Tesla Model Y"},
+        {"amount": "$94,500", "label": "Ford F-150"},
+        {"amount": "$89,000", "label": "Jeep Grand Cherokee"},
+        {"amount": "$85,200", "label": "Chevy Silverado"},
+        {"amount": "$79,800", "label": "Hyundai Tucson"},
+        {"amount": "$76,500", "label": "Kia Sorento"},
+    ],
+    "settlements_disclaimer": "Los resultados anteriores no garantizan un resultado similar.",
+    "settlements_cta": "Vea Si Mi Auto Califica",
+    "headline": "¿Atrapado con un Vehículo Defectuoso? Podría Tener Derecho a un Reembolso, un Auto Nuevo o Dinero en Efectivo.",
+    "subhead": (
+        "Miles de conductores siguen pagando autos que pasan más tiempo en el taller que en la "
+        "carretera. Así es como las Leyes Limón de hoy pueden obligar al fabricante a pagarle — sin "
+        "ningún costo para usted."
+    ),
+    "body": [
+        "Si su vehículo ha estado en el taller una y otra vez por el mismo problema — y todavía está "
+        "bajo la garantía del fabricante — las Leyes Limón federales y estatales podrían darle derecho "
+        "a un reembolso completo, un vehículo de reemplazo o un acuerdo en efectivo considerable.",
+        "La mayoría de los consumidores no tienen idea de que estas protecciones existen. Los "
+        "fabricantes están obligados por ley a responder por sus vehículos, y cuando no pueden reparar "
+        "un defecto recurrente en un número razonable de intentos, la responsabilidad recae sobre ellos "
+        "— no sobre usted. Eso puede significar recuperar todo lo que ha pagado, incluyendo su pago "
+        "inicial y sus mensualidades.",
+        "Recomendamos encarecidamente a cualquier conductor con problemas persistentes de motor, "
+        "transmisión, sistema eléctrico, frenos o seguridad que verifique si califica. No hay costo ni "
+        "obligación para averiguarlo, y todo el proceso toma menos de 60 segundos para empezar.",
+    ],
+    "callout_quote": (
+        "Si su auto sigue fallando bajo garantía, el fabricante podría estar legalmente obligado a "
+        "recomprarlo — y usted podría tener derecho a miles de dólares."
+    ),
+    "callout_cta": "Vea Si Mi Auto Califica",
+    "qualify_heading": "¿Cómo Califico?",
+    "qualify_intro": (
+        "La red de The Lemon Pros ha ayudado a innumerables consumidores a responsabilizar a los "
+        "fabricantes. Si puede responder sí a cualquiera de las siguientes, debería verificar su caso hoy:"
+    ),
+    "qualify_items": [
+        "Mi vehículo ha sido reparado varias veces por el mismo problema",
+        "El problema comenzó mientras todavía estaba bajo la garantía del fabricante",
+        "Mi auto ha pasado semanas en el taller o no es seguro para conducir",
+        "Sigo pagando un vehículo en el que no puedo confiar",
+    ],
+    "step1_label": "Seleccione la Marca de Su Vehículo",
+    "step2_label": "Responda unas preguntas rápidas",
+    "step2_text": (
+        "Averigüe en menos de 60 segundos si califica para un reembolso, reemplazo o compensación en "
+        "efectivo. Es gratis y no hay ninguna obligación."
+    ),
+    "final_cta": "Verifique Si Su Auto Califica",
+}
+
+
+def _merged_spa_content(cfg: dict) -> dict:
+    stored = (cfg or {}).get("spa_content") or {}
+    return {**DEFAULT_SPA_CONTENT, **stored}
+
+
 # Editable copy for the Home (`/`) and Spanish (`/sp`) landing pages. The big
 # headline/subhead are managed by the Hooks/Spanish tabs (A/B + geo macros);
 # these cover the CTA button, tooltip and trust-line badges.
@@ -580,6 +657,7 @@ def _username_from_request(request: Request) -> str:
 # Friendly labels for change-history entries, derived from method + path.
 _CHANGE_RULES = [
     ("PUT", r"/admin/pa-content$", "Edited PA page content"),
+    ("PUT", r"/admin/spa-content$", "Edited Spanish PA page content"),
     ("PUT", r"/admin/page-content/[^/]+$", "Edited page content"),
     ("PUT", r"/admin/config$", "Updated settings"),
     ("PUT", r"/admin/spanish$", "Edited Spanish hooks"),
@@ -663,7 +741,41 @@ async def get_pa_content_public():
     return _merged_pa_content(cfg)
 
 
-@api_router.get("/admin/pa-content")
+@api_router.get("/spa-content")
+async def get_spa_content_public():
+    """Public: editable copy for the /spa Spanish advertorial page."""
+    cfg = await get_or_create_config()
+    return _merged_spa_content(cfg)
+
+
+@api_router.get("/admin/spa-content")
+async def get_spa_content_admin(_: dict = Depends(require_admin)):
+    cfg = await get_or_create_config()
+    return _merged_spa_content(cfg)
+
+
+@api_router.put("/admin/spa-content")
+async def update_spa_content(body: dict, _: dict = Depends(require_editor)):
+    """Save Spanish-advertorial copy. Only known fields persisted; lists sanitized."""
+    allowed = set(DEFAULT_SPA_CONTENT.keys())
+    update = {}
+    for k, v in (body or {}).items():
+        if k not in allowed:
+            continue
+        if k == "settlements" and isinstance(v, list):
+            update[k] = [{"amount": str(s.get("amount", "")).strip(), "label": str(s.get("label", "")).strip()}
+                         for s in v if isinstance(s, dict) and (s.get("amount") or s.get("label"))]
+        elif k in ("body", "qualify_items", "attorney_badges") and isinstance(v, list):
+            update[k] = [str(x).strip() for x in v if str(x).strip()]
+        elif isinstance(v, str):
+            update[k] = v.strip()
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {"spa_content": {**DEFAULT_SPA_CONTENT, **update}, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    cfg = await get_or_create_config()
+    return _merged_spa_content(cfg)
 async def get_pa_content_admin(_: dict = Depends(require_admin)):
     cfg = await get_or_create_config()
     return _merged_pa_content(cfg)
@@ -2134,7 +2246,7 @@ async def _enrich_calls_with_hooks(items: list) -> list:
             q["$or"].append({"gclid": {"$in": gclids}})
         if sessions:
             q["$or"].append({"session_id": {"$in": sessions}})
-        async for ck in db.clicks.find(q, {"gclid": 1, "session_id": 1, "matched_rule_id": 1}):
+        async for ck in db.clicks.find(q, {"gclid": 1, "session_id": 1, "matched_rule_id": 1, "source_page": 1}):
             if ck.get("gclid"):
                 clicks_by_gclid[ck["gclid"]] = ck
             if ck.get("session_id"):
@@ -2157,6 +2269,8 @@ async def _enrich_calls_with_hooks(items: list) -> list:
             c["hook1"] = None
             c["hook2"] = None
             c["matched_rule_id"] = None
+            c["source_page"] = None
+            c["is_spanish"] = False
         else:
             rid = ck.get("matched_rule_id")
             hook = rule_map.get(rid) if rid else default_hook
@@ -2167,6 +2281,9 @@ async def _enrich_calls_with_hooks(items: list) -> list:
             c["hook1"] = hook.get("hook1")
             c["hook2"] = hook.get("hook2")
             c["matched_rule_id"] = rid
+            sp = (ck.get("source_page") or "").lower()
+            c["source_page"] = sp
+            c["is_spanish"] = sp in ("sp", "laspa")
     return items
 
 
