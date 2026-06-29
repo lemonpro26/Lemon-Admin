@@ -884,7 +884,10 @@ def _post_lead_to_crm(lead: dict):
     drop = {"campaign_id", "adgroup_id", "ad_id", "keyword", "gclid", "gbraid", "wbraid", "params", "matched_rule_id"}
     payload = {k: v for k, v in lead.items() if k not in drop}
     payload["source"] = "google ppc form"
-    payload["landing_page"] = "apply.thelemonpros.com"
+    # Tag the landing page so the CRM/Zapier knows which funnel the lead came from:
+    # Spanish (/sp) vs everything else (/pa).
+    slug = "sp" if (lead.get("source_page") or "").lower() == "sp" else "pa"
+    payload["landing_page"] = f"apply.lemonpros.com/{slug}"
     try:
         resp = requests.post(CRM_WEBHOOK_URL, json=payload, timeout=10)
         if resp.status_code >= 400:
