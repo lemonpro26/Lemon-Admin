@@ -114,12 +114,14 @@ export default function AdminDashboard() {
   // PA = English PA + Spanish PA).
   const inLeadSeg = (seg, sp) => {
     const s = (sp || '').toLowerCase();
+    if (seg === 'home') return s === 'home';
     if (seg === 'spanish') return s === 'sp' || s === 'laspa';
     if (seg === 'pa') return s === 'lapa' || s === 'laspa';
     return true;
   };
   const leadCounts = {
     all: leads.length,
+    home: leads.filter((l) => inLeadSeg('home', l.source_page)).length,
     spanish: leads.filter((l) => inLeadSeg('spanish', l.source_page)).length,
     pa: leads.filter((l) => inLeadSeg('pa', l.source_page)).length,
   };
@@ -467,6 +469,7 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-2 flex-wrap mb-4" data-testid="lead-segment-filters">
               {[
                 { key: 'all', label: 'All', count: leadCounts.all },
+                { key: 'home', label: 'Home', count: leadCounts.home },
                 { key: 'spanish', label: 'Spanish', count: leadCounts.spanish },
                 { key: 'pa', label: 'PA Page', count: leadCounts.pa },
               ].map((seg) => (
@@ -491,7 +494,7 @@ export default function AdminDashboard() {
                 </div>
               ) : shownLeads.length === 0 ? (
                 <div className="p-12 text-center text-slate-500" data-testid="admin-leads-seg-empty">
-                  No {leadSeg === 'spanish' ? 'Spanish' : 'PA page'} leads in this range.
+                  No {leadSeg === 'spanish' ? 'Spanish' : leadSeg === 'home' ? 'Home' : 'PA page'} leads in this range.
                 </div>
               ) : (
                 <div className="overflow-x-auto">

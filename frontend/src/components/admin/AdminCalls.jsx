@@ -54,15 +54,17 @@ export const AdminCalls = () => {
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
-  // Source-page segmentation (Spanish = sp + Spanish PA; PA = English PA + Spanish PA).
+  // Source-page segmentation (Home; Spanish = sp + Spanish PA; PA = English PA + Spanish PA).
   const inSeg = (s, sp) => {
     const p = (sp || '').toLowerCase();
+    if (s === 'home') return p === 'home';
     if (s === 'spanish') return p === 'sp' || p === 'laspa';
     if (s === 'pa') return p === 'lapa' || p === 'laspa';
     return true;
   };
   const segCounts = {
     all: calls.length,
+    home: calls.filter((c) => inSeg('home', c.source_page)).length,
     spanish: calls.filter((c) => inSeg('spanish', c.source_page)).length,
     pa: calls.filter((c) => inSeg('pa', c.source_page)).length,
   };
@@ -197,6 +199,7 @@ export const AdminCalls = () => {
       <div className="flex items-center gap-2 flex-wrap" data-testid="call-segment-filters">
         {[
           { key: 'all', label: 'All', count: segCounts.all },
+          { key: 'home', label: 'Home', count: segCounts.home },
           { key: 'spanish', label: 'Spanish', count: segCounts.spanish },
           { key: 'pa', label: 'PA Page', count: segCounts.pa },
         ].map((s) => (
@@ -233,7 +236,7 @@ export const AdminCalls = () => {
             ) : calls.length === 0 ? (
               <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
             ) : shownCalls.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-seg-empty">No {seg === 'spanish' ? 'Spanish' : 'PA page'} calls in this period.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-seg-empty">No {seg === 'spanish' ? 'Spanish' : seg === 'home' ? 'Home' : 'PA page'} calls in this period.</TableCell></TableRow>
             ) : shownCalls.map((c) => (
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
                 <TableCell className="font-medium text-slate-900">
