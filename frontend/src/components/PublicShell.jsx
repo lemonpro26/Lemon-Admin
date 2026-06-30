@@ -25,7 +25,7 @@ export default function PublicShell() {
           src={MINT_BG}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none select-none absolute inset-0 w-full h-full object-cover z-0"
+          className="pointer-events-none select-none absolute inset-0 w-full h-full object-cover opacity-40 z-0"
         />
         <div className="relative z-10 h-full overflow-y-auto">
           <Outlet />
