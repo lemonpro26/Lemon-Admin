@@ -776,6 +776,9 @@ async def update_spa_content(body: dict, _: dict = Depends(require_editor)):
     )
     cfg = await get_or_create_config()
     return _merged_spa_content(cfg)
+
+
+@api_router.get("/admin/pa-content")
 async def get_pa_content_admin(_: dict = Depends(require_admin)):
     cfg = await get_or_create_config()
     return _merged_pa_content(cfg)

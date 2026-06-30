@@ -132,3 +132,7 @@ Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
 - Added segment filter chips (All / Spanish / PA Page) with per-segment count badges to both the Leads tab (AdminDashboard) and Calls tab (AdminCalls). Spanish = sp+laspa; PA Page = lapa+laspa. Client-side filtering over loaded rows.
 - Leads: added 'Spanish · PA' badge for source_page=laspa.
 - Both rely on source_page already present on leads + enriched onto calls.
+
+## 2026-06-30 — Brand logo rollout + PA editor 405 fix
+- Fixed: GET /admin/pa-content was returning 405 (decorator dropped during spa-content insertion) -> PA editor "Failed to load page content". Restored decorator.
+- Replaced text wordmark with uploaded "The Lemon Pros / LEMON LAW ATTORNEYS" logo. Cut transparent PNG (public/lemon-pros-logo.png) + white variant (lemon-pros-logo-white.png for dark bg via light prop). Logo.jsx now renders <img>; updates all headers/footers/admin at once.
