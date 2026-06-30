@@ -154,7 +154,7 @@ export default function PresellSPA() {
                 {c.attorney_award}
               </div>
               <p className="mt-3 text-slate-700 leading-relaxed">{c.attorney_bio}</p>
-              <div className="mt-4 flex flex-wrap sm:flex-nowrap justify-center sm:justify-start gap-2">
+              <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
                 {c.attorney_badges.map((b) => (
                   <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 whitespace-nowrap">{b}</span>
                 ))}

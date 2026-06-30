@@ -75,13 +75,28 @@ function MakeStep({ onSelect }) {
 }
 
 /* ---------------- Model picker ---------------- */
-function ModelStep({ make, onSelect }) {
+function ModelStep({ make, onSelect, onChangeMake, t }) {
   const models = getModels(make);
   return (
-    <div
-      className="mx-auto max-w-2xl grid grid-cols-2 sm:grid-cols-3 gap-[clamp(8px,1.4vh,12px)] max-h-[52vh] overflow-y-auto px-1 pb-2"
-      data-testid="model-grid"
-    >
+    <>
+      {make && (
+        <div className="mx-auto max-w-2xl mb-4 flex items-center justify-center gap-2 text-sm" data-testid="model-current-make">
+          <span className="text-slate-500">{t.fields?.makeLabel || 'Make'}:</span>
+          <span className="font-semibold text-slate-900">{make}</span>
+          <button
+            type="button"
+            onClick={onChangeMake}
+            className="ml-1 font-semibold text-[#EF4444] hover:underline"
+            data-testid="model-change-make-button"
+          >
+            {t.buttons?.changeMake || 'Change'}
+          </button>
+        </div>
+      )}
+      <div
+        className="mx-auto max-w-2xl grid grid-cols-2 sm:grid-cols-3 gap-[clamp(8px,1.4vh,12px)] max-h-[52vh] overflow-y-auto px-1 pb-2"
+        data-testid="model-grid"
+      >
       {models.map((m) => (
         <button
           key={m}
@@ -93,7 +108,8 @@ function ModelStep({ make, onSelect }) {
           {m}
         </button>
       ))}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -346,6 +362,14 @@ export default function FunnelStep() {
     setTimeout(goNext, 140);
   };
 
+  // Re-open the make step when it was pre-selected on a landing page (/pa, /spa).
+  const changeMake = () => {
+    setAnswer('make_locked', '');
+    setAnswer('car_make', '');
+    setAnswer('car_model', '');
+    navigate('/flow/make');
+  };
+
   const submitLead = async (emailVal) => {
     setSubmitting(true);
     try {
@@ -411,7 +435,7 @@ export default function FunnelStep() {
         <div className="bg-white rounded-2xl shadow-[0_18px_50px_rgba(15,27,61,0.16)] p-4 sm:p-6">
           {step.type === 'year' && <YearStep onSelect={(v) => selectAndNext('car_year', v)} />}
           {step.type === 'make' && <MakeStep onSelect={(v) => selectAndNext('car_make', v)} />}
-          {step.type === 'model' && <ModelStep make={answers.car_make} onSelect={(v) => selectAndNext('car_model', v)} />}
+          {step.type === 'model' && <ModelStep make={answers.car_make} onSelect={(v) => selectAndNext('car_model', v)} onChangeMake={changeMake} t={t} />}
           {step.type === 'name' && <NameStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}
           {step.type === 'address' && <AddressStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}
           {step.type === 'phone' && <PhoneStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}

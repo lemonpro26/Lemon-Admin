@@ -35,9 +35,9 @@ export const STRINGS = {
       firstName: 'First Name', lastName: 'Last Name', street: 'Street Address',
       city: 'City', state: 'State', zip: 'ZIP', phone: 'Phone Number', email: 'Email',
       firstPh: 'John', lastPh: 'Smith', streetPh: '123 Main St', cityPh: 'City', statePh: 'CA',
-      zipPh: '90015', phonePh: '(555) 123-4567', emailPh: 'you@email.com',
+      zipPh: '90015', phonePh: '(555) 123-4567', emailPh: 'you@email.com', makeLabel: 'Make',
     },
-    buttons: { continue: 'Continue', verifying: 'Verifying…', checking: 'Checking…', submitting: 'Submitting…', submit: 'See If I Qualify' },
+    buttons: { continue: 'Continue', verifying: 'Verifying…', checking: 'Checking…', submitting: 'Submitting…', submit: 'See If I Qualify', changeMake: 'Change' },
     errors: {
       first: 'Please enter your first name.',
       last: 'Please enter your last name.',
@@ -95,9 +95,9 @@ export const STRINGS = {
       firstName: 'Nombre', lastName: 'Apellido', street: 'Dirección',
       city: 'Ciudad', state: 'Estado', zip: 'Código Postal', phone: 'Número de Teléfono', email: 'Correo Electrónico',
       firstPh: 'Juan', lastPh: 'Pérez', streetPh: 'Calle Principal 123', cityPh: 'Ciudad', statePh: 'CA',
-      zipPh: '90015', phonePh: '(555) 123-4567', emailPh: 'usted@correo.com',
+      zipPh: '90015', phonePh: '(555) 123-4567', emailPh: 'usted@correo.com', makeLabel: 'Marca',
     },
-    buttons: { continue: 'Continuar', verifying: 'Verificando…', checking: 'Comprobando…', submitting: 'Enviando…', submit: 'Ver Si Califico' },
+    buttons: { continue: 'Continuar', verifying: 'Verificando…', checking: 'Comprobando…', submitting: 'Enviando…', submit: 'Ver Si Califico', changeMake: 'Cambiar' },
     errors: {
       first: 'Por favor ingrese su nombre.',
       last: 'Por favor ingrese su apellido.',
