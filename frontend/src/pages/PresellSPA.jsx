@@ -9,6 +9,10 @@ import { COMPANY } from '@/lib/siteContent';
 import { Logo } from '@/components/Logo';
 import { CAR_MAKES, makeLogo } from '@/lib/carData';
 
+// Mint "flowing waves" brand background (matches thelemonpros.com palette).
+const MINT_BG =
+  'https://static.prod-images.emergentagent.com/jobs/77f40ca2-be7c-4af1-a571-bc3da13d847f/images/2354d67e25ac2009a893eb7ff98795fec2d63e2e564ed117a6805925cb0b29ca.png';
+
 const ATTORNEY_PHOTO = 'https://customer-assets.emergentagent.com/job_lemon-checker/artifacts/bijulyp5_attorney.jpg';
 const HERO_PA = 'https://images.unsplash.com/photo-1504203640717-b7d237a3dc84?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200';
 const LOT_PA = 'https://images.pexels.com/photos/29566906/pexels-photo-29566906.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=1200';
@@ -115,7 +119,13 @@ export default function PresellSPA() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-white font-sans text-slate-800" data-testid="presell-spa-page">
+    <div className="relative min-h-[100dvh] bg-[#E6F1ED] font-sans text-slate-800" data-testid="presell-spa-page">
+      <img
+        src={MINT_BG}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none select-none fixed inset-0 w-full h-full object-cover opacity-40 z-0"
+      />
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <Logo size="sm" />
@@ -135,13 +145,13 @@ export default function PresellSPA() {
         </div>
       </header>
 
-      <div className="bg-slate-100 border-b border-slate-200">
+      <div className="relative z-10 bg-slate-100/90 border-b border-slate-200">
         <div className="max-w-3xl mx-auto px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] text-slate-400 text-center">
           Publicidad de Abogado
         </div>
       </div>
 
-      <article className="max-w-3xl mx-auto px-4 py-8">
+      <article className="relative z-10 max-w-3xl mx-auto px-4 py-8">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-7" data-testid="spa-attorney">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
             <img src={ATTORNEY_PHOTO} alt="Michael Saeedian, Esq." className="h-32 w-32 rounded-2xl object-cover ring-2 ring-[#E0A800] shrink-0" data-testid="spa-attorney-photo" />
@@ -249,7 +259,7 @@ export default function PresellSPA() {
         </div>
       </article>
 
-      <footer className="border-t border-slate-200 bg-[#0B2545] text-slate-300 mt-6">
+      <footer className="relative z-10 border-t border-slate-200 bg-[#0B2545] text-slate-300 mt-6">
         <div className="max-w-3xl mx-auto px-4 py-9 text-center space-y-4">
           <div className="flex flex-col items-center gap-1">
             <p className="font-slab font-extrabold text-white text-lg">The Lemon Pros</p>
