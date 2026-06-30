@@ -136,3 +136,7 @@ Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
 ## 2026-06-30 — Brand logo rollout + PA editor 405 fix
 - Fixed: GET /admin/pa-content was returning 405 (decorator dropped during spa-content insertion) -> PA editor "Failed to load page content". Restored decorator.
 - Replaced text wordmark with uploaded "The Lemon Pros / LEMON LAW ATTORNEYS" logo. Cut transparent PNG (public/lemon-pros-logo.png) + white variant (lemon-pros-logo-white.png for dark bg via light prop). Logo.jsx now renders <img>; updates all headers/footers/admin at once.
+
+## 2026-06-30 (pm) — Bolder/crisper logo + favicon
+- Regenerated wordmark in extra-bold weight, cut transparent at 2x res (lemon-pros-logo.png navy + lemon-pros-logo-white.png). Sharper on retina.
+- New favicon: navy + lemon + bold 'LP' monogram. Wrote favicon.png/.ico + apple-touch-icon.png; updated index.html icon links.
