@@ -1025,7 +1025,6 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
         return {"success": True, "blocked": True}
     cfg = await get_or_create_config()
     ip = resolve_client_ip(request.headers)
-    geo = lookup_geo(ip, "", "")
     resolved = await resolve_hooks(cfg, payload.campaign_id, payload.adgroup_id, payload.ad_id, seed=payload.session_id)
 
     lead = payload.model_dump()
@@ -1033,8 +1032,8 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
     lead["source_page"] = (payload.source_page or "home").lower()
     lead["phone_digits"] = _re.sub(r"\D", "", payload.phone or "")
     lead["full_name"] = f"{payload.first_name} {payload.last_name}".strip()
-    lead["city"] = payload.city or geo["city"]
-    lead["state"] = payload.state or geo["state"]
+    lead["city"] = payload.city or ""
+    lead["state"] = payload.state or ""
     lead["ip"] = ip or ""
     lead["user_agent"] = request.headers.get("user-agent", "")
     # Attribute the lead to the SAME hook the visitor actually saw at click time
