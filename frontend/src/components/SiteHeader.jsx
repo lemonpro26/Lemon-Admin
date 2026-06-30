@@ -4,7 +4,7 @@ import { ChevronLeft, Phone, ShieldCheck } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { COMPANY } from '@/lib/siteContent';
 import { trackPhoneCallConversion } from '@/lib/analytics';
-import { STEP_IDS } from '@/lib/funnel';
+import { STEP_IDS, getActiveStepIds } from '@/lib/funnel';
 import { useFunnel } from '@/context/FunnelContext';
 import { tr } from '@/lib/i18n';
 
@@ -17,7 +17,7 @@ import { tr } from '@/lib/i18n';
 export const SiteHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { lang } = useFunnel();
+  const { lang, answers } = useFunnel();
   const t = tr(lang);
   const home = lang === 'es' ? '/sp' : '/';
   const phone = lang === 'es' ? COMPANY.phoneEs : COMPANY.phone;
@@ -25,13 +25,14 @@ export const SiteHeader = () => {
 
   const match = location.pathname.match(/^\/flow\/(.+)$/);
   const stepId = match ? match[1] : null;
-  const index = stepId ? STEP_IDS.indexOf(stepId) : -1;
+  const stepIds = getActiveStepIds(answers);
+  const index = stepId ? stepIds.indexOf(stepId) : -1;
   const inFunnel = index >= 0;
-  const total = STEP_IDS.length;
+  const total = stepIds.length;
   const pct = inFunnel ? Math.round(((index + 1) / total) * 100) : 0;
 
   const goBack = () => {
-    if (index > 0) navigate(`/flow/${STEP_IDS[index - 1]}`);
+    if (index > 0) navigate(`/flow/${stepIds[index - 1]}`);
     else navigate(home);
   };
 

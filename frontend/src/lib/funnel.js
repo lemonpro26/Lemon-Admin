@@ -31,12 +31,6 @@ export const FUNNEL_STEPS = [
     type: 'name',
   },
   {
-    id: 'address',
-    question: "What's your address?",
-    subtitle: 'Used to match you with the right lemon-law team.',
-    type: 'address',
-  },
-  {
     id: 'phone',
     question: "What's the best phone number to reach you?",
     subtitle: 'A specialist will call to review your case — free of charge.',
@@ -51,6 +45,13 @@ export const FUNNEL_STEPS = [
 ];
 
 export const STEP_IDS = FUNNEL_STEPS.map((s) => s.id);
+
+// Active steps for a given session. When the visitor already picked their make on
+// a landing page (e.g. the /pa make grid sets `make_locked`), the in-funnel make
+// step is dropped so they don't pick it twice.
+export function getActiveStepIds(answers = {}) {
+  return STEP_IDS.filter((id) => !(id === 'make' && answers && answers.make_locked));
+}
 
 export function getStepIndex(stepId) {
   return STEP_IDS.indexOf(stepId);

@@ -140,3 +140,8 @@ Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.
 ## 2026-06-30 (pm) — Bolder/crisper logo + favicon
 - Regenerated wordmark in extra-bold weight, cut transparent at 2x res (lemon-pros-logo.png navy + lemon-pros-logo-white.png). Sharper on retina.
 - New favicon: navy + lemon + bold 'LP' monogram. Wrote favicon.png/.ico + apple-touch-icon.png; updated index.html icon links.
+
+## 2026-06-30 (eve) — Funnel cleanups
+- Removed the Address step from the funnel entirely (all landing pages). Flow: year→make→model→name→phone→email.
+- /pa & /spa make grids now set make_locked; funnel skips the make step when make pre-chosen (getActiveStepIds). Home still shows make. Back button + progress bar use active step list.
+- Removed "Most case reviews are completed same day" from ThankYou page.

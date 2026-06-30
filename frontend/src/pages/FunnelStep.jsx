@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { CarFront } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { FUNNEL_STEPS, STEP_IDS, getStep, getStepIndex } from '@/lib/funnel';
+import { FUNNEL_STEPS, STEP_IDS, getActiveStepIds, getStep } from '@/lib/funnel';
 import { CAR_YEARS, CAR_MAKES, getModels, makeLogo } from '@/lib/carData';
 import { useFunnel } from '@/context/FunnelContext';
 import { getTracking, getSessionId } from '@/lib/tracking';
@@ -305,8 +305,9 @@ export default function FunnelStep() {
   const [submitting, setSubmitting] = useState(false);
 
   const step = getStep(stepId);
-  const index = getStepIndex(stepId);
-  const total = STEP_IDS.length;
+  const stepIds = getActiveStepIds(answers);
+  const index = stepIds.indexOf(stepId);
+  const total = stepIds.length;
   const stepText = (t.steps && t.steps[stepId]) || {};
 
   useEffect(() => {
@@ -314,7 +315,19 @@ export default function FunnelStep() {
       navigate(lang === 'es' ? '/sp' : '/', { replace: true });
       return;
     }
-    if (!step) navigate(`/flow/${STEP_IDS[0]}`, { replace: true });
+    if (!step) {
+      navigate(`/flow/${stepIds[0]}`, { replace: true });
+      return;
+    }
+    // Step is valid but skipped for this session (e.g. make already chosen on /pa)
+    // — jump to the next active step instead of showing it again.
+    if (index < 0) {
+      const full = FUNNEL_STEPS.map((s) => s.id);
+      const orig = full.indexOf(stepId);
+      const nextActive = full.slice(orig + 1).find((id) => stepIds.includes(id)) || stepIds[stepIds.length - 1];
+      navigate(`/flow/${nextActive}`, { replace: true });
+      return;
+    }
     window.scrollTo(0, 0);
     // Record furthest funnel step reached (for drop-off analytics).
     if (step && index >= 0) {
@@ -322,10 +335,10 @@ export default function FunnelStep() {
     }
   }, [stepId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!step) return null;
+  if (!step || index < 0) return null;
 
   const goNext = () => {
-    if (index < total - 1) navigate(`/flow/${STEP_IDS[index + 1]}`);
+    if (index < total - 1) navigate(`/flow/${stepIds[index + 1]}`);
   };
 
   const selectAndNext = (field, value) => {

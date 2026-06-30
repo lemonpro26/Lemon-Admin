@@ -115,7 +115,7 @@ export default function PresellPA() {
     resetAnswers();
     setAnswer('started', '1');
     setAnswer('source_page', 'lapa');
-    if (make) setAnswer('car_make', make);
+    if (make) { setAnswer('car_make', make); setAnswer('make_locked', '1'); }
     api.post('/track/engage', { session_id: getSessionId() }).catch(() => {});
     navigate('/flow/year');
   };

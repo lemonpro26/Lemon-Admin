@@ -109,7 +109,7 @@ export default function PresellSPA() {
     setLang('es');
     setAnswer('started', '1');
     setAnswer('source_page', 'laspa');
-    if (make) setAnswer('car_make', make);
+    if (make) { setAnswer('car_make', make); setAnswer('make_locked', '1'); }
     api.post('/track/engage', { session_id: getSessionId() }).catch(() => {});
     navigate('/flow/year');
   };
