@@ -119,6 +119,8 @@ export default function PresellSPA({
     setLang('es');
     setAnswer('started', '1');
     setAnswer('source_page', sourcePage);
+    setAnswer('entry_phone', phone);
+    setAnswer('entry_phone_href', phoneHref);
     if (make) { setAnswer('car_make', make); setAnswer('make_locked', '1'); }
     api.post('/track/engage', { session_id: getSessionId() }).catch(() => {});
     navigate('/flow/year');

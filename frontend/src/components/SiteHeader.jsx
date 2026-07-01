@@ -20,8 +20,6 @@ export const SiteHeader = () => {
   const { lang, answers } = useFunnel();
   const t = tr(lang);
   const home = lang === 'es' ? '/sp' : '/';
-  const phone = lang === 'es' ? COMPANY.phoneEs : COMPANY.phone;
-  const phoneHref = lang === 'es' ? COMPANY.phoneHrefEs : COMPANY.phoneHref;
 
   const match = location.pathname.match(/^\/flow\/(.+)$/);
   const stepId = match ? match[1] : null;
@@ -30,6 +28,13 @@ export const SiteHeader = () => {
   const inFunnel = index >= 0;
   const total = stepIds.length;
   const pct = inFunnel ? Math.round(((index + 1) / total) * 100) : 0;
+
+  // While inside the funnel, keep the SAME phone number the visitor saw on their
+  // entry landing page (e.g. /dg = 833-240-9312). Falls back to the site default.
+  const defaultPhone = lang === 'es' ? COMPANY.phoneEs : COMPANY.phone;
+  const defaultHref = lang === 'es' ? COMPANY.phoneHrefEs : COMPANY.phoneHref;
+  const phone = (inFunnel && answers.entry_phone) ? answers.entry_phone : defaultPhone;
+  const phoneHref = (inFunnel && answers.entry_phone_href) ? answers.entry_phone_href : defaultHref;
 
   const goBack = () => {
     if (index > 0) navigate(`/flow/${stepIds[index - 1]}`);
