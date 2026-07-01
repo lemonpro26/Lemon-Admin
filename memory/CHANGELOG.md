@@ -1,4 +1,13 @@
 
+## 2026-07-01 — Demand Gen pages + Pages hub 4-group + Spanish PA text sync (iteration_20, 100% pass)
+- NEW landing pages (copies of PA advertorials): `/dg` "Demand Gen Video Calls" (English, phone (833) 240-9312, source_page=dg) and `/dgs` "Demand Gen Spanish Video Calls" (Spanish, phone (833) 868-1802, source_page=dgs). Built by parameterizing PresellPA/PresellSPA (props: contentPath, sourcePage, phone, phoneHref, rootTestId) — routes added in App.js.
+- Each DG page independently editable in CMS: backend DEFAULT_DG_CONTENT/DEFAULT_DGS_CONTENT (deepcopy of PA/SPA), AD_CONTENT_DEFAULTS + _merged_ad_content + _sanitize_ad_content; endpoints GET /api/dg-content, /api/dgs-content, GET+PUT /api/admin/dg-content & /api/admin/dgs-content. Editing dg does not affect pa (verified independent).
+- Admin Pages tab restructured into 4 groups: Home Pages (/,/sp), PA Pages (/pa,/spa), Demand Gen Pages (/dg,/dgs), Split Tests. (AdminPages.jsx PAGE_GROUPS; AD_EDITORS=[pa,spa,dg,dgs]).
+- CRM/Zapier landing_page slug routing: dg→/dg, dgs→/dgs, sp/laspa→/sp, else /pa (_post_lead_to_crm).
+- Spanish PA text sync to mirror user's English /pa edits: removed "he exclusively practices lemon law" from attorney bio; removed "network" from "The Lemon Pros network has helped". Applied to code defaults (PA + SPA + DG + DGS) and cleared stale preview pa_content override. Admin lead-detail Source label now maps lapa/laspa/sp/dg/dgs to friendly names.
+- KNOWN follow-ups (not done): (a) funnel step header still shows site-default phone 844-335-8911 regardless of DG entry page; (b) preview CRM_WEBHOOK_URL is LIVE (real Zapier hook) — testing leads reached the CRM; consider a TEST-lead guard or clearing preview CRM URL.
+
+
 
 ## 2026-06-28 — Post-redeploy verification (iteration_17, 100% pass)
 Batch verified end-to-end (backend 12/12, frontend 8/8), now live on production.

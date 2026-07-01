@@ -5,6 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import copy
 import hashlib
 import secrets
 import random
@@ -273,8 +274,8 @@ def _merged_spa_content(cfg: dict) -> dict:
 
 # Demand Gen advertorial pages (/dg English, /dgs Spanish) — same field shape,
 # start as copies of the PA / Spanish-PA defaults; independently editable in CMS.
-DEFAULT_DG_CONTENT = {**DEFAULT_PA_CONTENT}
-DEFAULT_DGS_CONTENT = {**DEFAULT_SPA_CONTENT}
+DEFAULT_DG_CONTENT = copy.deepcopy(DEFAULT_PA_CONTENT)
+DEFAULT_DGS_CONTENT = copy.deepcopy(DEFAULT_SPA_CONTENT)
 
 # All advertorial-style pages share the same editing shape.
 AD_CONTENT_DEFAULTS = {
