@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { BarChart3, RefreshCw, Pencil, ChevronRight, Home } from 'lucide-react';
+import { BarChart3, RefreshCw, Pencil, ChevronRight, Home, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -121,6 +121,39 @@ function DrillTable({ title, columns, rows, onRowClick, testid }) {
     </div>
   );
 }
+
+// Compact "calls + closed revenue per tracked number" strip for the top of Analytics.
+const CallsByNumberStrip = ({ rows }) => {
+  if (!rows || rows.length === 0) return null;
+  return (
+    <div data-testid="analytics-calls-by-number">
+      <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-slate-700">
+        <Phone className="h-4 w-4 text-indigo-600" /> Calls by number
+      </div>
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        {rows.map((r) => (
+          <div key={r.key} className="rounded-2xl border border-slate-200 bg-white p-4" data-testid={`calls-by-number-${r.key}`}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-slab font-bold text-slate-900 tracking-tight" data-testid={`calls-by-number-display-${r.key}`}>{r.display}</span>
+              <span className="text-[9px] font-bold uppercase tracking-wide rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 whitespace-nowrap">{r.label}</span>
+            </div>
+            <div className="mt-3 flex items-end justify-between">
+              <div>
+                <div className="text-2xl font-extrabold text-slate-900 leading-none" data-testid={`calls-by-number-calls-${r.key}`}>{r.calls}</div>
+                <div className="text-[11px] text-slate-400 mt-1">calls</div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-emerald-700 leading-none" data-testid={`calls-by-number-revenue-${r.key}`}>${Number(r.revenue || 0).toLocaleString()}</div>
+                <div className="text-[11px] text-slate-400 mt-1">{r.sold} sold</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 
 export const AdminAnalytics = () => {
   const [data, setData] = useState(null);
@@ -354,6 +387,8 @@ export const AdminAnalytics = () => {
   return (
     <div className="grid gap-6" data-testid="admin-analytics">
       {header}
+
+      <CallsByNumberStrip rows={data.calls_by_number || []} />
 
       {/* Breadcrumb + (campaign-level) type filter */}
       <div className="flex items-center justify-between flex-wrap gap-3">

@@ -2945,6 +2945,26 @@ async def _agg_clicks(group_fields: list, s_iso: str, e_iso: str) -> dict:
     return out
 
 
+async def _calls_by_number(s_iso: str, e_iso: str) -> list:
+    """Aggregate calls + closed revenue within a range, grouped by dialed number."""
+    buckets = {g["key"]: {"key": g["key"], "label": g["label"], "display": g["display"],
+                          "calls": 0, "sold": 0, "revenue": 0.0} for g in CALL_NUMBER_GROUPS}
+    buckets["other"] = {"key": "other", "label": "Other", "display": "Other / untracked",
+                        "calls": 0, "sold": 0, "revenue": 0.0}
+    async for c in db.calls.find(
+        {"created_at": {"$gte": s_iso, "$lte": e_iso}},
+        {"tracking_number": 1, "sale_status": 1, "sale_value": 1},
+    ):
+        grp = _call_number_group(c.get("tracking_number"))["number_group"]
+        b = buckets.get(grp) or buckets["other"]
+        b["calls"] += 1
+        if c.get("sale_status") == "sold":
+            b["sold"] += 1
+            b["revenue"] += float(c.get("sale_value") or 0)
+    order = [g["key"] for g in CALL_NUMBER_GROUPS] + ["other"]
+    return [buckets[k] for k in order if k != "other" or buckets["other"]["calls"] > 0]
+
+
 @api_router.get("/admin/analytics")
 async def admin_analytics(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
     await _auto_clean_bot_clicks()
@@ -3038,6 +3058,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
         "by_keyword": await breakdown(["campaign_id", "adgroup_id", "ad_id", "keyword"]),
         "by_sitelink": await breakdown(["sitelink_id"]),
+        "calls_by_number": await _calls_by_number(s_iso, e_iso),
         "ad_labels": cfg.get("ad_labels") or {},
         "campaign_types": cfg.get("campaign_types") or {},
         "google_ads_connected": gnames.is_configured(),

@@ -1,4 +1,10 @@
 
+## 2026-07-01 (pm-2) — Analytics "Calls by number" summary strip
+- Added a summary strip at the top of the Analytics tab showing, per tracked number (Home & PA / Spanish & SPA / Demand Gen / Demand Gen Spanish): total calls, closed revenue, and # sold — for the selected date range.
+- Backend: _calls_by_number(s_iso, e_iso) helper; GET /api/admin/analytics now returns calls_by_number[].
+- Frontend: CallsByNumberStrip in AdminAnalytics.jsx (testids analytics-calls-by-number, calls-by-number-<key>, calls-by-number-calls-<key>, calls-by-number-revenue-<key>). Verified via API + screenshot; seeded test calls cleaned up.
+
+
 ## 2026-07-01 (pm) — Calls tab: number-based segmentation + Called# column + column toggles + Phone Numbers settings (iteration_21, 100% pass)
 - Calls are now grouped by the DIALED tracking number (reliable for every call — fixes "calls not populating in the correct tab", which happened because old segmentation relied on gclid/session→source_page matching that real click-to-calls lack). Backend: CALL_NUMBER_GROUPS + _digits10 + _call_number_group; _enrich_calls_with_hooks adds number_group / number_group_label / tracked_number_display to each call.
   - Groups: Home & PA = 844-335-8911 · Spanish & SPA = 866-524-3722 · Demand Gen = 833-240-9312 · Demand Gen Spanish = 833-868-1802.
