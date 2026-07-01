@@ -1,4 +1,9 @@
 
+## 2026-07-01 (pm-4) — Per-test date filter inside each split-test result
+- Each split-test card now has its own "Results" DateRangeFilter that fetches that test's stats independently for the chosen period. The top-level filter is now the "Default period" that seeds all tests; each can be adjusted individually.
+- Backend: new GET /api/admin/experiments/{id}/stats?start=&end= returns {stats} for a single experiment (reuses _experiment_stats). Frontend: ExperimentCard holds its own stats + range state (testid exp-stats-filter-<id>), re-syncs to the default period on list reload. Verified via endpoint + screenshot.
+
+
 ## 2026-07-01 (pm-3) — Edit the traffic split of an existing/ongoing split test
 - Added an inline "Adjust split" editor on each test card (AdminSplitTest.jsx ExperimentCard): weight input per variant with live "% of traffic" preview, Save/Cancel. Works on draft AND running tests — for running tests, changes apply to new visitors immediately.
 - Backend already accepted `variants` on PUT /admin/experiments/{id}; frontend now sends `{ variants }` via editSplit handler. Testids: exp-edit-split-<id>, exp-split-editor-<id>, exp-split-weight-<id>-<i>, exp-split-pct-<id>-<i>, exp-split-save-<id>, exp-split-cancel-<id>. Verified via UI flow; test experiment cleaned up.

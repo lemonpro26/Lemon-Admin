@@ -1611,6 +1611,17 @@ async def list_experiments(_: dict = Depends(require_admin), start: str = Query(
     return {"experiments": docs}
 
 
+@api_router.get("/admin/experiments/{exp_id}/stats")
+async def experiment_stats(exp_id: str, _: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
+    exp = await db.experiments.find_one({"id": exp_id}, {"_id": 0})
+    if not exp:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    s_iso, e_iso = ("", "")
+    if start or end:
+        s_iso, e_iso, _d = _date_range(start, end)
+    return {"stats": await _experiment_stats(exp, s_iso, e_iso)}
+
+
 @api_router.post("/admin/experiments")
 async def create_experiment(body: ExperimentBody, _: dict = Depends(require_editor)):
     variants = [{"label": v.label.strip() or v.path,

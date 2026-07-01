@@ -34,8 +34,10 @@ function VariantStatsRow({ v, isWinner }) {
   );
 }
 
-function ExperimentCard({ exp, origin, canEdit, onStart, onStop, onDelete, onRename, onEditSlug, onEditSplit }) {
-  const stats = exp.stats || { variants: [], winner: null };
+function ExperimentCard({ exp, origin, canEdit, defaultRange, onStart, onStop, onDelete, onRename, onEditSlug, onEditSplit }) {
+  const [stats, setStats] = useState(exp.stats || { variants: [], winner: null });
+  const [localRange, setLocalRange] = useState(defaultRange);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(exp.name);
   const [slugEditing, setSlugEditing] = useState(false);
@@ -44,6 +46,25 @@ function ExperimentCard({ exp, origin, canEdit, onStart, onStop, onDelete, onRen
   const [splitEditing, setSplitEditing] = useState(false);
   const [draftVariants, setDraftVariants] = useState((exp.variants || []).map((v) => ({ ...v })));
   const [savingSplit, setSavingSplit] = useState(false);
+
+  // Re-sync to parent-provided stats/range whenever the list reloads.
+  useEffect(() => {
+    setStats(exp.stats || { variants: [], winner: null });
+    setLocalRange(defaultRange);
+  }, [exp.stats, defaultRange]);
+
+  const changeRange = async (r) => {
+    setLocalRange(r);
+    setStatsLoading(true);
+    try {
+      const res = await api.get(`/admin/experiments/${exp.id}/stats`, { params: { start: r.start, end: r.end } });
+      setStats(res.data?.stats || { variants: [], winner: null });
+    } catch (e) {
+      toast.error('Failed to load stats for this range');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const url = `${origin}/${exp.slug || 'split'}`;
 
@@ -169,6 +190,12 @@ function ExperimentCard({ exp, origin, canEdit, onStart, onStop, onDelete, onRen
       </div>
 
       <div className="mt-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 px-3 pb-2" data-testid={`exp-stats-filter-${exp.id}`}>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400 inline-flex items-center gap-1.5">
+            <CalendarRange className="h-3.5 w-3.5" /> Results {statsLoading && <span className="text-slate-300 normal-case font-normal">· loading…</span>}
+          </span>
+          <DateRangeFilter value={localRange} onChange={changeRange} />
+        </div>
         <div className="flex items-center justify-between px-3 pb-1">
           <div className="grid grid-cols-[1.4fr_repeat(4,1fr)] gap-2 flex-1 text-[11px] uppercase tracking-wide text-slate-400 font-bold">
             <div>Page</div><div className="text-center">Split</div><div className="text-center">Visits</div><div className="text-center">Leads</div><div className="text-center">Conv.</div>
@@ -330,9 +357,9 @@ export function AdminSplitTest() {
 
       {/* Stats date filter */}
       <div className="flex items-center gap-2 flex-wrap" data-testid="split-date-filter">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 mr-1">Stats period</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 mr-1">Default period</span>
         <DateRangeFilter value={range} onChange={setRange} />
-        <span className="text-xs text-slate-400">Counts only visitors routed through each test's entry URL</span>
+        <span className="text-xs text-slate-400">Sets the period for all tests — adjust any test individually below.</span>
       </div>
 
       {!loading && running.length === 0 && (
@@ -392,7 +419,7 @@ export function AdminSplitTest() {
         ) : (
           <div className="space-y-4">
             {experiments.map((exp) => (
-              <ExperimentCard key={exp.id} exp={exp} origin={origin} canEdit={canEdit} onStart={startExp} onStop={stopExp} onDelete={deleteExp} onRename={renameExp} onEditSlug={editSlug} onEditSplit={editSplit} />
+              <ExperimentCard key={exp.id} exp={exp} origin={origin} canEdit={canEdit} defaultRange={range} onStart={startExp} onStop={stopExp} onDelete={deleteExp} onRename={renameExp} onEditSlug={editSlug} onEditSplit={editSplit} />
             ))}
           </div>
         )}
