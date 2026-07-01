@@ -34,7 +34,7 @@ const SPA_DEFAULTS = {
   attorney_title: 'Abogado Fundador · The Lemon Pros · Colegio de Abogados de CA #265470',
   attorney_award: 'National Trial Lawyers — Top 40 Menores de 40',
   attorney_bio:
-    'Michael Saeedian es un abogado de la Ley Limón de California a quien los fabricantes de autos temen. Graduado de UCLA con un Doctorado en Derecho de Loyola Law School, se dedica exclusivamente a la Ley Limón — luchando para conseguir el máximo reembolso, reemplazo o acuerdo en efectivo para los conductores atrapados con vehículos defectuosos. Cuando envía su caso, trabaja directamente con un abogado licenciado y galardonado, no con un centro de llamadas.',
+    'Michael Saeedian es un abogado de la Ley Limón de California a quien los fabricantes de autos temen. Graduado de UCLA con un Doctorado en Derecho de Loyola Law School, luchando para conseguir el máximo reembolso, reemplazo o acuerdo en efectivo para los conductores atrapados con vehículos defectuosos. Cuando envía su caso, trabaja directamente con un abogado licenciado y galardonado, no con un centro de llamadas.',
   attorney_badges: ['Top 100 Abogados Litigantes', 'Calificación 5 Estrellas en Yelp', 'Lead Counsel Rated', 'Si No Gana, No Paga'],
   attorney_school: 'UCLA · Doctorado en Derecho, Loyola Law School, Los Ángeles',
   settlements_eyebrow: 'Acuerdos Recientes',
@@ -54,7 +54,7 @@ const SPA_DEFAULTS = {
   callout_cta: 'Vea Si Mi Auto Califica',
   qualify_heading: '¿Cómo Califico?',
   qualify_intro:
-    'La red de The Lemon Pros ha ayudado a innumerables consumidores a responsabilizar a los fabricantes. Si puede responder sí a cualquiera de las siguientes, debería verificar su caso hoy:',
+    'The Lemon Pros ha ayudado a innumerables consumidores a responsabilizar a los fabricantes. Si puede responder sí a cualquiera de las siguientes, debería verificar su caso hoy:',
   qualify_items: [
     'Mi vehículo ha sido reparado varias veces por el mismo problema',
     'El problema comenzó mientras todavía estaba bajo la garantía del fabricante',
@@ -71,17 +71,23 @@ const SPA_DEFAULTS = {
 const POPULAR = ['Toyota', 'Honda', 'Ford', 'Chevrolet', 'Nissan', 'Jeep', 'Hyundai', 'Kia', 'Ram', 'BMW', 'Mercedes-Benz'];
 const TOP_MAKES = POPULAR.map((name) => CAR_MAKES.find((m) => m.name === name)).filter(Boolean);
 
-export default function PresellSPA() {
+export default function PresellSPA({
+  contentPath = '/spa-content',
+  sourcePage = 'laspa',
+  phone = COMPANY.phoneEs,
+  phoneHref = COMPANY.phoneHrefEs,
+  rootTestId = 'presell-spa-page',
+} = {}) {
   const navigate = useNavigate();
   const { setAnswer, resetAnswers, setLang } = useFunnel();
   const goLegal = (to) => navigate(to);
   const [c, setC] = useState(SPA_DEFAULTS);
 
   useEffect(() => {
-    api.get('/spa-content')
+    api.get(contentPath)
       .then((res) => setC({ ...SPA_DEFAULTS, ...(res.data || {}) }))
       .catch(() => {});
-  }, []);
+  }, [contentPath]);
 
   useEffect(() => {
     const tracking = captureTracking(window.location.search);
@@ -89,7 +95,7 @@ export default function PresellSPA() {
       .post('/track/click', {
         session_id: getSessionId(),
         landing_path: window.location.pathname,
-        source_page: 'laspa',
+        source_page: sourcePage,
         campaign_id: tracking.campaign_id,
         adgroup_id: tracking.adgroup_id,
         ad_id: tracking.ad_id,
@@ -112,14 +118,14 @@ export default function PresellSPA() {
     resetAnswers();
     setLang('es');
     setAnswer('started', '1');
-    setAnswer('source_page', 'laspa');
+    setAnswer('source_page', sourcePage);
     if (make) { setAnswer('car_make', make); setAnswer('make_locked', '1'); }
     api.post('/track/engage', { session_id: getSessionId() }).catch(() => {});
     navigate('/flow/year');
   };
 
   return (
-    <div className="relative min-h-[100dvh] bg-[#E6F1ED] font-sans text-slate-800" data-testid="presell-spa-page">
+    <div className="relative min-h-[100dvh] bg-[#E6F1ED] font-sans text-slate-800" data-testid={rootTestId}>
       <img
         src={MINT_BG}
         alt=""
@@ -130,13 +136,13 @@ export default function PresellSPA() {
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <Logo size="sm" />
           <a
-            href={COMPANY.phoneHrefEs}
+            href={phoneHref}
             onClick={trackPhoneCallConversion}
             data-testid="spa-header-call"
             className="flex flex-col items-center justify-center leading-none rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white px-2.5 py-1.5 sm:px-5 sm:py-2 transition-colors shadow-sm"
           >
             <span className="flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-xl font-extrabold whitespace-nowrap">
-              <Phone className="h-4 w-4 sm:h-5 sm:w-5" /> {COMPANY.phoneEs}
+              <Phone className="h-4 w-4 sm:h-5 sm:w-5" /> {phone}
             </span>
             <span className="mt-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.15em] text-white/90">
               Llame Ahora
@@ -264,7 +270,7 @@ export default function PresellSPA() {
           <div className="flex flex-col items-center gap-1">
             <p className="font-slab font-extrabold text-white text-lg">The Lemon Pros</p>
             <p className="text-sm text-slate-300">{COMPANY.address}</p>
-            <a href={COMPANY.phoneHrefEs} onClick={trackPhoneCallConversion} className="text-sm font-semibold text-[#FACC15] hover:text-white" data-testid="spa-footer-call">{COMPANY.phoneEs}</a>
+            <a href={phoneHref} onClick={trackPhoneCallConversion} className="text-sm font-semibold text-[#FACC15] hover:text-white" data-testid="spa-footer-call">{phone}</a>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm">
             <button type="button" onClick={() => goLegal('/terms')} className="hover:text-white transition-colors" data-testid="spa-footer-terms">Términos de Uso</button>

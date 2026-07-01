@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 20 (Demand Gen pages /dg + /dgs + Spanish text edits + Pages 4-group hub) verified end-to-end. Backend: 13/13 pytest pass — public /api/pa-content shows 'The Lemon Pros has helped' (no 'network') and attorney_bio without 'exclusively'; /api/spa-content shows 'The Lemon Pros ha ayudado' (no 'La red de') and bio without 'se dedica exclusivamente'; /api/dg-content and /api/dgs-content mirror the same edits and expose full PA-shape fields (headline, attorney_name, settlements, qualify_items, final_cta). Admin auth (POST /api/admin/login owner/LemonPros2026!) returns a token; unauthenticated GET /api/admin/dg-content and /api/admin/dgs-content return 401; authenticated GETs return 200. PUT /api/admin/dg-content with a TEST_DG_HEADLINE persists in /api/dg-content while /api/pa-content headline remains unchanged (independent). Same verified for /admin/dgs-content vs /api/spa-content. Both edits restored to original defaults. POST /api/leads with source_page='dg' and 'dgs' returns {success:true,id:...}. Frontend (Playwright): /dg renders presell-dg-page, pa-header-call = '(833) 240-9312', clicking pa-make-toyota routes to /flow/year. /dgs renders presell-dgs-page, spa-header-call = '(833) 868-1802', Spanish markers present, clicking spa-make-toyota routes to /flow/year (Spanish). Full /dg funnel completed end-to-end (year 2022 -> first model -> name -> phone 213xxxxxxx -> gmail.com email) reached /thank-you. Admin login -> Pages tab shows all 4 group headings (page-group-home-pages, page-group-pa-pages, page-group-demand-gen-pages, page-group-split-tests) and rows page-builtin-dg (/dg) + page-builtin-dgs (/dgs). Clicking page-builtin-dg-edit opens admin-dg-content editor with 44 form inputs and 'Open /dg' link href ends in /dg.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Funnel header (/flow/*)", "issues": ["Funnel header call button hardcodes 844-335-8911 regardless of entry page (/dg = 833-240-9312, /dgs = 833-868-1802). Presell headers correctly show the DG-specific numbers; only the funnel header falls back to the site-wide default. Not requested in this batch — flagging as possible UX inconsistency for the main agent to decide."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_dg_dgs_pages.py",
+    "/app/test_reports/pytest/iter20_dg_dgs.xml"
+  ],
+  "action_items": [
+    "PREVIEW ENV WARNING: /app/backend/.env still has CRM_WEBHOOK_URL set to https://hooks.zapier.com/hooks/catch/27976578/43evfq3/ (contrary to the review-request note that it's empty on preview). The 3 test leads submitted (2 API + 1 UI end-to-end) will have posted to that Zapier hook as background tasks. Consider clearing CRM_WEBHOOK_URL on preview OR gating _post_lead_to_crm behind an environment flag, so testing agents don't leak TEST_ leads into the real CRM.",
+    "Optional: propagate DG/DGS phone to funnel header so users staying in the funnel see the same number they called from the presell."
+  ],
+  "critical_code_review_comments": [
+    "server.py now 3168 lines — router split (auth/hooks/leads/calls/spanish/funnel/analytics/pa-content/page-content/ad-content/users/split/google-ads) is more overdue with 4 ad-content pages sharing shape (pa/spa/dg/dgs).",
+    "DEFAULT_DG_CONTENT and DEFAULT_DGS_CONTENT use {**DEFAULT_PA_CONTENT} / {**DEFAULT_SPA_CONTENT} — shallow copy is fine for top-level keys, but nested lists (settlements, attorney_badges, qualify_items, body) are shared references between PA/DG (and SPA/DGS). This has no runtime impact today because _merged_ad_content always returns new dicts and _sanitize_ad_content re-lists on save; but any future mutation of a default list at module scope would corrupt both pages. Recommend copy.deepcopy(DEFAULT_PA_CONTENT).",
+    "_post_lead_to_crm slug-routing (dg->/dg, dgs->/dgs, sp/laspa->/sp, else /pa) reads well but the 'else /pa' fallback lumps the plain '/home' source_page into /pa in the CRM landing_page — worth confirming with the business whether that's intentional or if home leads should carry landing_page 'apply.thelemonpros.com/' (or similar).",
+    "AdminPages.jsx PAGE_GROUPS uses group.title.replace(/\\s+/g, '-').toLowerCase() to derive testids — works today for the four hardcoded titles; if a future group title contains punctuation (colons, slashes, ampersands) the testid will silently include them. Consider a slug helper.",
+    "Frontend /dg and /dgs Pass phone/phoneHref/rootTestId via props to shared PresellPA/PresellSPA components — good composition. The funnel step page still calls a hardcoded number; consider threading the same phone through the flow via URL query or a lightweight context so the whole session is consistent."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_dg_dgs_pages.py",
+    "/app/test_reports/iteration_20.json"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% (all spec items verified)"},
+  "test_credentials": "owner / LemonPros2026!  (unchanged)",
+  "seed_data_creation": "Backend tests temporarily set TEST_DG_HEADLINE_<uuid> and TEST_DGS_HEADLINE_<uuid> then restored the originals via PUT (verified). Two API-level test leads (source_page=dg + dgs, first_name=TEST, gmail.com, area code 213) and one UI-level test lead were submitted. NOTE: CRM_WEBHOOK_URL was ACTUALLY set in backend/.env, so background tasks likely forwarded these to Zapier — see action_items.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_dg_dgs_pages.py covers: (a) all four public content endpoints reflect the removed 'exclusively'/'se dedica exclusivamente' and 'network'/'La red de' phrases; (b) admin auth requirement + admin GETs; (c) independent editing of /dg vs /pa AND /dgs vs /spa with automatic restoration; (d) lead POST with source_page in {dg,dgs}. Frontend testids verified: presell-dg-page, presell-dgs-page, pa-header-call, spa-header-call, pa-make-toyota, spa-make-toyota, page-group-{home-pages|pa-pages|demand-gen-pages|split-tests}, page-builtin-dg[-edit], page-builtin-dgs[-edit], admin-dg-content. Funnel testids used: year-option-YYYY, model-option-*, name-first-input, name-last-input, name-continue-button, phone-input, phone-continue-button, email-input, email-submit-button. IMPORTANT: phone validator rejects 555-prefix numbers and email validator rejects example.com — use area code 213 (or any real US area code) with 7 random digits, and a real domain (gmail.com etc.) for successful lead submission.",
+  "rca of the issue": "N/A — no bugs found. Only follow-ups: (1) CRM_WEBHOOK_URL was live on preview (mismatched with review-request assumption of empty); (2) funnel header phone doesn't inherit from DG entry — both flagged as action_items, neither blocking."
+}

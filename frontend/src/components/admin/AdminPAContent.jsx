@@ -62,7 +62,6 @@ function ListEditor({ label, items, onChange, area, testid }) {
 
 export function AdminPAContent({ page = 'pa' }) {
   const canEdit = canEditFn();
-  const isSpa = page === 'spa';
   const [c, setC] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -95,7 +94,7 @@ export function AdminPAContent({ page = 'pa' }) {
       const res = await api.put(`/admin/${page}-content`, c);
       setC(res.data);
       setPreviewKey((k) => k + 1); // refresh the live preview after save
-      toast.success(`${isSpa ? 'Spanish ' : ''}PA page updated — live now`);
+      toast.success(`/${page} page updated — live now`);
     } catch (e) {
       toast.error('Failed to save');
     } finally {

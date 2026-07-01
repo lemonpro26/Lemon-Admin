@@ -653,7 +653,7 @@ export default function AdminDashboard() {
                   ['Vehicle Model', selected.car_model, 'lead-detail-car-model'],
                   ['Phone', selected.phone, 'lead-detail-phone'],
                   ['Email', selected.email, 'lead-detail-email'],
-                  ['Source', selected.source_page === 'lapa' ? 'PA page (lapa)' : (selected.source_page || 'home'), 'lead-detail-source'],
+                  ['Source', ({ lapa: 'PA page (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish Landing (sp)', dg: 'Demand Gen (dg)', dgs: 'Spanish Demand Gen (dgs)' }[selected.source_page]) || (selected.source_page || 'home'), 'lead-detail-source'],
                   ['Campaign ID', selected.campaign_id, 'lead-detail-campaign'],
                   ['Ad Group ID', selected.adgroup_id, 'lead-detail-adgroup'],
                   ['Ad ID', selected.ad_id, 'lead-detail-ad'],

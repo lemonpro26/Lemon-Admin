@@ -35,7 +35,7 @@ const PA_DEFAULTS = {
   attorney_title: 'Founding Attorney · The Lemon Pros · CA State Bar #265470',
   attorney_award: 'National Trial Lawyers — Top 40 Under 40',
   attorney_bio:
-    'Michael Saeedian is a California Lemon Law attorney that auto manufacturers fear. A UCLA graduate with a Juris Doctorate from Loyola Law School, he exclusively practices lemon law — fighting to secure the maximum refund, replacement, or cash settlement for drivers stuck with defective vehicles. When you submit your case, you work directly with a licensed, award-winning attorney, not a call center.',
+    'Michael Saeedian is a California Lemon Law attorney that auto manufacturers fear. A UCLA graduate with a Juris Doctorate from Loyola Law School, fighting to secure the maximum refund, replacement, or cash settlement for drivers stuck with defective vehicles. When you submit your case, you work directly with a licensed, award-winning attorney, not a call center.',
   attorney_badges: ['Top 100 Trial Lawyers', '5-Star Rated on Yelp', 'Lead Counsel Rated', 'No Win, No Fee'],
   attorney_school: 'UCLA · J.D., Loyola Law School, Los Angeles',
   settlements_eyebrow: 'Recent Settlements',
@@ -55,7 +55,7 @@ const PA_DEFAULTS = {
   callout_cta: 'See If My Car Qualifies',
   qualify_heading: 'How Do I Qualify?',
   qualify_intro:
-    'The Lemon Pros network has helped countless consumers hold manufacturers accountable. If you can answer yes to any of the following, you should check your case today:',
+    'The Lemon Pros has helped countless consumers hold manufacturers accountable. If you can answer yes to any of the following, you should check your case today:',
   qualify_items: [
     'My vehicle has been repaired multiple times for the same issue',
     'The problem started while it was still under the manufacturer warranty',
@@ -74,17 +74,23 @@ const TOP_MAKES = POPULAR
   .map((name) => CAR_MAKES.find((m) => m.name === name))
   .filter(Boolean);
 
-export default function PresellPA() {
+export default function PresellPA({
+  contentPath = '/pa-content',
+  sourcePage = 'lapa',
+  phone = COMPANY.phone,
+  phoneHref = COMPANY.phoneHref,
+  rootTestId = 'presell-pa-page',
+} = {}) {
   const navigate = useNavigate();
   const { setAnswer, resetAnswers } = useFunnel();
   const goLegal = (to) => navigate(to);
   const [c, setC] = useState(PA_DEFAULTS);
 
   useEffect(() => {
-    api.get('/pa-content')
+    api.get(contentPath)
       .then((res) => setC({ ...PA_DEFAULTS, ...(res.data || {}) }))
       .catch(() => {});
-  }, []);
+  }, [contentPath]);
 
   useEffect(() => {
     const tracking = captureTracking(window.location.search);
@@ -93,7 +99,7 @@ export default function PresellPA() {
       .post('/track/click', {
         session_id: sessionId,
         landing_path: window.location.pathname,
-        source_page: 'lapa',
+        source_page: sourcePage,
         campaign_id: tracking.campaign_id,
         adgroup_id: tracking.adgroup_id,
         ad_id: tracking.ad_id,
@@ -114,26 +120,26 @@ export default function PresellPA() {
   const start = (make) => {
     resetAnswers();
     setAnswer('started', '1');
-    setAnswer('source_page', 'lapa');
+    setAnswer('source_page', sourcePage);
     if (make) { setAnswer('car_make', make); setAnswer('make_locked', '1'); }
     api.post('/track/engage', { session_id: getSessionId() }).catch(() => {});
     navigate('/flow/year');
   };
 
   return (
-    <div className="min-h-[100dvh] bg-white font-sans text-slate-800" data-testid="presell-pa-page">
+    <div className="min-h-[100dvh] bg-white font-sans text-slate-800" data-testid={rootTestId}>
       {/* Top brand bar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <Logo size="sm" />
           <a
-            href={COMPANY.phoneHref}
+            href={phoneHref}
             onClick={trackPhoneCallConversion}
             data-testid="pa-header-call"
             className="flex flex-col items-center justify-center leading-none rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white px-2.5 py-1.5 sm:px-5 sm:py-2 transition-colors shadow-sm"
           >
             <span className="flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-xl font-extrabold whitespace-nowrap">
-              <Phone className="h-4 w-4 sm:h-5 sm:w-5" /> {COMPANY.phone}
+              <Phone className="h-4 w-4 sm:h-5 sm:w-5" /> {phone}
             </span>
             <span className="mt-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.15em] text-white/90">
               Call Now
@@ -345,8 +351,8 @@ export default function PresellPA() {
           <div className="flex flex-col items-center gap-1">
             <p className="font-slab font-extrabold text-white text-lg">The Lemon Pros</p>
             <p className="text-sm text-slate-300">{COMPANY.address}</p>
-            <a href={COMPANY.phoneHref} onClick={trackPhoneCallConversion} className="text-sm font-semibold text-[#FACC15] hover:text-white" data-testid="pa-footer-call">
-              {COMPANY.phone}
+            <a href={phoneHref} onClick={trackPhoneCallConversion} className="text-sm font-semibold text-[#FACC15] hover:text-white" data-testid="pa-footer-call">
+              {phone}
             </a>
           </div>
 

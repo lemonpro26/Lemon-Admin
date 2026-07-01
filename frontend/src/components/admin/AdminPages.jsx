@@ -8,15 +8,39 @@ import { Label } from '@/components/ui/label';
 import { AdminPAContent } from '@/components/admin/AdminPAContent';
 import { AdminPageContent } from '@/components/admin/AdminPageContent';
 
-// Built-in pages that ship with the app (real routes). `editor` marks pages with
-// an inline content CMS (preview + publish).
-const BUILTINS = [
-  { key: 'home', label: 'Home (Main Landing)', path: '/', icon: HomeIcon, desc: 'Primary English landing page.', editor: 'home' },
-  { key: 'pa', label: 'PA Advertorial', path: '/pa', icon: FileText, desc: 'Presell / advertorial page (source = lapa).', editor: 'pa' },
-  { key: 'spa', label: 'PA Advertorial (Spanish)', path: '/spa', icon: Languages, desc: 'Spanish presell / advertorial page (source = laspa).', editor: 'spa' },
-  { key: 'sp', label: 'Spanish Landing', path: '/sp', icon: Languages, desc: 'Full Spanish funnel (source = sp).', editor: 'sp' },
-  { key: 'split', label: 'A/B Split Test Entry', path: '/split', icon: FlaskConical, desc: 'Routes visitors between pages by your split weight (managed in the Split Test tab).' },
+// Built-in pages that ship with the app (real routes), organized into groups.
+// `editor` marks pages with an inline content CMS (preview + publish).
+const PAGE_GROUPS = [
+  {
+    title: 'Home Pages',
+    pages: [
+      { key: 'home', label: 'Home (Main Landing)', path: '/', icon: HomeIcon, desc: 'Primary English landing page.', editor: 'home' },
+      { key: 'sp', label: 'Spanish Landing', path: '/sp', icon: Languages, desc: 'Full Spanish funnel (source = sp).', editor: 'sp' },
+    ],
+  },
+  {
+    title: 'PA Pages',
+    pages: [
+      { key: 'pa', label: 'PA Advertorial (English)', path: '/pa', icon: FileText, desc: 'Presell / advertorial page (source = lapa).', editor: 'pa' },
+      { key: 'spa', label: 'PA Advertorial (Spanish)', path: '/spa', icon: Languages, desc: 'Spanish presell / advertorial page (source = laspa).', editor: 'spa' },
+    ],
+  },
+  {
+    title: 'Demand Gen Pages',
+    pages: [
+      { key: 'dg', label: 'Demand Gen Video Calls (English)', path: '/dg', icon: FileText, desc: 'Demand Gen video-calls advertorial · calls (833) 240-9312 · source = dg.', editor: 'dg' },
+      { key: 'dgs', label: 'Demand Gen Spanish Video Calls', path: '/dgs', icon: Languages, desc: 'Spanish Demand Gen video-calls advertorial · calls (833) 868-1802 · source = dgs.', editor: 'dgs' },
+    ],
+  },
+  {
+    title: 'Split Tests',
+    pages: [
+      { key: 'split', label: 'A/B Split Test Entry', path: '/split', icon: FlaskConical, desc: 'Routes visitors between pages by your split weight (managed in the Split Test tab).' },
+    ],
+  },
 ];
+
+const AD_EDITORS = ['pa', 'spa', 'dg', 'dgs'];
 
 function PageRow({ icon: Icon, label, desc, path, origin, onDelete, onEdit, canEdit, testid }) {
   const [copied, setCopied] = useState(false);
@@ -127,7 +151,7 @@ export function AdminPages() {
         <div className="font-slab font-bold text-xl text-slate-900 flex items-center gap-2">
           <editing.icon className="h-5 w-5 text-[#0F1B3D]" /> Editing: {editing.label}
         </div>
-        {editing.editor === 'pa' || editing.editor === 'spa'
+        {AD_EDITORS.includes(editing.editor)
           ? <AdminPAContent page={editing.editor} />
           : <AdminPageContent page={editing.editor} />}
       </div>
@@ -140,25 +164,27 @@ export function AdminPages() {
         <LayoutGrid className="h-4 w-4" /> Edit a page's content, copy its URL for Google Ads, or save extra links.
       </p>
 
-      {/* Built-in pages */}
-      <div>
-        <div className="font-slab font-bold text-slate-900 mb-3">Live Pages</div>
-        <div className="grid gap-3">
-          {BUILTINS.map((p) => (
-            <PageRow
-              key={p.key}
-              icon={p.icon}
-              label={p.label}
-              desc={p.desc}
-              path={p.path}
-              origin={origin}
-              canEdit={canEdit}
-              onEdit={p.editor ? () => setEditing(p) : null}
-              testid={`page-builtin-${p.key}`}
-            />
-          ))}
+      {/* Built-in pages, grouped */}
+      {PAGE_GROUPS.map((group) => (
+        <div key={group.title} data-testid={`page-group-${group.title.replace(/\s+/g, '-').toLowerCase()}`}>
+          <div className="font-slab font-bold text-slate-900 mb-3">{group.title}</div>
+          <div className="grid gap-3">
+            {group.pages.map((p) => (
+              <PageRow
+                key={p.key}
+                icon={p.icon}
+                label={p.label}
+                desc={p.desc}
+                path={p.path}
+                origin={origin}
+                canEdit={canEdit}
+                onEdit={p.editor ? () => setEditing(p) : null}
+                testid={`page-builtin-${p.key}`}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      ))}
 
       {/* Custom pages */}
       <div>

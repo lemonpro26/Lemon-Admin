@@ -125,8 +125,8 @@ DEFAULT_PA_CONTENT = {
     "attorney_award": "National Trial Lawyers — Top 40 Under 40",
     "attorney_bio": (
         "Michael Saeedian is a California Lemon Law attorney that auto manufacturers fear. "
-        "A UCLA graduate with a Juris Doctorate from Loyola Law School, he exclusively practices "
-        "lemon law — fighting to secure the maximum refund, replacement, or cash settlement for "
+        "A UCLA graduate with a Juris Doctorate from Loyola Law School, fighting to secure the "
+        "maximum refund, replacement, or cash settlement for "
         "drivers stuck with defective vehicles. When you submit your case, you work directly with "
         "a licensed, award-winning attorney, not a call center."
     ),
@@ -169,7 +169,7 @@ DEFAULT_PA_CONTENT = {
     "callout_cta": "See If My Car Qualifies",
     "qualify_heading": "How Do I Qualify?",
     "qualify_intro": (
-        "The Lemon Pros network has helped countless consumers hold manufacturers accountable. If you "
+        "The Lemon Pros has helped countless consumers hold manufacturers accountable. If you "
         "can answer yes to any of the following, you should check your case today:"
     ),
     "qualify_items": [
@@ -202,8 +202,8 @@ DEFAULT_SPA_CONTENT = {
     "attorney_award": "National Trial Lawyers — Top 40 Menores de 40",
     "attorney_bio": (
         "Michael Saeedian es un abogado de la Ley Limón de California a quien los fabricantes de "
-        "autos temen. Graduado de UCLA con un Doctorado en Derecho de Loyola Law School, se dedica "
-        "exclusivamente a la Ley Limón — luchando para conseguir el máximo reembolso, reemplazo o "
+        "autos temen. Graduado de UCLA con un Doctorado en Derecho de Loyola Law School, "
+        "luchando para conseguir el máximo reembolso, reemplazo o "
         "acuerdo en efectivo para los conductores atrapados con vehículos defectuosos. Cuando envía "
         "su caso, trabaja directamente con un abogado licenciado y galardonado, no con un centro de llamadas."
     ),
@@ -247,7 +247,7 @@ DEFAULT_SPA_CONTENT = {
     "callout_cta": "Vea Si Mi Auto Califica",
     "qualify_heading": "¿Cómo Califico?",
     "qualify_intro": (
-        "La red de The Lemon Pros ha ayudado a innumerables consumidores a responsabilizar a los "
+        "The Lemon Pros ha ayudado a innumerables consumidores a responsabilizar a los "
         "fabricantes. Si puede responder sí a cualquiera de las siguientes, debería verificar su caso hoy:"
     ),
     "qualify_items": [
@@ -269,6 +269,42 @@ DEFAULT_SPA_CONTENT = {
 def _merged_spa_content(cfg: dict) -> dict:
     stored = (cfg or {}).get("spa_content") or {}
     return {**DEFAULT_SPA_CONTENT, **stored}
+
+
+# Demand Gen advertorial pages (/dg English, /dgs Spanish) — same field shape,
+# start as copies of the PA / Spanish-PA defaults; independently editable in CMS.
+DEFAULT_DG_CONTENT = {**DEFAULT_PA_CONTENT}
+DEFAULT_DGS_CONTENT = {**DEFAULT_SPA_CONTENT}
+
+# All advertorial-style pages share the same editing shape.
+AD_CONTENT_DEFAULTS = {
+    "pa": DEFAULT_PA_CONTENT,
+    "spa": DEFAULT_SPA_CONTENT,
+    "dg": DEFAULT_DG_CONTENT,
+    "dgs": DEFAULT_DGS_CONTENT,
+}
+
+
+def _merged_ad_content(cfg: dict, page: str) -> dict:
+    stored = (cfg or {}).get(f"{page}_content") or {}
+    return {**AD_CONTENT_DEFAULTS[page], **stored}
+
+
+def _sanitize_ad_content(page: str, body: dict) -> dict:
+    """Only known fields persisted; lists sanitized (matches PA/SPA save logic)."""
+    allowed = set(AD_CONTENT_DEFAULTS[page].keys())
+    update = {}
+    for k, v in (body or {}).items():
+        if k not in allowed:
+            continue
+        if k == "settlements" and isinstance(v, list):
+            update[k] = [{"amount": str(s.get("amount", "")).strip(), "label": str(s.get("label", "")).strip()}
+                         for s in v if isinstance(s, dict) and (s.get("amount") or s.get("label"))]
+        elif k in ("body", "qualify_items", "attorney_badges") and isinstance(v, list):
+            update[k] = [str(x).strip() for x in v if str(x).strip()]
+        elif isinstance(v, str):
+            update[k] = v.strip()
+    return update
 
 
 # Editable copy for the Home (`/`) and Spanish (`/sp`) landing pages. The big
@@ -658,6 +694,8 @@ def _username_from_request(request: Request) -> str:
 _CHANGE_RULES = [
     ("PUT", r"/admin/pa-content$", "Edited PA page content"),
     ("PUT", r"/admin/spa-content$", "Edited Spanish PA page content"),
+    ("PUT", r"/admin/dg-content$", "Edited Demand Gen page content"),
+    ("PUT", r"/admin/dgs-content$", "Edited Spanish Demand Gen page content"),
     ("PUT", r"/admin/page-content/[^/]+$", "Edited page content"),
     ("PUT", r"/admin/config$", "Updated settings"),
     ("PUT", r"/admin/spanish$", "Edited Spanish hooks"),
@@ -806,6 +844,55 @@ async def update_pa_content(body: dict, _: dict = Depends(require_editor)):
     )
     cfg = await get_or_create_config()
     return _merged_pa_content(cfg)
+
+
+# ---- Demand Gen page content (/dg English, /dgs Spanish) ----
+@api_router.get("/dg-content")
+async def get_dg_content_public():
+    cfg = await get_or_create_config()
+    return _merged_ad_content(cfg, "dg")
+
+
+@api_router.get("/dgs-content")
+async def get_dgs_content_public():
+    cfg = await get_or_create_config()
+    return _merged_ad_content(cfg, "dgs")
+
+
+@api_router.get("/admin/dg-content")
+async def get_dg_content_admin(_: dict = Depends(require_admin)):
+    cfg = await get_or_create_config()
+    return _merged_ad_content(cfg, "dg")
+
+
+@api_router.put("/admin/dg-content")
+async def update_dg_content(body: dict, _: dict = Depends(require_editor)):
+    update = _sanitize_ad_content("dg", body)
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {"dg_content": {**DEFAULT_DG_CONTENT, **update}, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    cfg = await get_or_create_config()
+    return _merged_ad_content(cfg, "dg")
+
+
+@api_router.get("/admin/dgs-content")
+async def get_dgs_content_admin(_: dict = Depends(require_admin)):
+    cfg = await get_or_create_config()
+    return _merged_ad_content(cfg, "dgs")
+
+
+@api_router.put("/admin/dgs-content")
+async def update_dgs_content(body: dict, _: dict = Depends(require_editor)):
+    update = _sanitize_ad_content("dgs", body)
+    await db.site_config.update_one(
+        {"_id": "singleton"},
+        {"$set": {"dgs_content": {**DEFAULT_DGS_CONTENT, **update}, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    cfg = await get_or_create_config()
+    return _merged_ad_content(cfg, "dgs")
 
 
 @api_router.get("/page-content/{page}")
@@ -999,10 +1086,16 @@ def _post_lead_to_crm(lead: dict):
     drop = {"campaign_id", "adgroup_id", "ad_id", "keyword", "gclid", "gbraid", "wbraid", "params", "matched_rule_id"}
     payload = {k: v for k, v in lead.items() if k not in drop}
     payload["source"] = "google ppc form"
-    # Tag the landing page so the CRM/Zapier knows which funnel the lead came from:
-    # Spanish (/sp) vs everything else (/pa).
+    # Tag the landing page so the CRM/Zapier knows which funnel the lead came from.
     sp_page = (lead.get("source_page") or "").lower()
-    slug = "sp" if sp_page in ("sp", "laspa") else "pa"
+    if sp_page == "dg":
+        slug = "dg"
+    elif sp_page == "dgs":
+        slug = "dgs"
+    elif sp_page in ("sp", "laspa"):
+        slug = "sp"
+    else:
+        slug = "pa"
     payload["landing_page"] = f"apply.thelemonpros.com/{slug}"
     try:
         resp = requests.post(CRM_WEBHOOK_URL, json=payload, timeout=10)

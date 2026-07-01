@@ -46,6 +46,14 @@ function App() {
           <Route path="/mockup/funnel" element={<MockupFunnel />} />
           <Route path="/pa" element={<PresellPA />} />
           <Route path="/spa" element={<PresellSPA />} />
+          <Route
+            path="/dg"
+            element={<PresellPA contentPath="/dg-content" sourcePage="dg" phone="(833) 240-9312" phoneHref="tel:+18332409312" rootTestId="presell-dg-page" />}
+          />
+          <Route
+            path="/dgs"
+            element={<PresellSPA contentPath="/dgs-content" sourcePage="dgs" phone="(833) 868-1802" phoneHref="tel:+18338681802" rootTestId="presell-dgs-page" />}
+          />
           <Route path="/split" element={<SplitEntry />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/terms" element={<LegalPage />} />
