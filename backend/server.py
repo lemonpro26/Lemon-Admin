@@ -2336,6 +2336,30 @@ async def calls_webhook(request: Request, token: str = ""):
     return {"success": True, "id": rec["id"]}
 
 
+# Tracked phone numbers -> the landing pages that display them. Calls are grouped
+# by the number that was DIALED (reliable for every call, unlike gclid/session
+# matching which only works when the caller first visited a landing page).
+CALL_NUMBER_GROUPS = [
+    {"key": "home_pa", "label": "Home & PA", "display": "844-335-8911", "digits": "8443358911", "pages": ["Home (/)", "PA (/pa)"]},
+    {"key": "spanish", "label": "Spanish & SPA", "display": "866-524-3722", "digits": "8665243722", "pages": ["Spanish (/sp)", "Spanish PA (/spa)"]},
+    {"key": "dg", "label": "Demand Gen", "display": "833-240-9312", "digits": "8332409312", "pages": ["Demand Gen (/dg)"]},
+    {"key": "dgs", "label": "Demand Gen Spanish", "display": "833-868-1802", "digits": "8338681802", "pages": ["Demand Gen Spanish (/dgs)"]},
+]
+_CALL_GROUP_BY_DIGITS = {g["digits"]: g for g in CALL_NUMBER_GROUPS}
+
+
+def _digits10(s: str) -> str:
+    d = _re.sub(r"\D", "", s or "")
+    return d[-10:] if len(d) >= 10 else d
+
+
+def _call_number_group(tracking_number: str) -> dict:
+    g = _CALL_GROUP_BY_DIGITS.get(_digits10(tracking_number))
+    if g:
+        return {"number_group": g["key"], "number_group_label": g["label"], "tracked_number_display": g["display"]}
+    return {"number_group": "other", "number_group_label": "Other", "tracked_number_display": (tracking_number or "")}
+
+
 async def _enrich_calls_with_hooks(items: list) -> list:
     """For each call, determine whether the caller saw the landing page and which
     hook variant they saw, by joining the call's gclid (or session_id) to a
@@ -2365,6 +2389,7 @@ async def _enrich_calls_with_hooks(items: list) -> list:
     default_hook = {"label": "Default hook", "hook1": cfg.get("hook1", ""), "hook2": cfg.get("hook2", "")}
 
     for c in items:
+        c.update(_call_number_group(c.get("tracking_number")))
         ck = None
         if c.get("gclid") and c["gclid"] in clicks_by_gclid:
             ck = clicks_by_gclid[c["gclid"]]
@@ -2417,6 +2442,12 @@ async def admin_get_calls(start: str = "", end: str = "", search: str = Query(""
     return {"calls": items, "total": len(items)}
 
 
+@api_router.get("/admin/phone-numbers")
+async def admin_phone_numbers(_: dict = Depends(require_admin)):
+    """The tracked phone numbers and which landing pages use each — shown in Settings."""
+    return {"numbers": CALL_NUMBER_GROUPS}
+
+
 @api_router.delete("/admin/calls/{call_id}")
 async def delete_call(call_id: str, _: dict = Depends(require_editor)):
     res = await db.calls.delete_one({"id": call_id})
@@ -2434,12 +2465,13 @@ async def create_test_call(_: dict = Depends(require_editor)):
     geo = rng.choice([("Los Angeles", "CA"), ("Phoenix", "AZ"), ("Houston", "TX"), ("Miami", "FL")])
     now = _now_iso()
     _num = f"(555) {rng.randint(100,999)}-{rng.randint(1000,9999)}"
+    _tracked = rng.choice(CALL_NUMBER_GROUPS)
     rec = {
         "id": str(uuid.uuid4()),
         "caller_number": _num,
         "caller_name": name,
         "caller_digits": _re.sub(r"\D", "", _num),
-        "tracking_number": "(844) 335-8911",
+        "tracking_number": _tracked["display"],
         "duration": rng.randint(45, 320),
         "source": "google",
         "keyword": "lemon law attorney",

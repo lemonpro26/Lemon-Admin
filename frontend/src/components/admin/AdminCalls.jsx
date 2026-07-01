@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X } from 'lucide-react';
+import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,43 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 import { useSortable, SortLabel } from '@/lib/useSortable';
 import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
 import { Badge } from '@/components/ui/badge';
+
+// Toggleable columns (Caller & Actions always shown). Persisted per-browser.
+const COLS = [
+  { key: 'number', label: 'Number' },
+  { key: 'called', label: 'Called #' },
+  { key: 'duration', label: 'Duration' },
+  { key: 'campaign', label: 'Campaign' },
+  { key: 'hook', label: 'Hook seen' },
+  { key: 'revenue', label: 'Revenue' },
+  { key: 'location', label: 'Location' },
+  { key: 'when', label: 'When' },
+];
+const COLS_KEY = 'lp_calls_cols_v1';
+const loadCols = () => {
+  const def = { number: true, called: true, duration: true, campaign: true, hook: true, revenue: true, location: true, when: true };
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLS_KEY) || '{}');
+    return { ...def, ...saved };
+  } catch { return def; }
+};
+
+// Call segments keyed on the DIALED tracking number (reliable for every call).
+const CALL_SEGMENTS = [
+  { key: 'all', label: 'All' },
+  { key: 'home_pa', label: 'Home & PA', hint: '844-335-8911' },
+  { key: 'spanish', label: 'Spanish', hint: '866-524-3722' },
+  { key: 'dg', label: 'Demand Gen', hint: '833-240-9312' },
+  { key: 'dgs', label: 'Demand Gen Spanish', hint: '833-868-1802' },
+];
+
 
 const fmtDuration = (s) => {
   const n = Number(s) || 0;
@@ -51,24 +84,23 @@ export const AdminCalls = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [seg, setSeg] = useState('all');
+  const [cols, setCols] = useState(loadCols);
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
-  // Source-page segmentation (Home; Spanish = sp + Spanish PA; PA = English PA + Spanish PA).
-  const inSeg = (s, sp) => {
-    const p = (sp || '').toLowerCase();
-    if (s === 'home') return p === 'home';
-    if (s === 'spanish') return p === 'sp' || p === 'laspa';
-    if (s === 'pa') return p === 'lapa' || p === 'laspa';
-    return true;
-  };
-  const segCounts = {
-    all: calls.length,
-    home: calls.filter((c) => inSeg('home', c.source_page)).length,
-    spanish: calls.filter((c) => inSeg('spanish', c.source_page)).length,
-    pa: calls.filter((c) => inSeg('pa', c.source_page)).length,
-  };
-  const shownCalls = sortedCalls.filter((c) => inSeg(seg, c.source_page));
+  useEffect(() => {
+    try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); } catch { /* ignore */ }
+  }, [cols]);
+  const toggleCol = (k) => setCols((prev) => ({ ...prev, [k]: !prev[k] }));
+
+  // Segment calls by the DIALED tracking number (number_group from the backend).
+  const inSeg = (s, c) => s === 'all' || (c.number_group || 'other') === s;
+  const segCounts = CALL_SEGMENTS.reduce((acc, s) => {
+    acc[s.key] = s.key === 'all' ? calls.length : calls.filter((c) => inSeg(s.key, c)).length;
+    return acc;
+  }, {});
+  const shownCalls = sortedCalls.filter((c) => inSeg(seg, c));
+  const colSpanCount = COLS.filter((k) => cols[k.key]).length + 2; // + Caller + Actions
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -192,25 +224,43 @@ export const AdminCalls = () => {
           <Button variant="outline" size="sm" onClick={() => load()} className="rounded-xl border-slate-200" data-testid="calls-refresh">
             <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="rounded-xl border-slate-200" data-testid="calls-columns-button">
+                <SlidersHorizontal className="h-4 w-4 mr-2" /> Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {COLS.map((col) => (
+                <DropdownMenuCheckboxItem
+                  key={col.key}
+                  checked={!!cols[col.key]}
+                  onCheckedChange={() => toggleCol(col.key)}
+                  onSelect={(e) => e.preventDefault()}
+                  data-testid={`calls-col-toggle-${col.key}`}
+                >
+                  {col.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {!debouncedSearch.trim() && <DateRangeFilter value={range} onChange={setRange} />}
         </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap" data-testid="call-segment-filters">
-        {[
-          { key: 'all', label: 'All', count: segCounts.all },
-          { key: 'home', label: 'Home', count: segCounts.home },
-          { key: 'spanish', label: 'Spanish', count: segCounts.spanish },
-          { key: 'pa', label: 'PA Page', count: segCounts.pa },
-        ].map((s) => (
+        {CALL_SEGMENTS.map((s) => (
           <button
             key={s.key}
             onClick={() => setSeg(s.key)}
+            title={s.hint || ''}
             className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${seg === s.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
             data-testid={`call-seg-${s.key}`}
           >
             {s.label}
-            <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${seg === s.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`call-seg-count-${s.key}`}>{s.count}</span>
+            <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${seg === s.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`call-seg-count-${s.key}`}>{segCounts[s.key]}</span>
           </button>
         ))}
       </div>
@@ -220,42 +270,48 @@ export const AdminCalls = () => {
           <TableHeader>
             <TableRow>
               <TableHead><SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              <TableHead><SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              <TableHead><SortLabel label="Duration" k="duration" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              <TableHead className="hidden md:table-cell"><SortLabel label="Campaign" k="campaign" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              <TableHead className="hidden lg:table-cell"><SortLabel label="Hook seen" k="hook_label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              <TableHead className="hidden sm:table-cell"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              <TableHead className="hidden lg:table-cell"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              <TableHead><SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              {cols.number && <TableHead><SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.called && <TableHead><SortLabel label="Called #" k="tracked_number_display" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.duration && <TableHead><SortLabel label="Duration" k="duration" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.campaign && <TableHead className="hidden md:table-cell"><SortLabel label="Campaign" k="campaign" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.hook && <TableHead className="hidden lg:table-cell"><SortLabel label="Hook seen" k="hook_label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.revenue && <TableHead className="hidden sm:table-cell"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.location && <TableHead className="hidden lg:table-cell"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.when && <TableHead><SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpanCount} className="text-center text-slate-400 py-10">Loading…</TableCell></TableRow>
             ) : calls.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpanCount} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
             ) : shownCalls.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10" data-testid="calls-seg-empty">No {seg === 'spanish' ? 'Spanish' : seg === 'home' ? 'Home' : 'PA page'} calls in this period.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpanCount} className="text-center text-slate-400 py-10" data-testid="calls-seg-empty">No {(CALL_SEGMENTS.find((s) => s.key === seg) || {}).label || ''} calls in this period.</TableCell></TableRow>
             ) : shownCalls.map((c) => (
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
                 <TableCell className="font-medium text-slate-900">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span>{c.caller_name || '—'}</span>
-                    {c.source_page === 'lapa' && (
-                      <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`call-source-lapa-${c.id}`}>PA page</Badge>
-                    )}
-                    {c.source_page === 'sp' && (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-source-sp-${c.id}`}>Spanish</Badge>
-                    )}
-                    {c.source_page === 'laspa' && (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-source-laspa-${c.id}`}>Spanish · PA</Badge>
+                    {c.number_group && c.number_group !== 'other' && (
+                      <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`call-group-${c.number_group}-${c.id}`}>{c.number_group_label}</Badge>
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-slate-700">{c.caller_number || '—'}</TableCell>
-                <TableCell className="text-slate-700">{fmtDuration(c.duration)}</TableCell>
-                <TableCell className="hidden md:table-cell text-slate-600">{c.campaign || '—'}</TableCell>
+                {cols.number && <TableCell className="text-slate-700">{c.caller_number || '—'}</TableCell>}
+                {cols.called && (
+                  <TableCell className="text-slate-700 whitespace-nowrap" data-testid={`call-called-number-${c.id}`}>
+                    <div className="flex flex-col leading-tight">
+                      <span className="font-medium">{c.tracked_number_display || '—'}</span>
+                      {c.number_group && c.number_group !== 'other' && (
+                        <span className="text-[10px] text-slate-400">{c.number_group_label}</span>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
+                {cols.duration && <TableCell className="text-slate-700">{fmtDuration(c.duration)}</TableCell>}
+                {cols.campaign && <TableCell className="hidden md:table-cell text-slate-600">{c.campaign || '—'}</TableCell>}
+                {cols.hook && (
                 <TableCell className="hidden lg:table-cell">
                   {c.saw_landing_page ? (
                     <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700" data-testid={`call-hook-${c.id}`} title={c.hook1 || ''}>
@@ -267,6 +323,8 @@ export const AdminCalls = () => {
                     </span>
                   )}
                 </TableCell>
+                )}
+                {cols.revenue && (
                 <TableCell className="hidden sm:table-cell">
                   {c.sale_status === 'sold' ? (
                     <div className="flex flex-col gap-1">
@@ -283,8 +341,9 @@ export const AdminCalls = () => {
                     <span className="text-slate-400">—</span>
                   )}
                 </TableCell>
-                <TableCell className="hidden lg:table-cell text-slate-600">{[c.city, c.state].filter(Boolean).join(', ') || '—'}</TableCell>
-                <TableCell className="text-slate-600 whitespace-nowrap">{fmtDate(c.called_at || c.created_at)}</TableCell>
+                )}
+                {cols.location && <TableCell className="hidden lg:table-cell text-slate-600">{[c.city, c.state].filter(Boolean).join(', ') || '—'}</TableCell>}
+                {cols.when && <TableCell className="text-slate-600 whitespace-nowrap">{fmtDate(c.called_at || c.created_at)}</TableCell>}
                 <TableCell>
                   <div className="flex items-center justify-end gap-1.5">
                     {c.recording_url && (
@@ -322,7 +381,8 @@ export const AdminCalls = () => {
                 {[
                   ['Caller', selected.caller_name, 'call-detail-name'],
                   ['Number', selected.caller_number, 'call-detail-number'],
-                  ['Tracking #', selected.tracking_number, 'call-detail-tracking'],
+                  ['Called #', selected.tracked_number_display || selected.tracking_number, 'call-detail-tracking'],
+                  ['Landing group', selected.number_group_label, 'call-detail-group'],
                   ['Duration', fmtDuration(selected.duration), 'call-detail-duration'],
                   ['Campaign', selected.campaign, 'call-detail-campaign'],
                   ['Keyword', selected.keyword, 'call-detail-keyword'],

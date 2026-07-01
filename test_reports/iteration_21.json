@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 21 — Calls-tab overhaul verified end-to-end. Backend: 6/6 pytest pass (test_calls_overhaul.py). GET /api/admin/phone-numbers requires admin auth and returns the 4 tracked numbers (home_pa/844-335-8911, spanish/866-524-3722, dg/833-240-9312, dgs/833-868-1802) with correct labels and pages arrays. POST /api/admin/calls/test rotates tracking_number across the 4 tracked displays; GET /api/admin/calls enriches each call with number_group + number_group_label + tracked_number_display, and the digits round-trip correctly. Specific cases confirmed for spanish (8665243722 -> 'spanish'), home_pa, dg, and dgs; unknown-digits fallback is handled via 'other' branch in _call_number_group. Frontend (Playwright, owner login): Calls tab renders all 5 segment chips (call-seg-{all,home_pa,spanish,dg,dgs}) with matching call-seg-count-* badges (spanish count=2 matched 2 visible rows after filter). Called # column populated for every row (11/11 call-called-number-<id> cells + 11/11 call-group-<group>-<id> badges). Columns dropdown lists all 8 toggles (number/called/duration/campaign/hook/revenue/location/when); un-checking Campaign hides the column immediately AND persists in localStorage after a full page reload (verified by re-inspecting the thead — no 'Campaign'). Call View dialog exposes call-detail-tracking ('833-868-1802') and call-detail-group ('Demand Gen Spanish'). Settings -> Phone Numbers sub-tab (settings-tab-phone-numbers) renders admin-phone-numbers container with all four cards (phone-number-home_pa / spanish / dg / dgs) each showing the correct display number + label chip + landing-page pills. Cleanup: 11 seeded is_test=true calls deleted at the end; DB has 0 calls remaining.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminSettings sub-tabs (Phone Numbers)", "issues": ["Very brief flash where the sub-tab's active-state style lags behind the content swap (screenshot captured Integrations still bg-slate-900 while Phone Numbers content was already loading). Purely cosmetic; state is correct within ~100ms. Not a functional issue."]},
+      {"screen": "Call detail dialog", "issues": ["Console warning: 'Missing Description or aria-describedby={undefined} for {DialogContent}' — accessibility warning from Radix Dialog; consider adding DialogDescription (or an aria-describedby={undefined} explicit) to admin-call-detail. Not blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_calls_overhaul.py",
+    "/app/test_reports/pytest/iter21_calls_overhaul.xml"
+  ],
+  "action_items": [
+    "Cosmetic-only: add a DialogDescription (or explicit aria-describedby={undefined}) to <DialogContent data-testid=\"admin-call-detail\"> to silence the Radix a11y warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py continues to grow (now ~3212 lines) — router split remains overdue; the new call-segmentation helpers (_digits10, _call_number_group, CALL_NUMBER_GROUPS) belong in a small calls module.",
+    "_enrich_calls_with_hooks mutates each call dict in place with _call_number_group(...) via c.update(); tight loop is fine today, but if this function is ever reused on read-only cached data it will leak. Safe for now.",
+    "AdminCalls.jsx COLS_KEY 'lp_calls_cols_v1' is versioned — good. But loadCols() silently falls back to full defaults if any parse error occurs, which will surprise a user who intentionally disabled columns after a corrupt localStorage entry. Log the error for support.",
+    "CALL_NUMBER_GROUPS pages array uses free-form strings like 'Home (/)' — fine for display, but if we ever want to link each pill to the actual route, the route needs to be a separate field. Small future refactor.",
+    "Test-call generator uses random.choice for rotation — over small sample sizes the distribution may miss a group (this run hit all 4 across 11 clicks). If deterministic rotation is desirable for QA, replace random.choice with a round-robin index persisted in mongo or module state.",
+    "Preview .env still has CRM_WEBHOOK_URL set to a live Zapier hook (unchanged from iter 20). The calls-overhaul tests never touch this (test calls are internal), but future test flows on Leads would still leak — main agent may want to clear it for preview."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_calls_overhaul.py",
+    "/app/test_reports/iteration_21.json"
+  ],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (all spec items verified)"},
+  "test_credentials": "owner / LemonPros2026! (unchanged)",
+  "seed_data_creation": "Backend tests created ~20 is_test=true calls via POST /api/admin/calls/test and deleted them after each class. Frontend test added 3 more test calls; a final cleanup pass deleted all is_test=true calls — DB verified at 0 calls remaining after the run. No Zapier or CTM traffic (test-call endpoint is internal-only).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_calls_overhaul.py is the regression suite for the number-based call segmentation. It logs in as owner, hits POST /api/admin/calls/test to create sample calls (safe — is_test=true, no CTM/Zapier), verifies GET /api/admin/calls returns number_group/number_group_label/tracked_number_display for each call, and confirms specific tracking_number -> group mappings. Testids on Calls tab: call-seg-{all|home_pa|spanish|dg|dgs}, call-seg-count-*, calls-columns-button, calls-col-toggle-{number|called|duration|campaign|hook|revenue|location|when}, call-called-number-<id>, call-group-<group>-<id>, admin-call-detail, call-detail-tracking, call-detail-group. Settings testids: settings-tab-phone-numbers, admin-phone-numbers, phone-number-{home_pa|spanish|dg|dgs}, phone-number-display-<key>. localStorage key: lp_calls_cols_v1.",
+  "rca of the issue": "N/A — no bugs. Two very minor observations: (1) Radix DialogContent a11y warning on admin-call-detail (add DialogDescription); (2) brief active-tab style lag on Settings sub-tabs while async content loads — both cosmetic."
+}
