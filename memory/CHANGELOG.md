@@ -1,4 +1,9 @@
 
+## 2026-07-01 (pm-5) — Fix: Funnel tab "Campaigns feeding" table showed campaign IDs instead of names
+- Bug: GET /api/admin/funnel/campaigns looked up names via ad_labels.get(cid) but ad_labels is nested by type ({"campaign": {id: name}, ...}), so lookups failed and it fell back to the raw campaign ID number.
+- Fix: use ad_labels["campaign"][str(cid)] (matches Analytics labelFor). Verified: 23956437547 -> "Lemon Law 2026". Note: campaign names only resolve for IDs present in synced ad_labels; run Analytics "Sync names" to populate missing ones. Requires redeploy for production.
+
+
 ## 2026-07-01 (pm-4) — Per-test date filter inside each split-test result
 - Each split-test card now has its own "Results" DateRangeFilter that fetches that test's stats independently for the chosen period. The top-level filter is now the "Default period" that seeds all tests; each can be adjusted individually.
 - Backend: new GET /api/admin/experiments/{id}/stats?start=&end= returns {stats} for a single experiment (reuses _experiment_stats). Frontend: ExperimentCard holds its own stats + range state (testid exp-stats-filter-<id>), re-syncs to the default period on list reload. Verified via endpoint + screenshot.
