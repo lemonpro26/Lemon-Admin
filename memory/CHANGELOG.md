@@ -1,4 +1,13 @@
 
+## 2026-07-01 (pm) — Calls tab: number-based segmentation + Called# column + column toggles + Phone Numbers settings (iteration_21, 100% pass)
+- Calls are now grouped by the DIALED tracking number (reliable for every call — fixes "calls not populating in the correct tab", which happened because old segmentation relied on gclid/session→source_page matching that real click-to-calls lack). Backend: CALL_NUMBER_GROUPS + _digits10 + _call_number_group; _enrich_calls_with_hooks adds number_group / number_group_label / tracked_number_display to each call.
+  - Groups: Home & PA = 844-335-8911 · Spanish & SPA = 866-524-3722 · Demand Gen = 833-240-9312 · Demand Gen Spanish = 833-868-1802.
+- Calls tab UI: 5 segment chips (All / Home & PA / Spanish / Demand Gen / Demand Gen Spanish) with live counts; new "Called #" column (number + group label); group badge per caller row; "Columns" dropdown to show/hide 8 columns (persisted in localStorage lp_calls_cols_v1); call detail dialog shows Called # + Landing group.
+- Settings: new "Phone Numbers" sub-tab (AdminPhoneNumbers.jsx) listing all 4 tracked numbers and the pages that use each. Endpoint GET /api/admin/phone-numbers.
+- Test-call generator now rotates tracking_number across the 4 tracked numbers (random) so all segments populate for QA. Test calls are internal (is_test=true) — never hit CTM/Zapier.
+- Backend regression suite: /app/backend/tests/test_calls_overhaul.py.
+
+
 ## 2026-07-01 — Demand Gen pages + Pages hub 4-group + Spanish PA text sync (iteration_20, 100% pass)
 - NEW landing pages (copies of PA advertorials): `/dg` "Demand Gen Video Calls" (English, phone (833) 240-9312, source_page=dg) and `/dgs` "Demand Gen Spanish Video Calls" (Spanish, phone (833) 868-1802, source_page=dgs). Built by parameterizing PresellPA/PresellSPA (props: contentPath, sourcePage, phone, phoneHref, rootTestId) — routes added in App.js.
 - Each DG page independently editable in CMS: backend DEFAULT_DG_CONTENT/DEFAULT_DGS_CONTENT (deepcopy of PA/SPA), AD_CONTENT_DEFAULTS + _merged_ad_content + _sanitize_ad_content; endpoints GET /api/dg-content, /api/dgs-content, GET+PUT /api/admin/dg-content & /api/admin/dgs-content. Editing dg does not affect pa (verified independent).
