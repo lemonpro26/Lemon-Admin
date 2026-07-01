@@ -2574,9 +2574,15 @@ class AdLabelBody(BaseModel):
 
 @api_router.post("/admin/ad-labels/sync-google")
 async def sync_google_ad_labels(force: bool = False, _: dict = Depends(require_editor)):
+    """Manual trigger for the Google Ads name sync (also runs automatically 24/7)."""
+    return await _sync_ad_labels_core(force=force)
+
+
+async def _sync_ad_labels_core(force: bool = False) -> dict:
     """Pull real campaign / ad-group / ad names from the Google Ads API and store
     them as labels. Cached for 6h unless force=true. Names from Google take
-    precedence; any manual labels for IDs not in Google are preserved."""
+    precedence; any manual labels for IDs not in Google are preserved.
+    Used by both the manual endpoint and the 24/7 background sync loop."""
     if not gnames.is_configured():
         return {"success": False, "configured": False, "error": "Google Ads API not configured"}
     cfg = await get_or_create_config()
@@ -2609,6 +2615,20 @@ async def sync_google_ad_labels(force: bool = False, _: dict = Depends(require_e
     )
     counts = {t: len(fetched.get(t) or {}) for t in ("campaign", "adgroup", "ad", "sitelink")}
     return {"success": True, "counts": counts, "ad_labels": labels}
+
+
+async def _ad_label_sync_loop():
+    """Keeps Google Ads campaign/ad names in sync 24/7 (every 3h, force refresh)."""
+    await asyncio.sleep(20)  # let the app finish booting first
+    while True:
+        try:
+            if gnames.is_configured():
+                res = await _sync_ad_labels_core(force=True)
+                if res.get("success") and not res.get("skipped"):
+                    logger.info("Auto-synced Google Ads names: %s", res.get("counts"))
+        except Exception as e:
+            logger.warning("Auto ad-label sync loop error: %s", e)
+        await asyncio.sleep(3 * 3600)
 
 
 @api_router.post("/admin/ad-labels")
@@ -3236,6 +3256,11 @@ async def startup():
                 await db.experiments.update_one({"id": d["id"]}, {"$set": {"slug": _gen()}})
     except Exception as e:
         logger.error("experiment slug backfill failed: %s", e)
+    # Keep Google Ads campaign/ad names fresh 24/7 (background loop).
+    try:
+        asyncio.create_task(_ad_label_sync_loop())
+    except Exception as e:
+        logger.error("failed to start ad-label sync loop: %s", e)
     logger.info("Lemon Pros API started")
 
 

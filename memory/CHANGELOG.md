@@ -1,4 +1,9 @@
 
+## 2026-07-01 (pm-6) — Google Ads names auto-sync 24/7
+- Campaign/ad-group/ad names now refresh automatically via a background loop (_ad_label_sync_loop): every 3h, force refresh, starts ~20s after boot; no-ops when Google Ads not configured (preview). Manual "Sync names" button still works.
+- Refactored sync into shared _sync_ad_labels_core(force); endpoint POST /api/admin/ad-labels/sync-google calls it. Loop started in startup event. Verified import + clean boot.
+
+
 ## 2026-07-01 (pm-5) — Fix: Funnel tab "Campaigns feeding" table showed campaign IDs instead of names
 - Bug: GET /api/admin/funnel/campaigns looked up names via ad_labels.get(cid) but ad_labels is nested by type ({"campaign": {id: name}, ...}), so lookups failed and it fell back to the raw campaign ID number.
 - Fix: use ad_labels["campaign"][str(cid)] (matches Analytics labelFor). Verified: 23956437547 -> "Lemon Law 2026". Note: campaign names only resolve for IDs present in synced ad_labels; run Analytics "Sync names" to populate missing ones. Requires redeploy for production.
