@@ -113,88 +113,6 @@ function ModelStep({ make, onSelect, onChangeMake, t }) {
   );
 }
 
-/* ---------------- Address step (with verification) ---------------- */
-function AddressStep({ answers, setAnswer, onNext, t }) {
-  const [street, setStreet] = useState(answers.address || '');
-  const [city, setCity] = useState(answers.city || '');
-  const [state, setState] = useState(answers.state || '');
-  const [zip, setZip] = useState(answers.zip || '');
-  const [error, setError] = useState('');
-  const [verifying, setVerifying] = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!street.trim()) {
-      setError(t.errors.street);
-      return;
-    }
-    if (!/^\d{5}$/.test(zip.trim())) {
-      setError(t.errors.zip);
-      return;
-    }
-    setError('');
-    setVerifying(true);
-    try {
-      if (!city || !state) {
-        const g = await api.get(`/geo-zip?zip=${encodeURIComponent(zip)}`);
-        if (g.data.found) {
-          setCity(g.data.city);
-          setState(g.data.state);
-        }
-      }
-    } catch (e2) {
-      /* ignore */
-    }
-    try {
-      const res = await api.post('/verify-address', { address: street, city, state, zip });
-      setAnswer('address', street.trim());
-      setAnswer('city', city);
-      setAnswer('state', state);
-      setAnswer('zip', zip);
-      if (res.data.valid || res.data.soft) {
-        onNext();
-      } else {
-        setError(t.errors.addrUnverified);
-      }
-    } catch (err) {
-      setAnswer('address', street.trim());
-      setAnswer('zip', zip);
-      onNext();
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="mx-auto max-w-xl w-full grid gap-4">
-      <NotchedField
-        label={t.fields.street}
-        value={street}
-        onChange={(e) => setStreet(e.target.value)}
-        placeholder={t.fields.streetPh}
-        data-testid="address-street-input"
-        autoFocus
-      />
-      <div className="grid grid-cols-3 gap-3">
-        <NotchedField label={t.fields.city} value={city} onChange={(e) => setCity(e.target.value)} placeholder={t.fields.cityPh} data-testid="address-city-input" />
-        <NotchedField label={t.fields.state} value={state} onChange={(e) => setState(e.target.value)} placeholder={t.fields.statePh} data-testid="address-state-input" />
-        <NotchedField
-          label={t.fields.zip}
-          value={zip}
-          onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
-          placeholder={t.fields.zipPh}
-          inputMode="numeric"
-          data-testid="address-zip-input"
-        />
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" disabled={verifying} className={`mt-3 ${RED_BTN}`} data-testid="address-continue-button">
-        {verifying ? t.buttons.verifying : t.buttons.continue}
-      </Button>
-    </form>
-  );
-}
-
 /* ---------------- Name step ---------------- */
 function NameStep({ answers, setAnswer, onNext, t }) {
   const [first, setFirst] = useState(answers.first_name || '');
@@ -378,10 +296,6 @@ export default function FunnelStep() {
         car_year: answers.car_year || '',
         car_make: answers.car_make || '',
         car_model: answers.car_model || '',
-        address: answers.address || '',
-        city: answers.city || '',
-        state: answers.state || '',
-        zip: answers.zip || '',
         first_name: answers.first_name || '',
         last_name: answers.last_name || '',
         phone: answers.phone || '',
@@ -437,7 +351,6 @@ export default function FunnelStep() {
           {step.type === 'make' && <MakeStep onSelect={(v) => selectAndNext('car_make', v)} />}
           {step.type === 'model' && <ModelStep make={answers.car_make} onSelect={(v) => selectAndNext('car_model', v)} onChangeMake={changeMake} t={t} />}
           {step.type === 'name' && <NameStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}
-          {step.type === 'address' && <AddressStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}
           {step.type === 'phone' && <PhoneStep answers={answers} setAnswer={setAnswer} onNext={goNext} t={t} />}
           {step.type === 'email' && (
             <EmailStep answers={answers} setAnswer={setAnswer} onSubmit={submitLead} submitting={submitting} t={t} />

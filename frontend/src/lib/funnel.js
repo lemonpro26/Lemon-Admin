@@ -1,6 +1,6 @@
 // Funnel definition for the Lemon Pros lemon-law qualification quiz.
-// Order requested: Car Year → Car Make → Car Model → Name → Address → Phone → Email.
-// Step types: 'year', 'make', 'model', 'name', 'address', 'phone', 'email'.
+// Order: Car Year → Car Make → Car Model → Name → Phone → Email.
+// Step types: 'year', 'make', 'model', 'name', 'phone', 'email'.
 
 export const FUNNEL_STEPS = [
   {

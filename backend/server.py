@@ -897,7 +897,7 @@ async def track_engage(body: ClickTrack, request: Request):
 
 
 # Ordered funnel steps (must match frontend STEP_IDS).
-FUNNEL_STEPS = ["year", "make", "model", "name", "address", "phone", "email"]
+FUNNEL_STEPS = ["year", "make", "model", "name", "phone", "email"]
 
 
 class StepTrack(BaseModel):
