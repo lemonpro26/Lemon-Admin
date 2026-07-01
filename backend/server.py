@@ -1078,6 +1078,26 @@ def _dispatch_lead_emails(cfg: dict, lead: dict):
         logger.error("Lead email dispatch failed: %s", e)
 
 
+# Maps a lead's internal source_page code to its real public landing path so the
+# CRM/Zapier receives the exact URL the visitor came from (empty => site root).
+CRM_SOURCE_PAGE_PATHS = {
+    "home": "",       # apply.thelemonpros.com
+    "sp": "sp",       # /sp  (Spanish landing)
+    "lapa": "pa",     # /pa  (English PA advertorial)
+    "laspa": "spa",   # /spa (Spanish PA advertorial)
+    "dg": "dg",       # /dg  (English Demand Gen)
+    "dgs": "dgs",     # /dgs (Spanish Demand Gen)
+}
+
+
+def _crm_landing_page(source_page: str) -> str:
+    base = "apply.thelemonpros.com"
+    sp = (source_page or "home").lower()
+    # Known code -> its path; unknown/custom codes fall back to the raw value.
+    path = CRM_SOURCE_PAGE_PATHS.get(sp, sp)
+    return f"{base}/{path}" if path else base
+
+
 def _post_lead_to_crm(lead: dict):
     """Runs in a BackgroundTask. Forwards the lead to an external CRM/Zapier
     webhook when CRM_WEBHOOK_URL is configured. No-op (logged) when not set.
@@ -1087,17 +1107,8 @@ def _post_lead_to_crm(lead: dict):
     drop = {"campaign_id", "adgroup_id", "ad_id", "keyword", "gclid", "gbraid", "wbraid", "params", "matched_rule_id"}
     payload = {k: v for k, v in lead.items() if k not in drop}
     payload["source"] = "google ppc form"
-    # Tag the landing page so the CRM/Zapier knows which funnel the lead came from.
-    sp_page = (lead.get("source_page") or "").lower()
-    if sp_page == "dg":
-        slug = "dg"
-    elif sp_page == "dgs":
-        slug = "dgs"
-    elif sp_page in ("sp", "laspa"):
-        slug = "sp"
-    else:
-        slug = "pa"
-    payload["landing_page"] = f"apply.thelemonpros.com/{slug}"
+    # Tag the exact landing page URL so the CRM/Zapier knows which funnel the lead came from.
+    payload["landing_page"] = _crm_landing_page(lead.get("source_page"))
     try:
         resp = requests.post(CRM_WEBHOOK_URL, json=payload, timeout=10)
         if resp.status_code >= 400:
