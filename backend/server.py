@@ -1821,10 +1821,11 @@ async def admin_funnel_campaigns(page: str = Query("overall"), _: dict = Depends
         leads[row["_id"] or ""] = row["n"]
 
     total_clicks = sum(clicks.values())
+    campaign_labels = ad_labels.get("campaign") or {}
     rows = []
     for cid in set(clicks) | set(leads):
         c, lc = clicks.get(cid, 0), leads.get(cid, 0)
-        name = ad_labels.get(cid) or ad_labels.get(str(cid)) or (cid if cid else "Direct / Untracked")
+        name = campaign_labels.get(str(cid)) or campaign_labels.get(cid) or (cid if cid else "Direct / Untracked")
         rows.append({
             "campaign_id": cid, "campaign": name, "clicks": c, "leads": lc,
             "conversion_rate": round((lc / c * 100), 1) if c else (100.0 if lc else 0.0),
