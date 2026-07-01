@@ -1,4 +1,9 @@
 
+## 2026-07-01 (pm-3) — Edit the traffic split of an existing/ongoing split test
+- Added an inline "Adjust split" editor on each test card (AdminSplitTest.jsx ExperimentCard): weight input per variant with live "% of traffic" preview, Save/Cancel. Works on draft AND running tests — for running tests, changes apply to new visitors immediately.
+- Backend already accepted `variants` on PUT /admin/experiments/{id}; frontend now sends `{ variants }` via editSplit handler. Testids: exp-edit-split-<id>, exp-split-editor-<id>, exp-split-weight-<id>-<i>, exp-split-pct-<id>-<i>, exp-split-save-<id>, exp-split-cancel-<id>. Verified via UI flow; test experiment cleaned up.
+
+
 ## 2026-07-01 (pm-2) — Analytics "Calls by number" summary strip
 - Added a summary strip at the top of the Analytics tab showing, per tracked number (Home & PA / Spanish & SPA / Demand Gen / Demand Gen Spanish): total calls, closed revenue, and # sold — for the selected date range.
 - Backend: _calls_by_number(s_iso, e_iso) helper; GET /api/admin/analytics now returns calls_by_number[].

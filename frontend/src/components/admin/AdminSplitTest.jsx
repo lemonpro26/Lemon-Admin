@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker, Pencil, CalendarRange } from 'lucide-react';
+import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker, Pencil, CalendarRange, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -34,13 +34,16 @@ function VariantStatsRow({ v, isWinner }) {
   );
 }
 
-function ExperimentCard({ exp, origin, canEdit, onStart, onStop, onDelete, onRename, onEditSlug }) {
+function ExperimentCard({ exp, origin, canEdit, onStart, onStop, onDelete, onRename, onEditSlug, onEditSplit }) {
   const stats = exp.stats || { variants: [], winner: null };
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(exp.name);
   const [slugEditing, setSlugEditing] = useState(false);
   const [slugDraft, setSlugDraft] = useState(exp.slug || 'split');
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [splitEditing, setSplitEditing] = useState(false);
+  const [draftVariants, setDraftVariants] = useState((exp.variants || []).map((v) => ({ ...v })));
+  const [savingSplit, setSavingSplit] = useState(false);
 
   const url = `${origin}/${exp.slug || 'split'}`;
 
@@ -51,6 +54,21 @@ function ExperimentCard({ exp, origin, canEdit, onStart, onStop, onDelete, onRen
     if (!next || next === exp.name) { setEditing(false); return; }
     await onRename(exp, next);
     setEditing(false);
+  };
+
+  const startSplitEdit = () => { setDraftVariants((exp.variants || []).map((v) => ({ ...v }))); setSplitEditing(true); };
+  const cancelSplitEdit = () => setSplitEditing(false);
+  const setDraftWeight = (i, val) => setDraftVariants((prev) => prev.map((v, idx) => (idx === i ? { ...v, weight: Math.max(0, Math.min(100, Number(val) || 0)) } : v)));
+  const totalWeight = draftVariants.reduce((s, v) => s + (Number(v.weight) || 0), 0);
+  const saveSplit = async () => {
+    if (totalWeight <= 0) { toast.error('At least one page needs a weight above 0.'); return; }
+    setSavingSplit(true);
+    try {
+      await onEditSplit(exp, draftVariants);
+      setSplitEditing(false);
+    } finally {
+      setSavingSplit(false);
+    }
   };
 
   const startSlugEdit = () => { setSlugDraft(exp.slug || 'split'); setSlugEditing(true); };
@@ -151,16 +169,64 @@ function ExperimentCard({ exp, origin, canEdit, onStart, onStop, onDelete, onRen
       </div>
 
       <div className="mt-4">
-        <div className="grid grid-cols-[1.4fr_repeat(4,1fr)] gap-2 px-3 pb-1 text-[11px] uppercase tracking-wide text-slate-400 font-bold">
-          <div>Page</div><div className="text-center">Split</div><div className="text-center">Visits</div><div className="text-center">Leads</div><div className="text-center">Conv.</div>
+        <div className="flex items-center justify-between px-3 pb-1">
+          <div className="grid grid-cols-[1.4fr_repeat(4,1fr)] gap-2 flex-1 text-[11px] uppercase tracking-wide text-slate-400 font-bold">
+            <div>Page</div><div className="text-center">Split</div><div className="text-center">Visits</div><div className="text-center">Leads</div><div className="text-center">Conv.</div>
+          </div>
+          {canEdit && !splitEditing && (
+            <button onClick={startSplitEdit} className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-[#0F1B3D] transition-colors" data-testid={`exp-edit-split-${exp.id}`}>
+              <SlidersHorizontal className="h-3.5 w-3.5" /> Adjust split
+            </button>
+          )}
         </div>
-        <div className="space-y-1">
-          {stats.variants.map((v) => (
-            <VariantStatsRow key={v.label} v={v} isWinner={stats.winner && stats.winner === v.label} />
-          ))}
-        </div>
-        {stats.winner === 'tie' && <p className="mt-2 px-3 text-xs text-amber-600">Variants are tied so far.</p>}
-        {!stats.winner && <p className="mt-2 px-3 text-xs text-slate-400">Need traffic on 2+ variants to call a winner. Stats count only visitors routed through this test's entry URL.</p>}
+
+        {splitEditing ? (
+          <div className="space-y-2" data-testid={`exp-split-editor-${exp.id}`}>
+            {draftVariants.map((v, i) => {
+              const pct = totalWeight > 0 ? Math.round(((Number(v.weight) || 0) / totalWeight) * 100) : 0;
+              return (
+                <div key={i} className="grid grid-cols-[1.4fr_1fr_1fr] gap-2 items-center px-3 py-1.5">
+                  <div className="font-semibold text-slate-800 text-sm truncate">
+                    {v.label} <code className="text-[10px] text-slate-400">{v.path}</code>
+                  </div>
+                  <div className="flex items-center gap-1 justify-center">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={v.weight}
+                      onChange={(e) => setDraftWeight(i, e.target.value)}
+                      className="w-20 h-9 rounded-lg border-slate-200 text-center"
+                      data-testid={`exp-split-weight-${exp.id}-${i}`}
+                    />
+                    <span className="text-sm text-slate-400">wt</span>
+                  </div>
+                  <div className="text-center text-xs text-slate-500" data-testid={`exp-split-pct-${exp.id}-${i}`}>{pct}% of traffic</div>
+                </div>
+              );
+            })}
+            <div className="flex items-center gap-2 px-3 pt-1">
+              <Button size="sm" onClick={saveSplit} disabled={savingSplit} className="rounded-lg bg-[#0F1B3D]" data-testid={`exp-split-save-${exp.id}`}>
+                <Check className="h-4 w-4 mr-1" /> {savingSplit ? 'Saving…' : 'Save split'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={cancelSplitEdit} className="rounded-lg border-slate-200" data-testid={`exp-split-cancel-${exp.id}`}>
+                <X className="h-4 w-4 mr-1" /> Cancel
+              </Button>
+              {exp.status === 'running' && <span className="text-xs text-emerald-600 font-semibold">Live — changes apply to new visitors immediately</span>}
+            </div>
+            <p className="px-3 text-xs text-slate-400">Weights are relative (they don't need to add to 100). The % shown is each page's share of traffic.</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1">
+              {stats.variants.map((v) => (
+                <VariantStatsRow key={v.label} v={v} isWinner={stats.winner && stats.winner === v.label} />
+              ))}
+            </div>
+            {stats.winner === 'tie' && <p className="mt-2 px-3 text-xs text-amber-600">Variants are tied so far.</p>}
+            {!stats.winner && <p className="mt-2 px-3 text-xs text-slate-400">Need traffic on 2+ variants to call a winner. Stats count only visitors routed through this test's entry URL.</p>}
+          </>
+        )}
       </div>
     </div>
   );
@@ -235,6 +301,16 @@ export function AdminSplitTest() {
   const editSlug = async (exp, newSlug) => {
     try { await api.put(`/admin/experiments/${exp.id}`, { slug: newSlug }); toast.success('Entry URL updated'); load(); }
     catch (e) { toast.error(e?.response?.data?.detail || 'Failed to update URL'); }
+  };
+  const editSplit = async (exp, variants) => {
+    try {
+      await api.put(`/admin/experiments/${exp.id}`, { variants });
+      toast.success('Traffic split updated');
+      load();
+    } catch (e) {
+      toast.error('Failed to update split');
+      throw e;
+    }
   };
   const deleteExp = async (exp) => {
     if (!window.confirm(`Delete "${exp.name}"? Its results will be lost.`)) return;
@@ -316,7 +392,7 @@ export function AdminSplitTest() {
         ) : (
           <div className="space-y-4">
             {experiments.map((exp) => (
-              <ExperimentCard key={exp.id} exp={exp} origin={origin} canEdit={canEdit} onStart={startExp} onStop={stopExp} onDelete={deleteExp} onRename={renameExp} onEditSlug={editSlug} />
+              <ExperimentCard key={exp.id} exp={exp} origin={origin} canEdit={canEdit} onStart={startExp} onStop={stopExp} onDelete={deleteExp} onRename={renameExp} onEditSlug={editSlug} onEditSplit={editSplit} />
             ))}
           </div>
         )}
