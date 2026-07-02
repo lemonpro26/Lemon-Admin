@@ -1,4 +1,10 @@
 
+## 2026-07-02 — Unified search across Calls + Leads (open either from either tab)
+- Calls-tab search now also queries LEADS and shows a "matching form leads" section (matched-lead-row-<id>), clickable to open a shared Lead detail dialog.
+- Leads-tab matching-calls rows are now clickable to open a shared Call detail dialog (previously non-clickable).
+- New self-contained shared dialogs: CallDetailDialog.jsx (shared-call-detail) and LeadDetailDialog.jsx (shared-lead-detail) — each with details + Mark Sold + Mark Retained + Delete, calling /admin/{calls|leads}/{id}/(sold|retained) and DELETE. Existing native dialogs left intact (low-risk additive). Backend /admin/leads and /admin/calls already support ?search=. Verified both directions via UI; test data cleaned up.
+
+
 ## 2026-07-01 (pm-7) — "Retained clients" + "All time" calendar preset (iteration_22, 100% pass)
 - Every date-range calendar now has an "All time" preset (DateRangeFilter: allTimeRange()/ALL_TIME_START=2000-01-01, date-preset-all).
 - Leads & calls can be marked "Retained": toggle in each detail dialog (lead-retained-toggle / call-retained-toggle), row badge (lead-/call-retained-badge-<id>). Backend: RetainedBody, POST /api/admin/leads/{id}/retained, POST /api/admin/calls/{id}/retained (set retained + retained_at). Actions now logged in admin history (_CHANGE_RULES).

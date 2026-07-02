@@ -30,6 +30,7 @@ import { AdminSpanish } from '@/components/admin/AdminSpanish';
 import { AdminPages } from '@/components/admin/AdminPages';
 import { AdminFunnel } from '@/components/admin/AdminFunnel';
 import { AdminRetained } from '@/components/admin/AdminRetained';
+import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 function fmtDate(iso) {
@@ -98,6 +99,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [matchedCalls, setMatchedCalls] = useState([]);
+  const [openedCall, setOpenedCall] = useState(null);
   const [leadSeg, setLeadSeg] = useState('all');
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem('admin_active_tab');
@@ -628,10 +630,11 @@ export default function AdminDashboard() {
                         </TableHeader>
                         <TableBody>
                           {matchedCalls.map((c) => (
-                            <TableRow key={c.id} data-testid={`matched-call-row-${c.id}`}>
+                            <TableRow key={c.id} data-testid={`matched-call-row-${c.id}`} className="cursor-pointer hover:bg-slate-50" onClick={() => setOpenedCall(c)}>
                               <TableCell className="font-medium text-slate-900">
                                 {c.caller_name || '\u2014'}
                                 <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">call</Badge>
+                                {c.retained && <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Retained</Badge>}
                               </TableCell>
                               <TableCell className="text-slate-600">{c.caller_number || '\u2014'}</TableCell>
                               <TableCell className="hidden sm:table-cell text-slate-600">{c.duration ? `${c.duration}s` : '\u2014'}</TableCell>
@@ -807,6 +810,14 @@ export default function AdminDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Shared call dialog for unified search (open a matching call from the Leads tab) */}
+      <CallDetailDialog
+        call={openedCall}
+        open={!!openedCall}
+        onOpenChange={(o) => { if (!o) setOpenedCall(null); }}
+        onChanged={() => loadLeads({ silent: true })}
+      />
     </div>
   );
 }

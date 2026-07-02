@@ -18,6 +18,7 @@ import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter'
 import { useSortable, SortLabel } from '@/lib/useSortable';
 import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
 import { Badge } from '@/components/ui/badge';
+import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
 
 // Toggleable columns (Caller & Actions always shown). Persisted per-browser.
 const COLS = [
@@ -85,6 +86,8 @@ export const AdminCalls = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [seg, setSeg] = useState('all');
   const [cols, setCols] = useState(loadCols);
+  const [matchedLeads, setMatchedLeads] = useState([]);
+  const [openedLead, setOpenedLead] = useState(null);
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
@@ -115,6 +118,15 @@ export const AdminCalls = () => {
       const params = q ? { search: q } : { start: range.start, end: range.end };
       const res = await api.get('/admin/calls', { params });
       setCalls(res.data?.calls || []);
+      // Unified search: also surface matching LEADS when searching.
+      if (q) {
+        try {
+          const lr = await api.get('/admin/leads', { params: { search: q } });
+          setMatchedLeads(lr.data?.leads || lr.data?.items || []);
+        } catch { setMatchedLeads([]); }
+      } else {
+        setMatchedLeads([]);
+      }
     } catch (e) {
       if (!silent) toast.error('Failed to load calls.');
     } finally {
@@ -276,6 +288,34 @@ export const AdminCalls = () => {
           </button>
         ))}
       </div>
+
+      {debouncedSearch.trim() && matchedLeads.length > 0 && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/40 overflow-hidden" data-testid="calls-matched-leads">
+          <div className="px-4 py-2 text-xs font-bold uppercase tracking-wide text-blue-700 bg-blue-50 border-b border-blue-200">
+            {matchedLeads.length} matching form lead{matchedLeads.length > 1 ? 's' : ''} — click to open
+          </div>
+          <Table>
+            <TableBody>
+              {matchedLeads.map((l) => {
+                const name = l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '—';
+                const vehicle = [l.car_year, l.car_make, l.car_model].filter(Boolean).join(' ');
+                return (
+                  <TableRow key={l.id} data-testid={`matched-lead-row-${l.id}`} className="cursor-pointer hover:bg-blue-50" onClick={() => setOpenedLead(l)}>
+                    <TableCell className="font-medium text-slate-900">
+                      {name}
+                      <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px]">lead</Badge>
+                      {l.retained && <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Retained</Badge>}
+                    </TableCell>
+                    <TableCell className="text-slate-600">{l.phone || '—'}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-slate-600">{l.email || '—'}</TableCell>
+                    <TableCell className="hidden md:table-cell text-slate-600">{vehicle || '—'}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         <Table>
@@ -564,6 +604,14 @@ export const AdminCalls = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Shared lead dialog for unified search (open a matching lead from the Calls tab) */}
+      <LeadDetailDialog
+        lead={openedLead}
+        open={!!openedLead}
+        onOpenChange={(o) => { if (!o) setOpenedLead(null); }}
+        onChanged={() => load({ silent: true })}
+      />
     </div>
   );
 };
