@@ -702,6 +702,8 @@ _CHANGE_RULES = [
     ("PUT", r"/admin/spa-content$", "Edited Spanish PA page content"),
     ("PUT", r"/admin/dg-content$", "Edited Demand Gen page content"),
     ("PUT", r"/admin/dgs-content$", "Edited Spanish Demand Gen page content"),
+    ("POST", r"/admin/leads/[^/]+/retained$", "Updated lead retained status"),
+    ("POST", r"/admin/calls/[^/]+/retained$", "Updated call retained status"),
     ("PUT", r"/admin/page-content/[^/]+$", "Edited page content"),
     ("PUT", r"/admin/config$", "Updated settings"),
     ("PUT", r"/admin/spanish$", "Edited Spanish hooks"),
@@ -2755,6 +2757,8 @@ async def mark_call_retained(call_id: str, body: RetainedBody, _: dict = Depends
 @api_router.get("/admin/retained")
 async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(require_admin)):
     """Combined list of every retained lead + call (your retained clients)."""
+    if not start:
+        start = "2000-01-01"  # default to all-time so nothing is hidden
     s_iso, e_iso, _d = _date_range(start, end)
     q = {"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}
     leads = await db.leads.find(q, {"_id": 0}).sort("retained_at", -1).to_list(length=2000)

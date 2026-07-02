@@ -1,4 +1,11 @@
 
+## 2026-07-01 (pm-7) — "Retained clients" + "All time" calendar preset (iteration_22, 100% pass)
+- Every date-range calendar now has an "All time" preset (DateRangeFilter: allTimeRange()/ALL_TIME_START=2000-01-01, date-preset-all).
+- Leads & calls can be marked "Retained": toggle in each detail dialog (lead-retained-toggle / call-retained-toggle), row badge (lead-/call-retained-badge-<id>). Backend: RetainedBody, POST /api/admin/leads/{id}/retained, POST /api/admin/calls/{id}/retained (set retained + retained_at). Actions now logged in admin history (_CHANGE_RULES).
+- New "Retained" tab (AdminRetained.jsx, admin-tab-retained) — combined view of all retained leads + calls, defaults to All time. Backend GET /api/admin/retained returns {items,total,lead_count,call_count}; defaults start to all-time server-side. Not a literal copy — the tab queries retained=true across both collections.
+- Backend suite: /app/backend/tests/test_retained_features.py.
+
+
 ## 2026-07-01 (pm-6) — Google Ads names auto-sync 24/7
 - Campaign/ad-group/ad names now refresh automatically via a background loop (_ad_label_sync_loop): every 3h, force refresh, starts ~20s after boot; no-ops when Google Ads not configured (preview). Manual "Sync names" button still works.
 - Refactored sync into shared _sync_ad_labels_core(force); endpoint POST /api/admin/ad-labels/sync-google calls it. Loop started in startup event. Verified import + clean boot.
