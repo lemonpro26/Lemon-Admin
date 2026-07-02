@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Award, RefreshCw, Phone, FileText, Pencil, Check, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
@@ -71,6 +71,7 @@ export const AdminRetained = () => {
   const [range, setRange] = useState(allTimeRange());
   const [data, setData] = useState({ items: [], total: 0, lead_count: 0, call_count: 0 });
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,7 +99,20 @@ export const AdminRetained = () => {
     }
   };
 
-  const items = data.items || [];
+  const allItems = data.items || [];
+  const items = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allItems;
+    const digits = q.replace(/\D/g, '');
+    return allItems.filter((it) => {
+      const source = it.type === 'call'
+        ? `call from ${it.number_group_label || ''}`
+        : (SOURCE_LABELS[it.source_page] || it.source_page || '');
+      const hay = [it.name, it.phone, source, it.type].filter(Boolean).join(' ').toLowerCase();
+      const phoneDigits = String(it.phone || '').replace(/\D/g, '');
+      return hay.includes(q) || (digits && phoneDigits.includes(digits));
+    });
+  }, [allItems, search]);
 
   return (
     <div className="space-y-5" data-testid="admin-retained">
@@ -107,6 +121,21 @@ export const AdminRetained = () => {
           <Award className="h-4 w-4 text-amber-500" /> Your retained clients — every lead &amp; call you marked as retained.
         </p>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search retained by name, number…"
+              className="pl-9 pr-8 h-9 w-64 rounded-xl border-slate-200"
+              data-testid="retained-search"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" data-testid="retained-search-clear" aria-label="Clear search">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <button onClick={load} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-[#0F1B3D] transition-colors" data-testid="retained-refresh">
             <RefreshCw className="h-4 w-4" /> Refresh
           </button>
@@ -132,7 +161,9 @@ export const AdminRetained = () => {
           <div className="p-12 text-center text-slate-500" data-testid="retained-loading">Loading…</div>
         ) : items.length === 0 ? (
           <div className="p-12 text-center text-slate-500" data-testid="retained-empty">
-            No retained clients yet. Open a lead or call and mark it as retained — it will appear here.
+            {search.trim()
+              ? `No retained clients match "${search.trim()}".`
+              : 'No retained clients yet. Open a lead or call and mark it as retained — it will appear here.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
