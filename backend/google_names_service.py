@@ -166,6 +166,84 @@ def fetch_names() -> dict:
             "live_campaigns": live_campaigns, "live_adgroups": live_adgroups}
 
 
+def _account_timezone(c, token) -> str:
+    """The Google Ads account's reporting timezone (e.g. America/Los_Angeles).
+    call_view times are returned in this tz with NO offset, so we need it to
+    convert them to UTC before matching against our stored calls."""
+    try:
+        rows = _search(c, token, "SELECT customer.time_zone FROM customer LIMIT 1")
+        if rows:
+            return (rows[0].get("customer", {}) or {}).get("timeZone", "") or ""
+    except Exception as e:
+        logger.info("Could not read account time zone: %s", e)
+    return ""
+
+
+def fetch_call_views(start_date: str, end_date: str) -> list:
+    """Pull Google Ads call details (call_view) since start_date (YYYY-MM-DD).
+    Returns a list of dicts with the caller's area/country code, duration, start
+    time (converted to a UTC ISO string), call type (CALL_TRACKED / DIRECT_CALL /
+    MANUALLY_DIALED / HIGH_END_MOBILE_SEARCH), status, and the campaign that drove
+    the call. Google does NOT expose the full caller number here — only the area
+    code — so callers match these to CTM calls on area code + time + duration.
+    NOTE: call_view does not support segments.date, so we filter on
+    call_view.start_call_date_time; Google returns that time in the ACCOUNT
+    timezone with no offset, so we convert it to UTC here.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    try:
+        from zoneinfo import ZoneInfo
+    except Exception:
+        ZoneInfo = None
+
+    c = _cfg()
+    if not is_configured():
+        raise RuntimeError("Google Ads API is not configured")
+    token = _access_token(c)
+    acct_tz = _account_timezone(c, token)
+    tzinfo = None
+    if acct_tz and ZoneInfo is not None:
+        try:
+            tzinfo = ZoneInfo(acct_tz)
+        except Exception:
+            tzinfo = None
+
+    def _to_utc_iso(raw: str) -> str:
+        if not raw:
+            return ""
+        try:
+            naive = _dt.strptime(raw.strip(), "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return raw
+        aware = naive.replace(tzinfo=tzinfo or _tz.utc)
+        return aware.astimezone(_tz.utc).isoformat()
+
+    query = (
+        "SELECT call_view.caller_area_code, call_view.caller_country_code, "
+        "call_view.call_duration_seconds, call_view.start_call_date_time, "
+        "call_view.end_call_date_time, call_view.type, call_view.call_status, "
+        "campaign.id, campaign.name "
+        f"FROM call_view WHERE call_view.start_call_date_time >= '{start_date} 00:00:00'"
+    )
+    out = []
+    for row in _search(c, token, query):
+        cv = row.get("callView", {}) or {}
+        camp = row.get("campaign", {}) or {}
+        raw_start = cv.get("startCallDateTime") or ""
+        out.append({
+            "caller_area_code": str(cv.get("callerAreaCode") or ""),
+            "caller_country_code": str(cv.get("callerCountryCode") or ""),
+            "duration": int(cv.get("callDurationSeconds") or 0),
+            "start_call_date_time": _to_utc_iso(raw_start),
+            "start_call_local": raw_start,
+            "type": cv.get("type") or "",
+            "status": cv.get("callStatus") or "",
+            "campaign_id": str(camp.get("id") or ""),
+            "campaign_name": camp.get("name") or "",
+        })
+    return out
+
+
 def fetch_sitelink_metrics(start_date: str, end_date: str, campaign_ids=None) -> list:
     """Real sitelink (asset) performance pulled straight from Google Ads for the
     given date range (YYYY-MM-DD). Returns a list of

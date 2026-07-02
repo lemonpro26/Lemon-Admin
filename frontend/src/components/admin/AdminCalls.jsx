@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award, FileText } from 'lucide-react';
+import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award, FileText, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -50,8 +50,15 @@ const CALL_SEGMENTS = [
 ];
 
 
-const fmtDuration = (s) => {
-  const n = Number(s) || 0;
+const GCALL_TYPE_LABELS = {
+  CALL_TRACKED: 'Tracked call',
+  DIRECT_CALL: 'Direct call',
+  MANUALLY_DIALED: 'Manually dialed',
+  HIGH_END_MOBILE_SEARCH: 'Mobile click-to-call',
+};
+const gcallType = (t) => GCALL_TYPE_LABELS[t] || (t ? String(t).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : '');
+
+const fmtDuration = (s) => {  const n = Number(s) || 0;
   const m = Math.floor(n / 60);
   const sec = n % 60;
   return `${m}:${String(sec).padStart(2, '0')}`;
@@ -88,6 +95,7 @@ export const AdminCalls = () => {
   const [cols, setCols] = useState(loadCols);
   const [matchedLeads, setMatchedLeads] = useState([]);
   const [openedLead, setOpenedLead] = useState(null);
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
@@ -217,6 +225,23 @@ export const AdminCalls = () => {
     }
   };
 
+  const syncGoogleCalls = async () => {
+    setSyncingGoogle(true);
+    try {
+      const res = await api.post('/admin/calls/sync-google');
+      const m = res.data?.matched ?? 0;
+      const g = res.data?.google_rows ?? 0;
+      toast.success(m > 0
+        ? `Matched ${m} call${m === 1 ? '' : 's'} to Google Ads (${g} Google records scanned).`
+        : `No new matches yet (${g} Google records scanned). Google call data can lag a few hours.`);
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Could not sync Google call details.');
+    } finally {
+      setSyncingGoogle(false);
+    }
+  };
+
   return (
     <div className="grid gap-4" data-testid="admin-calls">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -248,6 +273,11 @@ export const AdminCalls = () => {
           <Button variant="outline" size="sm" onClick={() => load()} className="rounded-xl border-slate-200" data-testid="calls-refresh">
             <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
+          {editable && (
+            <Button variant="outline" size="sm" onClick={syncGoogleCalls} disabled={syncingGoogle} className="rounded-xl border-slate-200" data-testid="calls-sync-google" title="Pull call type & campaign from Google Ads and match to your calls">
+              <Sparkles className={`h-4 w-4 mr-2 ${syncingGoogle ? 'animate-pulse' : ''}`} /> {syncingGoogle ? 'Syncing…' : 'Sync Google calls'}
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="rounded-xl border-slate-200" data-testid="calls-columns-button">
@@ -365,6 +395,11 @@ export const AdminCalls = () => {
                     {c.retained && (
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-retained-badge-${c.id}`}>Retained</Badge>
                     )}
+                    {c.google_matched && (
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] gap-1" data-testid={`call-google-badge-${c.id}`} title={`Verified via Google Ads${c.google_call_type ? ' — ' + gcallType(c.google_call_type) : ''}`}>
+                        <Sparkles className="h-3 w-3" /> Google Ads
+                      </Badge>
+                    )}
                   </div>
                 </TableCell>
                 {cols.number && <TableCell className="text-slate-700">{c.caller_number || '—'}</TableCell>}
@@ -379,7 +414,14 @@ export const AdminCalls = () => {
                   </TableCell>
                 )}
                 {cols.duration && <TableCell className="text-slate-700">{fmtDuration(c.duration)}</TableCell>}
-                {cols.campaign && <TableCell className="hidden md:table-cell text-slate-600">{c.campaign || '—'}</TableCell>}
+                {cols.campaign && (
+                  <TableCell className="hidden md:table-cell text-slate-600">
+                    {c.google_campaign || c.campaign || '—'}
+                    {c.google_matched && c.google_call_type && (
+                      <span className="block text-[10px] text-green-600" data-testid={`call-google-type-${c.id}`}>{gcallType(c.google_call_type)} · via Google</span>
+                    )}
+                  </TableCell>
+                )}
                 {cols.hook && (
                 <TableCell className="hidden lg:table-cell">
                   {c.saw_landing_page ? (
@@ -492,6 +534,24 @@ export const AdminCalls = () => {
                   </p>
                 )}
               </div>
+
+              {/* Google Ads call details (matched from call_view) */}
+              {selected.google_matched && (
+                <div className="rounded-xl border border-green-200 p-4 bg-green-50" data-testid="call-google-section">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-green-600" />
+                    <span className="font-semibold text-slate-900">Google Ads call details</span>
+                  </div>
+                  <div className="grid gap-1.5 text-sm">
+                    <div className="flex justify-between"><span className="text-slate-500">Call type</span><span className="font-medium text-slate-900" data-testid="call-google-type">{gcallType(selected.google_call_type) || '—'}</span></div>
+                    <div className="flex justify-between gap-4"><span className="text-slate-500">Campaign</span><span className="font-medium text-slate-900 text-right break-all" data-testid="call-google-campaign">{selected.google_campaign || '—'}</span></div>
+                    {selected.google_call_status && (
+                      <div className="flex justify-between"><span className="text-slate-500">Status</span><span className="font-medium text-slate-900">{selected.google_call_status}</span></div>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2">Matched from Google Ads on caller area code + time + duration.</p>
+                </div>
+              )}
 
               {/* Revenue + Google Ads conversion */}
               <div className="rounded-xl border border-slate-200 p-4 bg-slate-50" data-testid="call-revenue-section">

@@ -2353,6 +2353,9 @@ async def calls_webhook(request: Request, token: str = ""):
     await db.calls.insert_one({**rec})
     logger.info("Call webhook stored: %s (%ss) from %s", rec["caller_number"], duration, rec["source"])
     asyncio.create_task(_auto_upload_call_conversion(rec))
+    # Best-effort: try to attach Google Ads call type + campaign right away
+    # (Google reporting lags, so the periodic loop is the reliable catch-up).
+    asyncio.create_task(_enrich_calls_with_google(full=False))
     return {"success": True, "id": rec["id"]}
 
 
@@ -2437,6 +2440,107 @@ async def _enrich_calls_with_hooks(items: list) -> list:
             c["source_page"] = sp
             c["is_spanish"] = sp in ("sp", "laspa")
     return items
+
+
+# ---- Google Ads call-detail matching -------------------------------------
+# Google's call_view report only exposes the caller's AREA CODE + timestamp
+# (never the full number), so we enrich our CTM calls by matching on
+# area code + call start time (within a window) + duration. Matched calls get
+# Google's real call type + campaign attached and a "Verified via Google Ads" flag.
+_GCALL_TIME_WINDOW_S = 900   # +/- 15 minutes (absorbs minor clock/tz drift)
+_GCALL_DURATION_TOL_S = 25   # +/- 25 seconds
+
+
+def _parse_dt_epoch(value):
+    """Parse an ISO/Google datetime string to a UTC epoch (float) or None."""
+    if not value:
+        return None
+    s = str(value).strip().replace(" ", "T", 1)
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except Exception:
+        return None
+
+
+async def _enrich_calls_with_google(full: bool = False) -> dict:
+    """Match Google Ads call_view records to stored CTM calls and attach Google's
+    call type + campaign. Fuzzy match on area code + start time + duration.
+    When full=False only the last 3 days of calls are (re)matched (fast, used on
+    new-call ingestion + periodic loop); full=True re-scans from the first call."""
+    if not gnames.is_configured():
+        return {"success": False, "configured": False, "matched": 0}
+
+    # Determine the CTM calls we want to enrich.
+    if full:
+        first = await db.calls.find_one({}, sort=[("created_at", 1)])
+        if not first:
+            return {"success": True, "matched": 0, "google_rows": 0}
+        start_dt = datetime.fromisoformat(first["created_at"]) if first.get("created_at") else (datetime.now(timezone.utc) - timedelta(days=90))
+    else:
+        start_dt = datetime.now(timezone.utc) - timedelta(days=3)
+    start_date = (start_dt.astimezone(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    end_date = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    try:
+        g_rows = await asyncio.to_thread(gnames.fetch_call_views, start_date, end_date)
+    except Exception as e:
+        logger.warning("Google call_view fetch failed: %s", e)
+        return {"success": False, "configured": True, "matched": 0, "error": str(e)[:300]}
+
+    # Pre-compute epoch for each google row.
+    for r in g_rows:
+        r["_epoch"] = _parse_dt_epoch(r.get("start_call_date_time"))
+
+    q = {"is_test": {"$ne": True}, "created_at": {"$gte": start_dt.astimezone(timezone.utc).isoformat()}}
+    calls = await db.calls.find(q).to_list(5000)
+    matched = 0
+    used = set()  # google rows already claimed
+    for c in calls:
+        area = _digits10(c.get("caller_number"))[:3]
+        c_epoch = _parse_dt_epoch(c.get("called_at") or c.get("created_at"))
+        if not area or c_epoch is None:
+            continue
+        best, best_gap = None, None
+        for i, r in enumerate(g_rows):
+            if i in used or r.get("_epoch") is None:
+                continue
+            if r.get("caller_area_code") != area:
+                continue
+            gap = abs(r["_epoch"] - c_epoch)
+            if gap > _GCALL_TIME_WINDOW_S:
+                continue
+            if abs(int(r.get("duration") or 0) - int(c.get("duration") or 0)) > _GCALL_DURATION_TOL_S:
+                continue
+            if best_gap is None or gap < best_gap:
+                best, best_gap, best_i = r, gap, i
+        if best is None:
+            continue
+        used.add(best_i)
+        await db.calls.update_one({"id": c["id"]}, {"$set": {
+            "google_matched": True,
+            "google_call_type": best.get("type") or "",
+            "google_call_status": best.get("status") or "",
+            "google_campaign": best.get("campaign_name") or "",
+            "google_campaign_id": best.get("campaign_id") or "",
+            "google_matched_at": _now_iso(),
+        }})
+        matched += 1
+    if matched:
+        logger.info("Google call match: enriched %s of %s calls (%s google rows)", matched, len(calls), len(g_rows))
+    return {"success": True, "matched": matched, "google_rows": len(g_rows), "scanned_calls": len(calls)}
+
+
+
+@api_router.post("/admin/calls/sync-google")
+async def admin_sync_google_calls(_: dict = Depends(require_editor)):
+    """Force a full match of Google Ads call details onto stored CTM calls."""
+    res = await _enrich_calls_with_google(full=True)
+    if not res.get("configured", True):
+        raise HTTPException(status_code=400, detail="Google Ads API is not configured")
+    return res
 
 
 @api_router.get("/admin/calls")
@@ -2637,6 +2741,22 @@ async def _ad_label_sync_loop():
         except Exception as e:
             logger.warning("Auto ad-label sync loop error: %s", e)
         await asyncio.sleep(3 * 3600)
+
+
+async def _google_call_sync_loop():
+    """Catch-up matcher for Google Ads call details. Google's call_view data lags
+    behind the live call by up to a few hours, so we re-scan recent calls every
+    20 minutes and attach call type + campaign as Google makes it available."""
+    await asyncio.sleep(45)  # let the app finish booting first
+    while True:
+        try:
+            if gnames.is_configured():
+                res = await _enrich_calls_with_google(full=False)
+                if res.get("matched"):
+                    logger.info("Google call sync loop matched %s calls", res.get("matched"))
+        except Exception as e:
+            logger.warning("Google call sync loop error: %s", e)
+        await asyncio.sleep(20 * 60)
 
 
 @api_router.post("/admin/ad-labels")
@@ -3337,6 +3457,7 @@ async def startup():
     # Keep Google Ads campaign/ad names fresh 24/7 (background loop).
     try:
         asyncio.create_task(_ad_label_sync_loop())
+        asyncio.create_task(_google_call_sync_loop())
     except Exception as e:
         logger.error("failed to start ad-label sync loop: %s", e)
     logger.info("Lemon Pros API started")
