@@ -11,6 +11,9 @@ const BUILTIN_PAGES = [
   { label: 'Home (Main)', path: '/' },
   { label: 'PA Advertorial', path: '/pa' },
   { label: 'Spanish', path: '/sp' },
+  { label: 'Spanish PA', path: '/spa' },
+  { label: 'Demand Gen', path: '/dg' },
+  { label: 'Demand Gen Spanish', path: '/dgs' },
 ];
 
 const STATUS_STYLE = {
@@ -284,7 +287,10 @@ export function AdminSplitTest() {
       ]);
       setExperiments(ex.data.experiments || []);
       const custom = (pg.data.custom_pages || []).map((p) => ({ label: p.label, path: p.path }));
-      setPages([...BUILTIN_PAGES, ...custom]);
+      const seen = new Set(BUILTIN_PAGES.map((p) => p.path));
+      const merged = [...BUILTIN_PAGES];
+      custom.forEach((p) => { if (p.path && !seen.has(p.path)) { seen.add(p.path); merged.push(p); } });
+      setPages(merged);
     } catch (e) {
       toast.error('Failed to load experiments');
     } finally {

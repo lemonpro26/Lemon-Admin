@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-02
+- FIX: Split Test "New Test" page dropdown only listed Home/PA/Spanish. Added Spanish PA (/spa), Demand Gen (/dg), Demand Gen Spanish (/dgs) to `BUILTIN_PAGES` and deduped against custom pages so all 6 landing pages are selectable as split-test variants.
 - FEATURE: Google Ads call-detail enrichment. Pull `call_view` (call type + campaign + status) from Google Ads and match to CTM calls.
   - `google_names_service.fetch_call_views()`: GAQL over `call_view`. NOTE `segments.date` is prohibited on call_view — filter on `call_view.start_call_date_time` instead. Google returns times in the ACCOUNT timezone with no offset; we read `customer.time_zone` and convert to UTC.
   - Matching (`_enrich_calls_with_google` in server.py): fuzzy match on caller **area code** + start time (±15 min) + duration (±25s). Google does NOT expose the full caller number via API (only area code), so this is best-effort by design (user accepted). Adds `google_matched`, `google_call_type`, `google_campaign`, `google_call_status` to the call doc. Fetch window buffered by 1 day to avoid tz-boundary misses.
