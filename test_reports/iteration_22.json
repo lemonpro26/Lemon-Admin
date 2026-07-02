@@ -1,0 +1,37 @@
+{
+  "summary": "Verified new 'Retained clients' feature + 'All time' date-range preset on the Lemon Pros admin. Backend pytest (10/10 passing) covers POST /api/admin/leads/{id}/retained toggle (sets retained_at when true, clears when false), POST /api/admin/calls/{id}/retained (same), auth requirement, missing-id 404s, and GET /api/admin/retained aggregation (items/total/lead_count/call_count with all-time range). Frontend Playwright verified: new admin-tab-retained sits between Leads and Settings, retained-stat-total/leads/calls cards + retained-table render, default range is 'All time', lead/call retained toggles switch label to 'Retained client \u2713 (click to remove)' and add lead-/call-retained-badge-<id> on the row, and date-preset-all is present and functional in Funnel, Analytics, Calls, Leads, and Retained date filters. After marking one lead + one call retained the Retained tab correctly showed total=2, lead_count=1, call_count=1.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Lead / Call detail dialog", "issues": ["Radix Dialog console warning: 'Missing Description or aria-describedby={undefined} for DialogContent' (minor a11y warning, not blocking)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_retained_features.py",
+    "/app/test_reports/pytest/iter22_retained.xml"
+  ],
+  "action_items": [
+    "(Optional) Add DialogDescription (or aria-describedby) to the lead & call detail dialogs to silence the Radix a11y warning.",
+    "(Optional) Clean up leftover retained test-lead 'TEST Iter20DG' remaining in DB from a previous iteration (visible in Retained tab)."
+  ],
+  "critical_code_review_comments": [
+    "server.py mark_lead_retained/mark_call_retained update the record but do not call _record_activity, so 'Marked as retained' / 'Unmarked' actions are NOT recorded in the admin change history (all other similar admin write endpoints log activity via the middleware/_CHANGE_RULES). Consider adding entries to _CHANGE_RULES for /admin/leads/{id}/retained and /admin/calls/{id}/retained.",
+    "GET /admin/retained defaults start/end to today via _date_range() when either param is empty. Frontend always sends the ALL_TIME_START (2000-01-01) so it works, but if a caller omits start the endpoint silently returns only today\u2019s retained items \u2014 consider defaulting start to ALL_TIME_START server-side to make the API safer.",
+    "server.py is 3.3k+ lines. Recommend splitting into modules (admin, tracking, verification, etc.) per code-review guideline (>700 lines)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_retained_features.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "owner / LemonPros2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created one lead via public /api/leads and one call via POST /api/admin/calls/test during pytest; both cleaned up (unmarked + deleted) in teardown. Frontend test also created a test call and deleted it after the run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Retained feature end-to-end confirmed working. Backend suite: /app/backend/tests/test_retained_features.py. Note there is at least one pre-existing retained lead ('TEST Iter20DG') left over from an earlier iteration \u2014 harmless but visible in the Retained tab. If retesting, use the seed_lead/seed_call fixtures pattern already in the pytest file to avoid polluting UI.",
+  "rca of the issue": "N/A \u2014 no bugs found for the reviewed feature set."
+}

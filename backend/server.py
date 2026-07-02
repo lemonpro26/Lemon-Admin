@@ -482,6 +482,11 @@ class SaleBody(BaseModel):
     sale_datetime: Optional[str] = None  # ISO; defaults to now (UTC)
 
 
+class RetainedBody(BaseModel):
+    """Marks a lead/call as a retained client (shows in the Retained tab)."""
+    retained: bool = True
+
+
 # ----------------------------- Helpers -----------------------------
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -2723,6 +2728,59 @@ async def mark_lead_sold(lead_id: str, body: SaleBody, _: dict = Depends(require
     sale_fields["conversion_last_attempt"] = _now_iso()
     await db.leads.update_one({"id": lead_id}, {"$set": sale_fields})
     return {"success": True, "lead_id": lead_id, "conversion": result, **sale_fields}
+
+
+@api_router.post("/admin/leads/{lead_id}/retained")
+async def mark_lead_retained(lead_id: str, body: RetainedBody, _: dict = Depends(require_editor)):
+    """Flag/unflag a lead as a retained client. Retained items appear in the Retained tab."""
+    lead = await db.leads.find_one({"id": lead_id}, {"_id": 0})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    fields = {"retained": bool(body.retained), "retained_at": _now_iso() if body.retained else None}
+    await db.leads.update_one({"id": lead_id}, {"$set": fields})
+    return {"success": True, "lead_id": lead_id, **fields}
+
+
+@api_router.post("/admin/calls/{call_id}/retained")
+async def mark_call_retained(call_id: str, body: RetainedBody, _: dict = Depends(require_editor)):
+    """Flag/unflag a call as a retained client. Retained items appear in the Retained tab."""
+    call = await db.calls.find_one({"id": call_id}, {"_id": 0})
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+    fields = {"retained": bool(body.retained), "retained_at": _now_iso() if body.retained else None}
+    await db.calls.update_one({"id": call_id}, {"$set": fields})
+    return {"success": True, "call_id": call_id, **fields}
+
+
+@api_router.get("/admin/retained")
+async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(require_admin)):
+    """Combined list of every retained lead + call (your retained clients)."""
+    s_iso, e_iso, _d = _date_range(start, end)
+    q = {"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}
+    leads = await db.leads.find(q, {"_id": 0}).sort("retained_at", -1).to_list(length=2000)
+    calls = await db.calls.find(q, {"_id": 0}).sort("retained_at", -1).to_list(length=2000)
+    calls = await _enrich_calls_with_hooks(calls)
+    items = []
+    for l in leads:
+        items.append({
+            "type": "lead", "id": l.get("id"), "name": l.get("full_name") or l.get("first_name") or "—",
+            "phone": l.get("phone"), "email": l.get("email"),
+            "vehicle": " ".join([str(x) for x in [l.get("car_year"), l.get("car_make"), l.get("car_model")] if x]),
+            "source_page": l.get("source_page") or "home",
+            "sale_status": l.get("sale_status"), "sale_value": l.get("sale_value"),
+            "retained_at": l.get("retained_at"), "created_at": l.get("created_at"),
+        })
+    for c in calls:
+        items.append({
+            "type": "call", "id": c.get("id"), "name": c.get("caller_name") or "—",
+            "phone": c.get("caller_number"), "email": None, "vehicle": "",
+            "source_page": c.get("source_page") or "", "number_group_label": c.get("number_group_label"),
+            "tracked_number_display": c.get("tracked_number_display"),
+            "sale_status": c.get("sale_status"), "sale_value": c.get("sale_value"),
+            "retained_at": c.get("retained_at"), "created_at": c.get("created_at"),
+        })
+    items.sort(key=lambda x: x.get("retained_at") or "", reverse=True)
+    return {"items": items, "total": len(items), "lead_count": len(leads), "call_count": len(calls)}
 
 
 @api_router.post("/admin/leads/{lead_id}/conversion/retry")

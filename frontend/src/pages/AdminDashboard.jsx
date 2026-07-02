@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid, Filter,
-  FileText, Percent, Sigma, Search, X, AlertTriangle,
+  FileText, Percent, Sigma, Search, X, AlertTriangle, Award,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, TOKEN_KEY, clearSession, canEdit as canEditFn, getRole, getUsername } from '@/lib/api';
@@ -29,6 +29,7 @@ import { AdminSplitTest } from '@/components/admin/AdminSplitTest';
 import { AdminSpanish } from '@/components/admin/AdminSpanish';
 import { AdminPages } from '@/components/admin/AdminPages';
 import { AdminFunnel } from '@/components/admin/AdminFunnel';
+import { AdminRetained } from '@/components/admin/AdminRetained';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 function fmtDate(iso) {
@@ -260,6 +261,18 @@ export default function AdminDashboard() {
     }
   };
 
+  const markRetained = async (retained) => {
+    if (!selected) return;
+    try {
+      await api.post(`/admin/leads/${selected.id}/retained`, { retained });
+      setSelected((prev) => (prev ? { ...prev, retained, retained_at: retained ? new Date().toISOString() : null } : prev));
+      toast.success(retained ? 'Marked as retained client' : 'Removed from retained');
+      await loadLeads();
+    } catch (e) {
+      toast.error('Could not update retained status.');
+    }
+  };
+
   const retryConversion = async () => {
     setMarking(true);
     try {
@@ -362,6 +375,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="pages" data-testid="admin-tab-pages"><LayoutGrid className="h-4 w-4 mr-2" /> Pages</TabsTrigger>
             <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.total_calls ?? 0})</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
+            <TabsTrigger value="retained" data-testid="admin-tab-retained"><Award className="h-4 w-4 mr-2" /> Retained</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
           </TabsList>
 
@@ -531,6 +545,9 @@ export default function AdminDashboard() {
                             {lead.crm_duplicate_skipped && (
                               <Badge variant="outline" className="ml-2 bg-rose-50 text-rose-700 border-rose-200 text-[10px]" data-testid={`lead-crm-dup-${lead.id}`}>Duplicate · not sent to CRM</Badge>
                             )}
+                            {lead.retained && (
+                              <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`lead-retained-badge-${lead.id}`}>Retained</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-slate-600">{lead.phone}</TableCell>
                           <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>
@@ -629,6 +646,11 @@ export default function AdminDashboard() {
                 )}
               </div>
             )}
+          </TabsContent>
+
+          {/* RETAINED */}
+          <TabsContent value="retained">
+            <AdminRetained />
           </TabsContent>
 
           {/* SETTINGS */}
@@ -759,6 +781,17 @@ export default function AdminDashboard() {
                   </p>
                 )}
               </div>
+
+              {editable && (
+                <Button
+                  onClick={() => markRetained(!selected.retained)}
+                  variant="outline"
+                  className={`w-full rounded-lg ${selected.retained ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                  data-testid="lead-retained-toggle"
+                >
+                  <Award className="h-4 w-4 mr-2" /> {selected.retained ? 'Retained client \u2713 (click to remove)' : 'Mark as Retained Client'}
+                </Button>
+              )}
 
               {editable && (
                 <Button

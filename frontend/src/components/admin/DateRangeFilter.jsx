@@ -23,11 +23,16 @@ export const todayRange = () => {
   return { start: t, end: t };
 };
 
+// "All time" spans from a fixed early date up to today.
+export const ALL_TIME_START = '2000-01-01';
+export const allTimeRange = () => ({ start: ALL_TIME_START, end: toISO(new Date()) });
+
 const presets = [
   { key: 'today', label: 'Today', days: 0 },
   { key: '7d', label: 'Last 7 days', days: 6 },
   { key: '30d', label: 'Last 30 days', days: 29 },
   { key: '90d', label: 'Last 90 days', days: 89 },
+  { key: 'all', label: 'All time', all: true },
 ];
 
 /** Reusable date-range filter. value={start,end} (YYYY-MM-DD). */
@@ -41,6 +46,14 @@ export const DateRangeFilter = ({ value, onChange }) => {
     start.setDate(end.getDate() - days);
     setRange({ from: start, to: end });
     onChange({ start: toISO(start), end: toISO(end) });
+    setOpen(false);
+  };
+
+  const applyAllTime = () => {
+    const start = parse(ALL_TIME_START);
+    const end = new Date();
+    setRange({ from: start, to: end });
+    onChange({ start: ALL_TIME_START, end: toISO(end) });
     setOpen(false);
   };
 
@@ -64,9 +77,12 @@ export const DateRangeFilter = ({ value, onChange }) => {
   };
 
   const isToday = value.start === value.end && value.start === toISO(new Date());
-  const label = value.start === value.end
-    ? (isToday ? 'Today' : pretty(value.start))
-    : `${pretty(value.start)} \u2013 ${pretty(value.end)}`;
+  const isAllTime = value.start === ALL_TIME_START;
+  const label = isAllTime
+    ? 'All time'
+    : (value.start === value.end
+        ? (isToday ? 'Today' : pretty(value.start))
+        : `${pretty(value.start)} \u2013 ${pretty(value.end)}`);
 
   const stagedLabel = range?.from
     ? (range?.to && toISO(range.to) !== toISO(range.from)
@@ -108,7 +124,7 @@ export const DateRangeFilter = ({ value, onChange }) => {
               {presets.map((p) => (
                 <button
                   key={p.key}
-                  onClick={() => applyPreset(p.days)}
+                  onClick={() => (p.all ? applyAllTime() : applyPreset(p.days))}
                   className="text-left text-sm px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
                   data-testid={`date-preset-${p.key}`}
                 >

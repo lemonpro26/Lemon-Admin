@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal } from 'lucide-react';
+import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -172,6 +172,18 @@ export const AdminCalls = () => {
     }
   };
 
+  const markRetained = async (retained) => {
+    if (!selected) return;
+    try {
+      await api.post(`/admin/calls/${selected.id}/retained`, { retained });
+      setSelected({ ...selected, retained, retained_at: retained ? new Date().toISOString() : null });
+      toast.success(retained ? 'Marked as retained client' : 'Removed from retained');
+      await load();
+    } catch (e) {
+      toast.error('Could not update retained status.');
+    }
+  };
+
   const deleteCall = async (c) => {
     if (!window.confirm(`Delete call from ${c.caller_number || 'unknown'}?`)) return;
     try {
@@ -295,6 +307,9 @@ export const AdminCalls = () => {
                     <span>{c.caller_name || '—'}</span>
                     {c.number_group && c.number_group !== 'other' && (
                       <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`call-group-${c.number_group}-${c.id}`}>{c.number_group_label}</Badge>
+                    )}
+                    {c.retained && (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-retained-badge-${c.id}`}>Retained</Badge>
                     )}
                   </div>
                 </TableCell>
@@ -534,6 +549,17 @@ export const AdminCalls = () => {
                   </p>
                 )}
               </div>
+
+              {editable && (
+                <Button
+                  onClick={() => markRetained(!selected.retained)}
+                  variant="outline"
+                  className={`w-full rounded-lg ${selected.retained ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                  data-testid="call-retained-toggle"
+                >
+                  <Award className="h-4 w-4 mr-2" /> {selected.retained ? 'Retained client \u2713 (click to remove)' : 'Mark as Retained Client'}
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>
