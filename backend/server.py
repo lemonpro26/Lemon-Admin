@@ -2566,6 +2566,71 @@ async def admin_get_calls(start: str = "", end: str = "", search: str = Query(""
     return {"calls": items, "total": len(items)}
 
 
+_HOURLY_TZ = "America/Los_Angeles"
+
+
+def _hour_label(h: int) -> str:
+    ampm = "am" if h < 12 else "pm"
+    hr = h % 12
+    if hr == 0:
+        hr = 12
+    return f"{hr}{ampm}"
+
+
+def _to_pacific_hour(value: str):
+    """Parse an ISO timestamp and return its hour (0-23) in Pacific time, or None."""
+    if not value:
+        return None
+    s = str(value).strip().replace(" ", "T", 1)
+    try:
+        from zoneinfo import ZoneInfo
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(ZoneInfo(_HOURLY_TZ)).hour
+    except Exception:
+        return None
+
+
+@api_router.get("/admin/analytics/hourly")
+async def admin_analytics_hourly(start: str = "", end: str = "", _: dict = Depends(require_admin)):
+    """Calls & leads bucketed by hour of day (Pacific time) within the date range.
+    A call/lead at 8:xx is attributed to the 8am bucket. Calls use their actual
+    call time (called_at); leads use submission time (created_at)."""
+    s_iso, e_iso, _d = _date_range(start, end)
+    calls_by_hour = [0] * 24
+    leads_by_hour = [0] * 24
+
+    calls = await db.calls.find(
+        {"is_test": {"$ne": True}, "created_at": {"$gte": s_iso, "$lte": e_iso}},
+        {"called_at": 1, "created_at": 1},
+    ).to_list(20000)
+    for c in calls:
+        h = _to_pacific_hour(c.get("called_at") or c.get("created_at"))
+        if h is not None:
+            calls_by_hour[h] += 1
+
+    leads = await db.leads.find(
+        {"created_at": {"$gte": s_iso, "$lte": e_iso}},
+        {"created_at": 1},
+    ).to_list(20000)
+    for l in leads:
+        h = _to_pacific_hour(l.get("created_at"))
+        if h is not None:
+            leads_by_hour[h] += 1
+
+    hours = [
+        {"hour": h, "label": _hour_label(h), "calls": calls_by_hour[h], "leads": leads_by_hour[h]}
+        for h in range(24)
+    ]
+    return {
+        "timezone": _HOURLY_TZ,
+        "hours": hours,
+        "total_calls": sum(calls_by_hour),
+        "total_leads": sum(leads_by_hour),
+    }
+
+
 @api_router.get("/admin/phone-numbers")
 async def admin_phone_numbers(_: dict = Depends(require_admin)):
     """The tracked phone numbers and which landing pages use each — shown in Settings."""

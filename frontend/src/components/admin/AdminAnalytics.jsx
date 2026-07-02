@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { BarChart3, RefreshCw, Pencil, ChevronRight, Home, Phone } from 'lucide-react';
+import { BarChart3, RefreshCw, Pencil, ChevronRight, Home, Phone, Clock, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -155,6 +155,52 @@ const CallsByNumberStrip = ({ rows }) => {
 };
 
 
+// Calls & leads bucketed by hour of day (Pacific). A call/lead at 8:xx → 8am.
+const HourlyBreakdown = ({ data, loading }) => {
+  const hours = (data?.hours || []).filter((h) => h.calls > 0 || h.leads > 0);
+  const max = Math.max(1, ...(data?.hours || []).map((h) => Math.max(h.calls, h.leads)));
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid="analytics-by-hour">
+      <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+        <Clock className="h-4 w-4 text-indigo-600" /> Calls &amp; Leads by hour of day
+        <span className="text-[11px] font-sans font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5">Pacific time</span>
+        <div className="ml-auto flex items-center gap-3 text-xs font-sans font-medium">
+          <span className="flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-indigo-500" /> Calls {data?.total_calls ?? 0}</span>
+          <span className="flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Leads {data?.total_leads ?? 0}</span>
+        </div>
+      </div>
+      {loading ? (
+        <div className="p-8 text-center text-slate-500 text-sm">Loading hourly breakdown…</div>
+      ) : hours.length === 0 ? (
+        <div className="p-8 text-center text-slate-500 text-sm" data-testid="analytics-by-hour-empty">No calls or leads in this date range.</div>
+      ) : (
+        <div className="p-4 sm:p-5 space-y-2.5">
+          {hours.map((h) => (
+            <div key={h.hour} className="grid grid-cols-[52px_1fr] items-center gap-3" data-testid={`hour-row-${h.hour}`}>
+              <div className="text-sm font-semibold text-slate-600 text-right tabular-nums">{h.label}</div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-4 rounded-full bg-slate-50 overflow-hidden">
+                    <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${(h.calls / max) * 100}%` }} />
+                  </div>
+                  <span className="w-16 text-xs text-slate-500 tabular-nums" data-testid={`hour-calls-${h.hour}`}>{h.calls} call{h.calls === 1 ? '' : 's'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-4 rounded-full bg-slate-50 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${(h.leads / max) * 100}%` }} />
+                  </div>
+                  <span className="w-16 text-xs text-slate-500 tabular-nums" data-testid={`hour-leads-${h.hour}`}>{h.leads} lead{h.leads === 1 ? '' : 's'}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 export const AdminAnalytics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -164,6 +210,8 @@ export const AdminAnalytics = () => {
   const [drill, setDrill] = useState({ campaign: null, adgroup: null, ad: null });
   const [sitelinks, setSitelinks] = useState(null); // {connected, sitelinks, error}
   const [slLoading, setSlLoading] = useState(true);
+  const [hourly, setHourly] = useState(null);
+  const [hourlyLoading, setHourlyLoading] = useState(true);
   const editable = canEditFn();
   const autoSynced = React.useRef(false);
 
@@ -188,6 +236,18 @@ export const AdminAnalytics = () => {
       setSitelinks({ connected: true, sitelinks: [], error: 'Could not load sitelink data.' });
     } finally {
       setSlLoading(false);
+    }
+  }, [range]);
+
+  const loadHourly = useCallback(async () => {
+    setHourlyLoading(true);
+    try {
+      const res = await api.get('/admin/analytics/hourly', { params: { start: range.start, end: range.end } });
+      setHourly(res.data);
+    } catch (e) {
+      setHourly({ hours: [], total_calls: 0, total_leads: 0 });
+    } finally {
+      setHourlyLoading(false);
     }
   }, [range]);
 
@@ -231,6 +291,7 @@ export const AdminAnalytics = () => {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadSitelinks(); }, [loadSitelinks]);
+  useEffect(() => { loadHourly(); }, [loadHourly]);
 
   useEffect(() => {
     if (data?.google_ads_connected && !autoSynced.current) {
@@ -389,6 +450,8 @@ export const AdminAnalytics = () => {
       {header}
 
       <CallsByNumberStrip rows={data.calls_by_number || []} />
+
+      <HourlyBreakdown data={hourly} loading={hourlyLoading} />
 
       {/* Breadcrumb + (campaign-level) type filter */}
       <div className="flex items-center justify-between flex-wrap gap-3">

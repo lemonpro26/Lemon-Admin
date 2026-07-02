@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-02
+- FEATURE: "Calls & Leads by hour of day" section in the Analytics tab. Backend `GET /admin/analytics/hourly` buckets all calls (called_at) and leads (created_at) into 24 hour-of-day buckets converted to **Pacific (America/Los_Angeles)**; respects the date-range picker. Frontend `HourlyBreakdown` renders labelled rows (12am..11pm) with indigo (calls) + emerald (leads) bars and counts; shows only hours with activity. Verified (9am 2 calls/1 lead, 10am 3 leads, etc.).
+
 - FIX: Split Test "New Test" page dropdown only listed Home/PA/Spanish. Added Spanish PA (/spa), Demand Gen (/dg), Demand Gen Spanish (/dgs) to `BUILTIN_PAGES` and deduped against custom pages so all 6 landing pages are selectable as split-test variants.
 - FEATURE: Google Ads call-detail enrichment. Pull `call_view` (call type + campaign + status) from Google Ads and match to CTM calls.
   - `google_names_service.fetch_call_views()`: GAQL over `call_view`. NOTE `segments.date` is prohibited on call_view — filter on `call_view.start_call_date_time` instead. Google returns times in the ACCOUNT timezone with no offset; we read `customer.time_zone` and convert to UTC.
