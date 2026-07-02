@@ -485,6 +485,7 @@ class SaleBody(BaseModel):
 class RetainedBody(BaseModel):
     """Marks a lead/call as a retained client (shows in the Retained tab)."""
     retained: bool = True
+    retained_at: Optional[str] = None  # optional override date (ISO or YYYY-MM-DD)
 
 
 # ----------------------------- Helpers -----------------------------
@@ -2732,13 +2733,27 @@ async def mark_lead_sold(lead_id: str, body: SaleBody, _: dict = Depends(require
     return {"success": True, "lead_id": lead_id, "conversion": result, **sale_fields}
 
 
+def _normalize_retained_at(value: Optional[str]) -> str:
+    """Accept a full ISO datetime or a plain YYYY-MM-DD and return a stored ISO string."""
+    if not value:
+        return _now_iso()
+    v = value.strip()
+    if len(v) == 10:  # date only -> midday UTC (keeps range filters intuitive)
+        return f"{v}T12:00:00+00:00"
+    try:
+        return datetime.fromisoformat(v.replace("Z", "+00:00")).isoformat()
+    except Exception:
+        return _now_iso()
+
+
 @api_router.post("/admin/leads/{lead_id}/retained")
 async def mark_lead_retained(lead_id: str, body: RetainedBody, _: dict = Depends(require_editor)):
     """Flag/unflag a lead as a retained client. Retained items appear in the Retained tab."""
     lead = await db.leads.find_one({"id": lead_id}, {"_id": 0})
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-    fields = {"retained": bool(body.retained), "retained_at": _now_iso() if body.retained else None}
+    fields = {"retained": bool(body.retained),
+              "retained_at": _normalize_retained_at(body.retained_at) if body.retained else None}
     await db.leads.update_one({"id": lead_id}, {"$set": fields})
     return {"success": True, "lead_id": lead_id, **fields}
 
@@ -2749,7 +2764,8 @@ async def mark_call_retained(call_id: str, body: RetainedBody, _: dict = Depends
     call = await db.calls.find_one({"id": call_id}, {"_id": 0})
     if not call:
         raise HTTPException(status_code=404, detail="Call not found")
-    fields = {"retained": bool(body.retained), "retained_at": _now_iso() if body.retained else None}
+    fields = {"retained": bool(body.retained),
+              "retained_at": _normalize_retained_at(body.retained_at) if body.retained else None}
     await db.calls.update_one({"id": call_id}, {"$set": fields})
     return {"success": True, "call_id": call_id, **fields}
 

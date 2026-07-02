@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Award, RefreshCw, Phone, FileText } from 'lucide-react';
+import { Award, RefreshCw, Phone, FileText, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -15,6 +16,55 @@ const fmtDate = (s) => {
 };
 
 const SOURCE_LABELS = { lapa: 'PA', laspa: 'Spanish PA', sp: 'Spanish', dg: 'Demand Gen', dgs: 'Spanish DG', home: 'Home' };
+
+// yyyy-mm-dd for a date <input>, from a stored ISO string.
+const toDateInput = (s) => {
+  if (!s) return '';
+  try { return new Date(s).toISOString().slice(0, 10); } catch { return ''; }
+};
+
+const RetainedDateCell = ({ item, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(toDateInput(item.retained_at));
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!draft) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      await onSave(item, draft);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          type="date"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          className="h-8 w-36 rounded-lg border-slate-200 text-sm"
+          data-testid={`retained-date-input-${item.id}`}
+        />
+        <button onClick={save} disabled={saving} className="text-emerald-600 hover:text-emerald-700 p-1" data-testid={`retained-date-save-${item.id}`}><Check className="h-4 w-4" /></button>
+        <button onClick={() => { setDraft(toDateInput(item.retained_at)); setEditing(false); }} className="text-slate-400 hover:text-slate-600 p-1" data-testid={`retained-date-cancel-${item.id}`}><X className="h-4 w-4" /></button>
+      </div>
+    );
+  }
+  return (
+    <button
+      onClick={() => { setDraft(toDateInput(item.retained_at)); setEditing(true); }}
+      className="group inline-flex items-center gap-1.5 text-slate-600 hover:text-[#0F1B3D] transition-colors"
+      data-testid={`retained-date-edit-${item.id}`}
+    >
+      {fmtDate(item.retained_at)}
+      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  );
+};
 
 export const AdminRetained = () => {
   // Defaults to All-time so the tab shows every retained client.
@@ -35,6 +85,18 @@ export const AdminRetained = () => {
   }, [range]);
 
   useEffect(() => { load(); }, [load]);
+
+  const saveRetainedDate = async (item, dateStr) => {
+    const path = item.type === 'call' ? 'calls' : 'leads';
+    try {
+      await api.post(`/admin/${path}/${item.id}/retained`, { retained: true, retained_at: dateStr });
+      toast.success('Retained date updated');
+      await load();
+    } catch (e) {
+      toast.error('Could not update the retained date.');
+      throw e;
+    }
+  };
 
   const items = data.items || [];
 
@@ -105,7 +167,7 @@ export const AdminRetained = () => {
                     <TableCell className="hidden sm:table-cell">
                       {it.sale_status === 'sold' ? <span className="font-semibold text-slate-900">${Number(it.sale_value).toLocaleString()}</span> : <span className="text-slate-400">{'\u2014'}</span>}
                     </TableCell>
-                    <TableCell className="text-slate-500 text-sm whitespace-nowrap">{fmtDate(it.retained_at)}</TableCell>
+                    <TableCell className="text-slate-500 text-sm whitespace-nowrap"><RetainedDateCell item={it} onSave={saveRetainedDate} /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
