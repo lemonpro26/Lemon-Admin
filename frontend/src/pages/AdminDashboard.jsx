@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid, Filter,
-  FileText, Percent, Sigma, Search, X, AlertTriangle, Award,
+  FileText, Percent, Sigma, Search, X, AlertTriangle, Award, SlidersHorizontal,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { api, TOKEN_KEY, clearSession, canEdit as canEditFn, getRole, getUsername } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -32,6 +35,22 @@ import { AdminFunnel } from '@/components/admin/AdminFunnel';
 import { AdminRetained } from '@/components/admin/AdminRetained';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
+
+// Toggleable Leads-table columns (Name & Actions always shown). Persisted per-browser.
+const LEAD_COLS = [
+  { key: 'phone', label: 'Phone' },
+  { key: 'vehicle', label: 'Vehicle' },
+  { key: 'email', label: 'Email' },
+  { key: 'revenue', label: 'Revenue' },
+  { key: 'location', label: 'Location' },
+  { key: 'date', label: 'Date' },
+];
+const LEAD_COLS_KEY = 'lp_leads_cols_v1';
+const loadLeadCols = () => {
+  const def = { phone: true, vehicle: true, email: true, revenue: true, location: true, date: true };
+  try { return { ...def, ...JSON.parse(localStorage.getItem(LEAD_COLS_KEY) || '{}') }; } catch { return def; }
+};
+
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -101,6 +120,9 @@ export default function AdminDashboard() {
   const [matchedCalls, setMatchedCalls] = useState([]);
   const [openedCall, setOpenedCall] = useState(null);
   const [leadSeg, setLeadSeg] = useState('all');
+  const [leadCols, setLeadCols] = useState(loadLeadCols);
+  useEffect(() => { try { localStorage.setItem(LEAD_COLS_KEY, JSON.stringify(leadCols)); } catch { /* ignore */ } }, [leadCols]);
+  const toggleLeadCol = (k) => setLeadCols((p) => ({ ...p, [k]: !p[k] }));
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem('admin_active_tab');
     return saved === 'pacontent' ? 'pages' : (saved || 'hooks');
@@ -482,23 +504,47 @@ export default function AdminDashboard() {
             </div>
 
             {/* Source segment filters + per-segment counters */}
-            <div className="flex items-center gap-2 flex-wrap mb-4" data-testid="lead-segment-filters">
-              {[
-                { key: 'all', label: 'All', count: leadCounts.all },
-                { key: 'home', label: 'Home', count: leadCounts.home },
-                { key: 'spanish', label: 'Spanish', count: leadCounts.spanish },
-                { key: 'pa', label: 'PA Page', count: leadCounts.pa },
-              ].map((seg) => (
-                <button
-                  key={seg.key}
-                  onClick={() => setLeadSeg(seg.key)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadSeg === seg.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                  data-testid={`lead-seg-${seg.key}`}
-                >
-                  {seg.label}
-                  <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{seg.count}</span>
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
+              <div className="flex items-center gap-2 flex-wrap" data-testid="lead-segment-filters">
+                {[
+                  { key: 'all', label: 'All', count: leadCounts.all },
+                  { key: 'home', label: 'Home', count: leadCounts.home },
+                  { key: 'spanish', label: 'Spanish', count: leadCounts.spanish },
+                  { key: 'pa', label: 'PA Page', count: leadCounts.pa },
+                ].map((seg) => (
+                  <button
+                    key={seg.key}
+                    onClick={() => setLeadSeg(seg.key)}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadSeg === seg.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+                    data-testid={`lead-seg-${seg.key}`}
+                  >
+                    {seg.label}
+                    <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{seg.count}</span>
+                  </button>
+                ))}
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:border-slate-300" data-testid="leads-columns-button">
+                    <SlidersHorizontal className="h-4 w-4" /> Columns
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {LEAD_COLS.map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.key}
+                      checked={!!leadCols[col.key]}
+                      onCheckedChange={() => toggleLeadCol(col.key)}
+                      onSelect={(e) => e.preventDefault()}
+                      data-testid={`leads-col-toggle-${col.key}`}
+                    >
+                      {col.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -518,12 +564,12 @@ export default function AdminDashboard() {
                     <TableHeader>
                       <TableRow>
                         <TableHead><SortLabel label="Name" k="full_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                        <TableHead><SortLabel label="Phone" k="phone" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                        <TableHead className="hidden md:table-cell"><SortLabel label="Vehicle" k="car_make" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                        <TableHead className="hidden md:table-cell"><SortLabel label="Email" k="email" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                        <TableHead className="hidden sm:table-cell"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                        <TableHead className="hidden lg:table-cell"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-                        <TableHead className="hidden sm:table-cell"><SortLabel label="Date" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+                        {leadCols.phone && <TableHead><SortLabel label="Phone" k="phone" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+                        {leadCols.vehicle && <TableHead className="hidden md:table-cell"><SortLabel label="Vehicle" k="car_make" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+                        {leadCols.email && <TableHead className="hidden md:table-cell"><SortLabel label="Email" k="email" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+                        {leadCols.revenue && <TableHead className="hidden sm:table-cell"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+                        {leadCols.location && <TableHead className="hidden lg:table-cell"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+                        {leadCols.date && <TableHead className="hidden sm:table-cell"><SortLabel label="Date" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -551,9 +597,10 @@ export default function AdminDashboard() {
                               <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`lead-retained-badge-${lead.id}`}>Retained</Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-slate-600">{lead.phone}</TableCell>
-                          <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>
-                          <TableCell className="hidden md:table-cell text-slate-600 break-all">{lead.email}</TableCell>
+                          {leadCols.phone && <TableCell className="text-slate-600">{lead.phone}</TableCell>}
+                          {leadCols.vehicle && <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>}
+                          {leadCols.email && <TableCell className="hidden md:table-cell text-slate-600 break-all">{lead.email}</TableCell>}
+                          {leadCols.revenue && (
                           <TableCell className="hidden sm:table-cell">
                             {lead.sale_status === 'sold' ? (
                               <div className="flex flex-col gap-1">
@@ -570,8 +617,9 @@ export default function AdminDashboard() {
                               <span className="text-slate-400">{'\u2014'}</span>
                             )}
                           </TableCell>
-                          <TableCell className="hidden lg:table-cell text-slate-600">{lead.city}, {lead.state}</TableCell>
-                          <TableCell className="hidden sm:table-cell text-slate-500 text-sm">{fmtDate(lead.created_at)}</TableCell>
+                          )}
+                          {leadCols.location && <TableCell className="hidden lg:table-cell text-slate-600">{lead.city}, {lead.state}</TableCell>}
+                          {leadCols.date && <TableCell className="hidden sm:table-cell text-slate-500 text-sm">{fmtDate(lead.created_at)}</TableCell>}
                           <TableCell>
                             <div className="flex items-center justify-end gap-1.5">
                               <Button

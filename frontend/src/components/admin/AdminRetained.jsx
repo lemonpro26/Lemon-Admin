@@ -142,9 +142,9 @@ export const AdminRetained = () => {
                   <TableHead>Client</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Phone</TableHead>
-                  <TableHead className="hidden md:table-cell">Vehicle / Number</TableHead>
                   <TableHead className="hidden sm:table-cell">Source</TableHead>
                   <TableHead className="hidden sm:table-cell">Revenue</TableHead>
+                  <TableHead className="hidden md:table-cell">Came in on</TableHead>
                   <TableHead>Retained on</TableHead>
                 </TableRow>
               </TableHeader>
@@ -160,13 +160,15 @@ export const AdminRetained = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-slate-600">{it.phone || '\u2014'}</TableCell>
-                    <TableCell className="hidden md:table-cell text-slate-600">
-                      {it.type === 'call' ? (it.tracked_number_display || '\u2014') : (it.vehicle || '\u2014')}
+                    <TableCell className="hidden sm:table-cell text-slate-600" data-testid={`retained-source-${it.id}`}>
+                      {it.type === 'call'
+                        ? `Call from ${it.number_group_label || 'Unknown'}`
+                        : (SOURCE_LABELS[it.source_page] || it.source_page || '\u2014')}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell text-slate-600">{SOURCE_LABELS[it.source_page] || it.source_page || '\u2014'}</TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {it.sale_status === 'sold' ? <span className="font-semibold text-slate-900">${Number(it.sale_value).toLocaleString()}</span> : <span className="text-slate-400">{'\u2014'}</span>}
                     </TableCell>
+                    <TableCell className="hidden md:table-cell text-slate-500 text-sm whitespace-nowrap" data-testid={`retained-camein-${it.id}`}>{fmtDate(it.created_at)}</TableCell>
                     <TableCell className="text-slate-500 text-sm whitespace-nowrap"><RetainedDateCell item={it} onSave={saveRetainedDate} /></TableCell>
                   </TableRow>
                 ))}

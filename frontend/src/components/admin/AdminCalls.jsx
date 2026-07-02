@@ -290,30 +290,44 @@ export const AdminCalls = () => {
       </div>
 
       {debouncedSearch.trim() && matchedLeads.length > 0 && (
-        <div className="rounded-2xl border border-blue-200 bg-blue-50/40 overflow-hidden" data-testid="calls-matched-leads">
-          <div className="px-4 py-2 text-xs font-bold uppercase tracking-wide text-blue-700 bg-blue-50 border-b border-blue-200">
-            {matchedLeads.length} matching form lead{matchedLeads.length > 1 ? 's' : ''} — click to open
-          </div>
-          <Table>
-            <TableBody>
-              {matchedLeads.map((l) => {
-                const name = l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '—';
-                const vehicle = [l.car_year, l.car_make, l.car_model].filter(Boolean).join(' ');
-                return (
-                  <TableRow key={l.id} data-testid={`matched-lead-row-${l.id}`} className="cursor-pointer hover:bg-blue-50" onClick={() => setOpenedLead(l)}>
-                    <TableCell className="font-medium text-slate-900">
-                      {name}
-                      <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px]">lead</Badge>
-                      {l.retained && <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Retained</Badge>}
-                    </TableCell>
-                    <TableCell className="text-slate-600">{l.phone || '—'}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-slate-600">{l.email || '—'}</TableCell>
-                    <TableCell className="hidden md:table-cell text-slate-600">{vehicle || '—'}</TableCell>
+        <div data-testid="calls-matched-leads">
+          <p className="text-sm text-slate-500 flex items-center gap-2 mb-3">
+            <FileText className="h-4 w-4" /> Matching leads ({matchedLeads.length})
+          </p>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table data-testid="calls-matched-leads-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead className="hidden sm:table-cell">Email</TableHead>
+                    <TableHead className="hidden md:table-cell">Vehicle</TableHead>
+                    <TableHead className="hidden sm:table-cell">Date</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {matchedLeads.map((l) => {
+                    const name = l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '\u2014';
+                    const vehicle = [l.car_year, l.car_make, l.car_model].filter(Boolean).join(' ');
+                    return (
+                      <TableRow key={l.id} data-testid={`matched-lead-row-${l.id}`} className="cursor-pointer hover:bg-slate-50" onClick={() => setOpenedLead(l)}>
+                        <TableCell className="font-medium text-slate-900">
+                          {name}
+                          <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px]">lead</Badge>
+                          {l.retained && <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Retained</Badge>}
+                        </TableCell>
+                        <TableCell className="text-slate-600">{l.phone || '\u2014'}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-slate-600">{l.email || '\u2014'}</TableCell>
+                        <TableCell className="hidden md:table-cell text-slate-600">{vehicle || '\u2014'}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-slate-500 text-sm">{fmtDate(l.created_at)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </div>
       )}
 
