@@ -2982,6 +2982,23 @@ async def _enrich_from_quickbase(doc: dict, collection) -> dict:
     return fields
 
 
+async def _run_quickbase_sync() -> dict:
+    """Re-look-up name + email from Quickbase for every lead and call (by phone).
+    Returns counts. Shared by the hourly loop and the manual 'Sync now' button."""
+    if not qb.is_configured():
+        return {"success": False, "configured": False, "leads": 0, "calls": 0, "matched": 0}
+    leads = await db.leads.find({}, {"id": 1, "phone": 1}).to_list(5000)
+    calls = await db.calls.find({"is_test": {"$ne": True}}, {"id": 1, "caller_number": 1}).to_list(5000)
+    docs = [(l, db.leads) for l in leads] + [(c, db.calls) for c in calls]
+    matched = 0
+    for i in range(0, len(docs), 8):
+        batch = docs[i:i + 8]
+        results = await asyncio.gather(*[_enrich_from_quickbase(d, coll) for d, coll in batch])
+        matched += sum(1 for r in results if (r or {}).get("qb_name"))
+    logger.info("Quickbase sync: %s leads + %s calls, %s matched to a name", len(leads), len(calls), matched)
+    return {"success": True, "leads": len(leads), "calls": len(calls), "matched": matched}
+
+
 async def _quickbase_sync_loop():
     """Every hour, refresh name + email from Quickbase for ALL leads and calls
     (matched by phone). Keeps the admin caller ID in sync with Quickbase edits.
@@ -2989,17 +3006,19 @@ async def _quickbase_sync_loop():
     await asyncio.sleep(90)  # let the app boot
     while True:
         try:
-            if qb.is_configured():
-                leads = await db.leads.find({}, {"id": 1, "phone": 1}).to_list(3000)
-                calls = await db.calls.find({"is_test": {"$ne": True}}, {"id": 1, "caller_number": 1}).to_list(3000)
-                docs = [(l, db.leads) for l in leads] + [(c, db.calls) for c in calls]
-                for i in range(0, len(docs), 8):
-                    batch = docs[i:i + 8]
-                    await asyncio.gather(*[_enrich_from_quickbase(d, coll) for d, coll in batch])
-                logger.info("Quickbase hourly sync refreshed %s records", len(docs))
+            await _run_quickbase_sync()
         except Exception as e:
             logger.warning("Quickbase sync loop error: %s", e)
         await asyncio.sleep(3600)
+
+
+@api_router.post("/admin/quickbase/sync")
+async def admin_quickbase_sync(_: dict = Depends(require_editor)):
+    """Manually refresh name + email from Quickbase for all leads + calls now."""
+    res = await _run_quickbase_sync()
+    if not res.get("configured", True):
+        raise HTTPException(status_code=400, detail="Quickbase is not configured")
+    return res
 
 
 @api_router.post("/admin/leads/{lead_id}/retained")

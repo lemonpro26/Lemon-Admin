@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign } from 'lucide-react';
+import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
@@ -132,6 +132,7 @@ export const AdminRetained = () => {
   const [data, setData] = useState({ items: [], total: 0, lead_count: 0, call_count: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [syncingQb, setSyncingQb] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -178,6 +179,20 @@ export const AdminRetained = () => {
     }
   };
 
+  const syncQuickbase = async () => {
+    setSyncingQb(true);
+    try {
+      const res = await api.post('/admin/quickbase/sync');
+      const { leads = 0, calls = 0, matched = 0 } = res.data || {};
+      toast.success(`Synced ${leads + calls} records from Quickbase — ${matched} matched to a name/email.`);
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Could not sync from Quickbase.');
+    } finally {
+      setSyncingQb(false);
+    }
+  };
+
   const allItems = data.items || [];
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -217,6 +232,9 @@ export const AdminRetained = () => {
           </div>
           <button onClick={load} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-[#0F1B3D] transition-colors" data-testid="retained-refresh">
             <RefreshCw className="h-4 w-4" /> Refresh
+          </button>
+          <button onClick={syncQuickbase} disabled={syncingQb} className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-60 transition-colors" data-testid="retained-sync-quickbase">
+            <Database className={`h-4 w-4 ${syncingQb ? 'animate-pulse' : ''}`} /> {syncingQb ? 'Syncing…' : 'Sync from Quickbase'}
           </button>
           <DateRangeFilter value={range} onChange={setRange} />
         </div>
