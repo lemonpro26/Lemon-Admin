@@ -63,7 +63,8 @@ export const CallDetailDialog = ({ call, open, onOpenChange, onChanged }) => {
     ['Called #', c.tracked_number_display || c.tracking_number, 'cd-tracking'],
     ['Landing group', c.number_group_label, 'cd-group'],
     ['Duration', fmtDur(c.duration), 'cd-duration'],
-    ['Campaign', c.google_campaign || c.campaign_name || c.campaign, 'cd-campaign'],
+    ['Campaign', c.campaign_name || c.google_campaign || c.campaign, 'cd-campaign'],
+    ['Ad Group', c.adgroup_name || c.adgroup_id, 'cd-adgroup'],
     ['Location', [c.city, c.state].filter(Boolean).join(', '), 'cd-location'],
     ['When', fmtDate(c.called_at || c.created_at), 'cd-when'],
   ];

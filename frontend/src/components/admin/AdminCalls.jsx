@@ -435,7 +435,10 @@ export const AdminCalls = () => {
                 {cols.duration && <TableCell className="text-slate-700">{fmtDuration(c.duration)}</TableCell>}
                 {cols.campaign && (
                   <TableCell className="hidden md:table-cell text-slate-600">
-                    {c.google_campaign || c.campaign || '—'}
+                    {c.campaign_name || c.google_campaign || c.campaign || '—'}
+                    {c.adgroup_name && (
+                      <span className="block text-[10px] text-slate-400" data-testid={`call-adgroup-${c.id}`}>{c.adgroup_name}</span>
+                    )}
                     {c.google_matched && c.google_call_type && (
                       <span className="block text-[10px] text-green-600" data-testid={`call-google-type-${c.id}`}>{gcallType(c.google_call_type)} · via Google</span>
                     )}
@@ -551,7 +554,8 @@ export const AdminCalls = () => {
                   ['Called #', selected.tracked_number_display || selected.tracking_number, 'call-detail-tracking'],
                   ['Landing group', selected.number_group_label, 'call-detail-group'],
                   ['Duration', fmtDuration(selected.duration), 'call-detail-duration'],
-                  ['Campaign', selected.google_campaign || selected.campaign_name || selected.campaign, 'call-detail-campaign'],
+                  ['Campaign', selected.campaign_name || selected.google_campaign || selected.campaign, 'call-detail-campaign'],
+                  ['Ad Group', selected.adgroup_name || selected.adgroup_id, 'call-detail-adgroup'],
                   ['Keyword', selected.keyword, 'call-detail-keyword'],
                   ['GCLID', selected.gclid, 'call-detail-gclid'],
                   ['Location', [selected.city, selected.state].filter(Boolean).join(', '), 'call-detail-location'],

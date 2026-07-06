@@ -2450,7 +2450,8 @@ async def _enrich_calls_with_hooks(items: list) -> list:
             q["$or"].append({"gclid": {"$in": gclids}})
         if sessions:
             q["$or"].append({"session_id": {"$in": sessions}})
-        async for ck in db.clicks.find(q, {"gclid": 1, "session_id": 1, "matched_rule_id": 1, "source_page": 1}):
+        async for ck in db.clicks.find(q, {"gclid": 1, "session_id": 1, "matched_rule_id": 1, "source_page": 1,
+                                            "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "keyword": 1}):
             if ck.get("gclid"):
                 clicks_by_gclid[ck["gclid"]] = ck
             if ck.get("session_id"):
@@ -2489,6 +2490,16 @@ async def _enrich_calls_with_hooks(items: list) -> list:
             sp = (ck.get("source_page") or "").lower()
             c["source_page"] = sp
             c["is_spanish"] = sp in ("sp", "laspa")
+            # Carry the click's Google Ads attribution onto the call so click-to-call
+            # calls show the campaign / ad group they came from (resolved to names later).
+            if ck.get("campaign_id"):
+                c["campaign_id"] = ck["campaign_id"]
+            if ck.get("adgroup_id"):
+                c["adgroup_id"] = ck["adgroup_id"]
+            if ck.get("ad_id"):
+                c["ad_id"] = ck["ad_id"]
+            if ck.get("keyword") and not c.get("keyword"):
+                c["keyword"] = ck["keyword"]
     return items
 
 

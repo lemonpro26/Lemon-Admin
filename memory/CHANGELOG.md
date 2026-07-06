@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-06 (cont. 4)
+- FEATURE: Click-to-call attribution — calls now show which Campaign AND Ad Group they came from. `_enrich_calls_with_hooks` now carries the matched click's `campaign_id`/`adgroup_id`/`ad_id`/`keyword` onto the call, which `_resolve_ad_names` then turns into real Google Ads names. Call detail (AdminCalls.jsx) gained an "Ad Group" row + prefers the click-attributed campaign name; Calls list Campaign column shows the ad-group name as a subtitle; CallDetailDialog.jsx (Retained tab) also shows Ad Group. Verified: a click-to-call matched to a click resolved Campaign "01. Los Angeles [E]" + Ad Group "Lemon Law". Note: calls matched only via Google call_view (area code/time) still show `google_campaign` but no ad group (Google's call_view doesn't expose ad group).
+
 ## 2026-07-06 (cont. 3)
 - FEATURE: Leads tab now has a secondary "campaign" dropdown next to the source segment filters (All/Home/Spanish/PA). It lists the distinct Google Ads campaigns present in the currently-selected source, with per-campaign lead counts, using real synced campaign names (falls back to "Direct / Untracked"). Selecting a campaign filters the table; switching source resets it. Client-side only (AdminDashboard.jsx): `leadCampaign` state, `segLeads`/`leadCampaignOptions` computed from enriched `campaign_name`/`campaign_id`, shadcn Select. Verified: Home segment → "01. Los Angeles [E] (2)", "The Lemon Law Lawyers (1)".
 - FEATURE: Retained tab trigger now shows a daily count `Retained (N)` matching the Calls/Leads tab badges. Added `total_retained` (leads + calls with retained_at in range) to `/admin/stats`; frontend reads `stats.total_retained`. Verified via curl (all-time=2, today=0).
