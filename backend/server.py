@@ -2682,6 +2682,7 @@ async def delete_call(call_id: str, _: dict = Depends(require_editor)):
 class TestCallBody(BaseModel):
     phone: Optional[str] = None
     name: Optional[str] = None
+    tracking_number: Optional[str] = None
 
 
 @api_router.post("/admin/calls/test")
@@ -2703,13 +2704,21 @@ async def create_test_call(body: Optional[TestCallBody] = None, _: dict = Depend
         _num = f"({digits[0:3]}) {digits[3:6]}-{digits[6:]}" if len(digits) == 10 else custom_phone
     else:
         _num = f"(555) {rng.randint(100,999)}-{rng.randint(1000,9999)}"
-    _tracked = rng.choice(CALL_NUMBER_GROUPS)
+    _tracked = None
+    if body and body.tracking_number:
+        tn = _re.sub(r"\D", "", body.tracking_number)
+        _tracked = next((g for g in CALL_NUMBER_GROUPS if g["digits"] == tn or g["display"] == body.tracking_number), None)
+    if not _tracked:
+        _tracked = rng.choice(CALL_NUMBER_GROUPS)
     rec = {
         "id": str(uuid.uuid4()),
         "caller_number": _num,
         "caller_name": name,
         "caller_digits": _re.sub(r"\D", "", _num),
         "tracking_number": _tracked["display"],
+        "number_group": _tracked["key"],
+        "number_group_label": _tracked["label"],
+        "tracked_number_display": _tracked["display"],
         "duration": rng.randint(45, 320),
         "source": "google",
         "keyword": "lemon law attorney",

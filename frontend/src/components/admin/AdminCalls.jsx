@@ -100,6 +100,8 @@ export const AdminCalls = () => {
   const [testOpen, setTestOpen] = useState(false);
   const [testPhone, setTestPhone] = useState('');
   const [testName, setTestName] = useState('');
+  const [testNumber, setTestNumber] = useState('');
+  const [numbers, setNumbers] = useState([]);
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
@@ -147,6 +149,9 @@ export const AdminCalls = () => {
   }, [range, debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    api.get('/admin/phone-numbers').then((r) => setNumbers(r.data?.numbers || [])).catch(() => {});
+  }, []);
   useLivePoll(() => load({ silent: true }), { intervalMs: 30000 });
 
   useEffect(() => {
@@ -224,6 +229,7 @@ export const AdminCalls = () => {
       const payload = {};
       if (testPhone.trim()) payload.phone = testPhone.trim();
       if (testName.trim()) payload.name = testName.trim();
+      if (testNumber) payload.tracking_number = testNumber;
       const res = await api.post('/admin/calls/test', payload);
       const c = res.data?.call || {};
       toast.success(payload.phone
@@ -506,6 +512,20 @@ export const AdminCalls = () => {
             <div>
               <label className="text-xs font-semibold text-slate-600">Caller name (optional)</label>
               <Input value={testName} onChange={(e) => setTestName(e.target.value)} placeholder="Leave blank to auto-fill from Quickbase" className="mt-1 rounded-xl border-slate-200" data-testid="test-call-name" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Tracking number (which number was called)</label>
+              <select
+                value={testNumber}
+                onChange={(e) => setTestNumber(e.target.value)}
+                className="mt-1 w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0F1B3D]/20"
+                data-testid="test-call-number"
+              >
+                <option value="">Random</option>
+                {numbers.map((n) => (
+                  <option key={n.key} value={n.display}>{n.label} — {n.display}</option>
+                ))}
+              </select>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setTestOpen(false)} className="rounded-xl" data-testid="test-call-cancel">Cancel</Button>
