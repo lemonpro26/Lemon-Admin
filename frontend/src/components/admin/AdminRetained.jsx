@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search } from 'lucide-react';
+import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +66,65 @@ const RetainedDateCell = ({ item, onSave }) => {
   );
 };
 
+// Small indicator of whether the revenue was sent to Google Ads.
+const GoogleSyncTag = ({ item }) => {
+  if (item.sale_status !== 'sold') return null;
+  if (item.conversion_uploaded) {
+    return <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-1.5 py-0.5 whitespace-nowrap" title={item.conversion_status || 'Uploaded to Google Ads'} data-testid={`retained-gsync-${item.id}`}>✓ Google</span>;
+  }
+  return <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-1.5 py-0.5 whitespace-nowrap" title={item.conversion_status || 'Not yet uploaded to Google Ads'} data-testid={`retained-gsync-${item.id}`}>Google pending</span>;
+};
+
+// Inline revenue editor. Saving marks the client "sold" and uploads the revenue
+// passback to Google Ads via the existing /sold endpoint.
+const RevenueCell = ({ item, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.sale_value != null ? String(item.sale_value) : '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const val = parseFloat(draft);
+    if (isNaN(val) || val < 0) { toast.error('Enter a valid revenue amount.'); return; }
+    setSaving(true);
+    try { await onSave(item, val); setEditing(false); } finally { setSaving(false); }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <div className="relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+          <Input
+            type="number" min="0" step="0.01" value={draft} autoFocus
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+            className="h-8 w-28 pl-5 rounded-lg border-slate-200 text-sm"
+            data-testid={`retained-revenue-input-${item.id}`}
+          />
+        </div>
+        <button onClick={save} disabled={saving} className="text-emerald-600 hover:text-emerald-700 p-1" data-testid={`retained-revenue-save-${item.id}`}><Check className="h-4 w-4" /></button>
+        <button onClick={() => { setDraft(item.sale_value != null ? String(item.sale_value) : ''); setEditing(false); }} className="text-slate-400 hover:text-slate-600 p-1" data-testid={`retained-revenue-cancel-${item.id}`}><X className="h-4 w-4" /></button>
+      </div>
+    );
+  }
+  if (item.sale_status === 'sold') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => setEditing(true)} className="group inline-flex items-center gap-1.5" data-testid={`retained-revenue-edit-${item.id}`}>
+          <span className="font-semibold text-slate-900">${Number(item.sale_value).toLocaleString()}</span>
+          <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />
+        </button>
+        <GoogleSyncTag item={item} />
+      </div>
+    );
+  }
+  return (
+    <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-700" data-testid={`retained-revenue-add-${item.id}`}>
+      <DollarSign className="h-3.5 w-3.5" /> Add revenue
+    </button>
+  );
+};
+
 export const AdminRetained = () => {
   // Defaults to All-time so the tab shows every retained client.
   const [range, setRange] = useState(allTimeRange());
@@ -95,6 +154,25 @@ export const AdminRetained = () => {
       await load();
     } catch (e) {
       toast.error('Could not update the retained date.');
+      throw e;
+    }
+  };
+
+  const saveRevenue = async (item, value) => {
+    const path = item.type === 'call' ? 'calls' : 'leads';
+    try {
+      const res = await api.post(`/admin/${path}/${item.id}/sold`, { value, currency: item.sale_currency || 'USD' });
+      const conv = res.data?.conversion || {};
+      if (conv.ok && !conv.validate_only) {
+        toast.success(`Revenue saved & sent to Google Ads ($${Number(value).toLocaleString()}).`);
+      } else if (conv.validate_only) {
+        toast.success(`Revenue saved. Google Ads is in validation mode (test) — not counted live.`);
+      } else {
+        toast.success(`Revenue saved ($${Number(value).toLocaleString()}). Google Ads upload pending — ${conv.detail || conv.status || 'will retry'}.`);
+      }
+      await load();
+    } catch (e) {
+      toast.error('Could not save revenue.');
       throw e;
     }
   };
@@ -143,11 +221,12 @@ export const AdminRetained = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { k: 'total', label: 'Retained clients', v: data.total, cls: 'text-amber-600' },
           { k: 'leads', label: 'From form leads', v: data.lead_count, cls: 'text-blue-600' },
           { k: 'calls', label: 'From phone calls', v: data.call_count, cls: 'text-emerald-600' },
+          { k: 'revenue', label: 'Total revenue', v: `$${Number(data.total_revenue || 0).toLocaleString()}`, cls: 'text-slate-900' },
         ].map((c) => (
           <div key={c.k} className="rounded-2xl border border-slate-200 bg-white p-4" data-testid={`retained-stat-${c.k}`}>
             <div className="text-sm text-slate-500">{c.label}</div>
@@ -197,7 +276,7 @@ export const AdminRetained = () => {
                         : (SOURCE_LABELS[it.source_page] || it.source_page || '\u2014')}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      {it.sale_status === 'sold' ? <span className="font-semibold text-slate-900">${Number(it.sale_value).toLocaleString()}</span> : <span className="text-slate-400">{'\u2014'}</span>}
+                      <RevenueCell item={it} onSave={saveRevenue} />
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-slate-500 text-sm whitespace-nowrap" data-testid={`retained-camein-${it.id}`}>{fmtDate(it.created_at)}</TableCell>
                     <TableCell className="text-slate-500 text-sm whitespace-nowrap"><RetainedDateCell item={it} onSave={saveRetainedDate} /></TableCell>

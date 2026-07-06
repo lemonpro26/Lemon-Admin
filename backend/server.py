@@ -3004,6 +3004,10 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
             "vehicle": " ".join([str(x) for x in [l.get("car_year"), l.get("car_make"), l.get("car_model")] if x]),
             "source_page": l.get("source_page") or "home",
             "sale_status": l.get("sale_status"), "sale_value": l.get("sale_value"),
+            "sale_currency": l.get("sale_currency") or "USD",
+            "conversion_uploaded": bool(l.get("conversion_uploaded")),
+            "conversion_status": l.get("conversion_status"),
+            "conversion_validate_only": bool(l.get("conversion_validate_only")),
             "retained_at": l.get("retained_at"), "created_at": l.get("created_at"),
         })
     for c in calls:
@@ -3013,10 +3017,15 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
             "source_page": c.get("source_page") or "", "number_group_label": c.get("number_group_label"),
             "tracked_number_display": c.get("tracked_number_display"),
             "sale_status": c.get("sale_status"), "sale_value": c.get("sale_value"),
+            "sale_currency": c.get("sale_currency") or "USD",
+            "conversion_uploaded": bool(c.get("conversion_uploaded")),
+            "conversion_status": c.get("conversion_status"),
+            "conversion_validate_only": bool(c.get("conversion_validate_only")),
             "retained_at": c.get("retained_at"), "created_at": c.get("created_at"),
         })
     items.sort(key=lambda x: x.get("retained_at") or "", reverse=True)
-    return {"items": items, "total": len(items), "lead_count": len(leads), "call_count": len(calls)}
+    total_revenue = round(sum(float(i.get("sale_value") or 0) for i in items if i.get("sale_status") == "sold"), 2)
+    return {"items": items, "total": len(items), "lead_count": len(leads), "call_count": len(calls), "total_revenue": total_revenue}
 
 
 @api_router.post("/admin/leads/{lead_id}/conversion/retry")

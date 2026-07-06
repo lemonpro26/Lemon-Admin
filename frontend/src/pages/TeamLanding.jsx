@@ -107,56 +107,47 @@ const CallButton = ({ phone, phoneHref, dark = false }) => (
 // (w-full h-auto) so EVERY attorney is always visible, never cropped.
 // ---------------------------------------------------------------------------
 export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-overlay-page' } = {}) {
-  const { start, navigate } = useTeamFunnel({ sourcePage, phone, phoneHref });
+  const { start } = useTeamFunnel({ sourcePage, phone, phoneHref });
   return (
-    <div className="min-h-[100dvh] bg-[#0B2545] font-sans" data-testid={rootTestId}>
-      <div className="relative">
-        {/* Full team photo — natural aspect, so nobody is cut off */}
-        <img src={TEAM_PHOTO_STONE} alt="The Lemon Pros attorney team" className="w-full h-auto object-contain bg-[#0B2545]" data-testid="team-overlay-photo" />
-        {/* Gradient for text legibility (bottom + left) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0B2545] via-[#0B2545]/55 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0B2545]/80 via-transparent to-transparent" />
+    <div className="h-[100dvh] overflow-hidden flex flex-col bg-[#0B2545] font-sans" data-testid={rootTestId}>
+      {/* Header */}
+      <header className="shrink-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+          <Logo size="sm" light />
+          <CallButton phone={phone} phoneHref={phoneHref} dark />
+        </div>
+      </header>
 
-        {/* Header */}
-        <header className="absolute top-0 inset-x-0 z-20">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-            <Logo size="sm" light />
-            <CallButton phone={phone} phoneHref={phoneHref} dark />
-          </div>
-        </header>
-
-        {/* Hero text */}
-        <div className="absolute inset-x-0 bottom-0 z-10">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-6 sm:pb-10">
-            <h1 className="font-slab font-extrabold uppercase text-white leading-[0.95] text-4xl sm:text-6xl lg:text-7xl tracking-tight" data-testid="team-overlay-headline">
-              We Fight<br />For You
-            </h1>
-            <div className="h-1.5 w-40 sm:w-56 bg-[#FACC15] rounded-full mt-2" />
-            <p className="mt-4 text-white/90 text-lg sm:text-2xl max-w-xl font-medium">
-              California's dedicated lemon law team — no fees unless we win.
-            </p>
-            <button
-              onClick={start}
-              data-testid="team-overlay-cta"
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#FACC15] hover:bg-[#eabf08] text-[#0B2545] font-extrabold text-lg px-8 py-4 shadow-lg shadow-black/20 transition-colors"
-            >
-              See If You Qualify <ArrowRight className="h-5 w-5" />
-            </button>
+      {/* Copy + CTA (kept high, above the photo) */}
+      <div className="shrink-0 max-w-6xl mx-auto w-full px-4 sm:px-6 pb-4 sm:pb-5 text-center sm:text-left">
+        <h1 className="font-slab font-extrabold uppercase text-white leading-[0.9] text-4xl sm:text-6xl lg:text-7xl tracking-tight" data-testid="team-overlay-headline">
+          We Fight For You
+        </h1>
+        <div className="h-1.5 w-40 sm:w-56 bg-[#FACC15] rounded-full mt-2 mx-auto sm:mx-0" />
+        <p className="mt-3 text-white/90 text-base sm:text-xl lg:text-2xl max-w-xl mx-auto sm:mx-0 font-medium">
+          California's dedicated lemon law team — no fees unless we win.
+        </p>
+        <div className="mt-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-5">
+          <button
+            onClick={start}
+            data-testid="team-overlay-cta"
+            className="inline-flex items-center gap-2 rounded-full bg-[#FACC15] hover:bg-[#eabf08] text-[#0B2545] font-extrabold text-lg px-8 py-4 shadow-lg shadow-black/20 transition-colors"
+          >
+            See If You Qualify <ArrowRight className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap justify-center text-xs sm:text-sm text-slate-300 font-medium">
+            <span className="flex items-center gap-1.5"><Scale className="h-4 w-4 text-[#FACC15]" /> No Win, No Fee</span>
+            <span className="flex items-center gap-1.5"><Star className="h-4 w-4 text-[#FACC15]" /> 5-Star Rated</span>
+            <span className="flex items-center gap-1.5"><DollarSign className="h-4 w-4 text-[#FACC15]" /> Millions Recovered</span>
           </div>
         </div>
       </div>
 
-      {/* Trust strip */}
-      <div className="bg-[#0B2545] py-8">
-        <TrustBadges light />
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-300 px-4">
-          <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-emerald-400" /> 100% Free &amp; Confidential</span>
-          <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-emerald-400" /> Takes 60 Seconds</span>
-          <span className="flex items-center gap-1.5"><Scale className="h-4 w-4 text-emerald-400" /> No Win, No Fee</span>
-        </div>
+      {/* Team photo fills the remaining screen (all attorneys stay in frame) */}
+      <div className="relative flex-1 min-h-0">
+        <img src={TEAM_PHOTO_STONE} alt="The Lemon Pros attorney team" className="absolute inset-0 h-full w-full object-cover object-center" data-testid="team-overlay-photo" />
+        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#0B2545] to-transparent" />
       </div>
-
-      <TeamFooter phone={phone} phoneHref={phoneHref} goLegal={navigate} />
     </div>
   );
 }

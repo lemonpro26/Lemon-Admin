@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-07-06
+- FEATURE: Editable revenue in the Retained tab. Inline "Add revenue" per client → POSTs to existing `/admin/{leads|calls}/{id}/sold`, which marks sold + uploads the offline conversion (revenue passback) to Google Ads. Added a green "✓ Google" / "Google pending" sync badge and a "Total revenue" stat card. Backend `/admin/retained` now returns `sale_currency`, `conversion_uploaded`, `conversion_status`, and `total_revenue`. Verified end-to-end (conversion uploaded, total = $5,000).
+- CHANGE: `/tm` is now a single non-scrollable viewport (h-[100dvh], flex-col). Headline + subtext + CTA + trust chips sit at the top; team photo (object-cover, all attorneys in frame) fills the remainder. Verified scrollHeight == innerHeight.
+
 - FEATURE: Two new attorney-team landing pages. `/tm` (TeamOverlay) full-bleed hero with the team photo at natural height so all attorneys are always visible + "WE FIGHT FOR YOU" + yellow "See If You Qualify" CTA + trust badges. `/tm2` (TeamSplit) navy copy panel + team photo (object-cover keeps whole group) + "Check Your Vehicle" CTA. Both in `TeamLanding.jsx`, routed in App.js, wired to the funnel (start → /flow/year, source_page tm/tm2), click tracking, phone tracking, and attorney-advertising footer. Verified CTA routes into funnel with entry phone.
 
 - FIX: Hourly Analytics section counted 0 calls. Calls were bucketed by CTM `called_at` first and dropped when that string wasn't parseable (no fallback). Now bucket by our reliable `created_at` (UTC) with `called_at` fallback, and `_to_pacific_hour` handles ISO / 'YYYY-MM-DD HH:MM:SS' / US MM/DD/YYYY AM-PM / unix epoch. Section recomputes live on each Analytics load (no daily job needed).
