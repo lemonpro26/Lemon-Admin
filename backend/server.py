@@ -2578,15 +2578,41 @@ def _hour_label(h: int) -> str:
 
 
 def _to_pacific_hour(value: str):
-    """Parse an ISO timestamp and return its hour (0-23) in Pacific time, or None."""
-    if not value:
+    """Parse a timestamp (ISO, 'YYYY-MM-DD HH:MM:SS', US date, or unix epoch) and
+    return its hour (0-23) in Pacific time, or None if it can't be parsed."""
+    if value is None or value == "":
         return None
-    s = str(value).strip().replace(" ", "T", 1)
+    from zoneinfo import ZoneInfo
+    dt = None
+    raw = str(value).strip()
+    # Unix epoch (seconds or milliseconds)
+    if raw.isdigit():
+        try:
+            ts = int(raw)
+            if ts > 1e12:  # milliseconds
+                ts = ts / 1000.0
+            dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+        except Exception:
+            dt = None
+    if dt is None:
+        try:
+            dt = datetime.fromisoformat(raw.replace(" ", "T", 1))
+        except Exception:
+            dt = None
+    if dt is None:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%m/%d/%Y %I:%M:%S %p",
+                    "%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M",
+                    "%Y-%m-%d %H:%M", "%m/%d/%Y"):
+            try:
+                dt = datetime.strptime(raw, fmt)
+                break
+            except Exception:
+                continue
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
     try:
-        from zoneinfo import ZoneInfo
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(ZoneInfo(_HOURLY_TZ)).hour
     except Exception:
         return None
@@ -2606,7 +2632,12 @@ async def admin_analytics_hourly(start: str = "", end: str = "", _: dict = Depen
         {"called_at": 1, "created_at": 1},
     ).to_list(20000)
     for c in calls:
-        h = _to_pacific_hour(c.get("called_at") or c.get("created_at"))
+        # Bucket by OUR own record of when the call arrived (created_at, reliable
+        # UTC). Fall back to the CTM-provided called_at only if created_at is
+        # somehow missing/unparseable.
+        h = _to_pacific_hour(c.get("created_at"))
+        if h is None:
+            h = _to_pacific_hour(c.get("called_at"))
         if h is not None:
             calls_by_hour[h] += 1
 

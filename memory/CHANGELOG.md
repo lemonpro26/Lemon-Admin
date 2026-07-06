@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-02
+- FIX: Hourly Analytics section counted 0 calls. Calls were bucketed by CTM `called_at` first and dropped when that string wasn't parseable (no fallback). Now bucket by our reliable `created_at` (UTC) with `called_at` fallback, and `_to_pacific_hour` handles ISO / 'YYYY-MM-DD HH:MM:SS' / US MM/DD/YYYY AM-PM / unix epoch. Section recomputes live on each Analytics load (no daily job needed).
+
 - FEATURE: "Calls & Leads by hour of day" section in the Analytics tab. Backend `GET /admin/analytics/hourly` buckets all calls (called_at) and leads (created_at) into 24 hour-of-day buckets converted to **Pacific (America/Los_Angeles)**; respects the date-range picker. Frontend `HourlyBreakdown` renders labelled rows (12am..11pm) with indigo (calls) + emerald (leads) bars and counts; shows only hours with activity. Verified (9am 2 calls/1 lead, 10am 3 leads, etc.).
 
 - FIX: Split Test "New Test" page dropdown only listed Home/PA/Spanish. Added Spanish PA (/spa), Demand Gen (/dg), Demand Gen Spanish (/dgs) to `BUILTIN_PAGES` and deduped against custom pages so all 6 landing pages are selectable as split-test variants.
