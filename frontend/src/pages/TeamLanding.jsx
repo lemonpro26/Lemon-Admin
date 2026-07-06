@@ -129,8 +129,8 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
       </header>
 
       {/* Hero photo section */}
-      <section className="relative flex-1 min-h-[60vh] overflow-hidden">
-        <img src={TEAM_PHOTO_STONE} alt="The Lemon Pros attorney team" className="absolute inset-0 h-full w-full object-cover object-center" data-testid="team-overlay-photo" />
+      <section className="relative flex-1 min-h-[80vh] overflow-hidden">
+        <img src={TEAM_PHOTO_STONE} alt="The Lemon Pros attorney team" className="absolute inset-0 h-full w-full object-cover object-top" data-testid="team-overlay-photo" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/5 to-black/80" />
 
         <div className="absolute inset-0 flex flex-col">
