@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-06 (cont. 6)
+- FEATURE: Leads tab now has dedicated source filter chips for the four ad-landing flows — Demand Gen (ladg), Demand Gen ES (ladgs), Team /tm (latm), Team /tm2 (latm2) — alongside All / Home / Spanish / PA Page, each with a live count. Refactored chips to a `LEAD_SEGMENTS` array; `inLeadSeg`/`leadCounts` extended; empty-state label now generic. The campaign sub-dropdown works within each chip. Verified via screenshot (each new chip showed count 1 with seeded leads).
+
 ## 2026-07-06 (cont. 5)
 - CHANGE: Renamed source_page attribution codes for the ad-landing flows to the "la" convention (matches lapa/laspa): `/dg`→`ladg`, `/dgs`→`ladgs`, `/tm`→`latm`, `/tm2`→`latm2`. Updated App.js route sourcePage props, TeamLanding.jsx TeamOverlay/TeamSplit defaults, backend `CRM_SOURCE_PAGE_PATHS` (new codes → correct /dg,/dgs,/tm,/tm2 public URLs; legacy codes kept as fallback), and the lead-detail Source label map. NOTE: CMS content keys + phone-number-group keys remain `dg`/`dgs`/`tm`/`tm2` (unchanged — those are page/content identifiers, not attribution).
 - MIGRATION: Renamed existing DB records to the new codes — leads: 2×`dg`→`ladg`, 1×`dgs`→`ladgs` (no tm/tm2 leads, no calls/clicks with old codes existed). Verified distinct lead source_pages now = [ladg, ladgs, sp]. CRM landing_page mapping confirmed: ladg→/dg, ladgs→/dgs, latm→/tm, latm2→/tm2.

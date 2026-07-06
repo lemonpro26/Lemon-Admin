@@ -138,21 +138,35 @@ export default function AdminDashboard() {
 
   const { sorted: sortedLeads, sortKey, sortDir, toggle } = useSortable(leads, 'created_at', 'desc');
 
-  // Source-page segmentation for the Leads table (Spanish = sp + Spanish PA;
-  // PA = English PA + Spanish PA).
+  // Source-page segmentation for the Leads table. Spanish = sp + Spanish PA;
+  // PA = English PA + Spanish PA. The ad-landing flows each get their own chip.
   const inLeadSeg = (seg, sp) => {
     const s = (sp || '').toLowerCase();
     if (seg === 'home') return s === 'home';
     if (seg === 'spanish') return s === 'sp' || s === 'laspa';
     if (seg === 'pa') return s === 'lapa' || s === 'laspa';
+    if (seg === 'ladg') return s === 'ladg';
+    if (seg === 'ladgs') return s === 'ladgs';
+    if (seg === 'latm') return s === 'latm';
+    if (seg === 'latm2') return s === 'latm2';
     return true;
   };
-  const leadCounts = {
-    all: leads.length,
-    home: leads.filter((l) => inLeadSeg('home', l.source_page)).length,
-    spanish: leads.filter((l) => inLeadSeg('spanish', l.source_page)).length,
-    pa: leads.filter((l) => inLeadSeg('pa', l.source_page)).length,
-  };
+  // Chip definitions (order shown left→right). Label doubles as the empty-state noun.
+  const LEAD_SEGMENTS = [
+    { key: 'all', label: 'All' },
+    { key: 'home', label: 'Home' },
+    { key: 'spanish', label: 'Spanish' },
+    { key: 'pa', label: 'PA Page' },
+    { key: 'ladg', label: 'Demand Gen' },
+    { key: 'ladgs', label: 'Demand Gen ES' },
+    { key: 'latm', label: 'Team /tm' },
+    { key: 'latm2', label: 'Team /tm2' },
+  ];
+  const leadCounts = LEAD_SEGMENTS.reduce((acc, seg) => {
+    acc[seg.key] = seg.key === 'all' ? leads.length : leads.filter((l) => inLeadSeg(seg.key, l.source_page)).length;
+    return acc;
+  }, {});
+  const activeSegLabel = (LEAD_SEGMENTS.find((s) => s.key === leadSeg) || {}).label || 'matching';
   // Campaign key + label for a lead (real Google Ads name when synced).
   const leadCampaignKey = (l) => (l.campaign_id || l.campaign_name || '').trim() || '__none__';
   const leadCampaignLabel = (l) => (l.campaign_name || l.campaign_id || '').trim() || 'Direct / Untracked';
@@ -529,12 +543,7 @@ export default function AdminDashboard() {
             {/* Source segment filters + per-segment counters */}
             <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
               <div className="flex items-center gap-2 flex-wrap" data-testid="lead-segment-filters">
-                {[
-                  { key: 'all', label: 'All', count: leadCounts.all },
-                  { key: 'home', label: 'Home', count: leadCounts.home },
-                  { key: 'spanish', label: 'Spanish', count: leadCounts.spanish },
-                  { key: 'pa', label: 'PA Page', count: leadCounts.pa },
-                ].map((seg) => (
+                {LEAD_SEGMENTS.map((seg) => (
                   <button
                     key={seg.key}
                     onClick={() => selectLeadSeg(seg.key)}
@@ -542,7 +551,7 @@ export default function AdminDashboard() {
                     data-testid={`lead-seg-${seg.key}`}
                   >
                     {seg.label}
-                    <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{seg.count}</span>
+                    <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{leadCounts[seg.key] ?? 0}</span>
                   </button>
                 ))}
                 {/* Secondary filter: campaign within the selected source segment */}
@@ -594,7 +603,7 @@ export default function AdminDashboard() {
                 </div>
               ) : shownLeads.length === 0 ? (
                 <div className="p-12 text-center text-slate-500" data-testid="admin-leads-seg-empty">
-                  No {leadSeg === 'spanish' ? 'Spanish' : leadSeg === 'home' ? 'Home' : 'PA page'} leads in this range.
+                  No {activeSegLabel} leads in this range.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
