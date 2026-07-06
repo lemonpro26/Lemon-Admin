@@ -9,9 +9,11 @@ import { Label } from '@/components/ui/label';
 const PAGE_META = {
   home: { path: '/', label: 'Home', noun: 'home' },
   sp: { path: '/sp', label: 'Spanish', noun: 'Spanish' },
+  tm: { path: '/tm', label: 'We Fight For You — Overlay', noun: 'tm' },
+  tm2: { path: '/tm2', label: 'We Fight For You — Split', noun: 'tm2' },
 };
 
-const FIELDS = [
+const LANDING_FIELDS = [
   { key: 'cta', label: 'Get-started button text' },
   { key: 'tooltip', label: 'Tooltip above the button' },
   { key: 'rated', label: 'Trust badge — rating' },
@@ -19,10 +21,28 @@ const FIELDS = [
   { key: 'no_win_no_fee', label: 'Trust badge — fee' },
 ];
 
+const TEAM_FIELDS = [
+  { key: 'headline_line1', label: 'Headline — line 1' },
+  { key: 'headline_line2', label: 'Headline — line 2 (highlighted)' },
+  { key: 'subhead', label: 'Subheadline' },
+  { key: 'cta', label: 'Call-to-action button text' },
+];
+
+const PAGE_FIELDS = {
+  home: LANDING_FIELDS,
+  sp: LANDING_FIELDS,
+  tm: TEAM_FIELDS,
+  tm2: TEAM_FIELDS,
+};
+
+const TEAM_PAGES = ['tm', 'tm2'];
+
 // CMS editor for the Home (`/`) and Spanish (`/sp`) landing pages. Mirrors the
 // PA editor: live iframe preview + instant Save & Publish.
 export function AdminPageContent({ page }) {
   const meta = PAGE_META[page];
+  const fields = PAGE_FIELDS[page] || LANDING_FIELDS;
+  const isTeam = TEAM_PAGES.includes(page);
   const canEdit = canEditFn();
   const [c, setC] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,13 +118,15 @@ export function AdminPageContent({ page }) {
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
-        <div className="font-slab font-bold text-slate-900">Hero CTA & Trust Line</div>
-        <p className="rounded-lg bg-sky-50 border border-sky-100 text-sky-800 text-xs px-3 py-2" data-testid={`page-content-hint-${page}`}>
-          The big headline &amp; subheadline are managed in the{' '}
-          <span className="font-semibold">{page === 'sp' ? 'Spanish' : 'Hooks'}</span> tab (they support A/B testing &amp; live location text). This editor controls the button, tooltip and trust badges.
-        </p>
+        <div className="font-slab font-bold text-slate-900">{isTeam ? 'Hero Headline & CTA' : 'Hero CTA & Trust Line'}</div>
+        {!isTeam && (
+          <p className="rounded-lg bg-sky-50 border border-sky-100 text-sky-800 text-xs px-3 py-2" data-testid={`page-content-hint-${page}`}>
+            The big headline &amp; subheadline are managed in the{' '}
+            <span className="font-semibold">{page === 'sp' ? 'Spanish' : 'Hooks'}</span> tab (they support A/B testing &amp; live location text). This editor controls the button, tooltip and trust badges.
+          </p>
+        )}
         <div className="grid sm:grid-cols-2 gap-4">
-          {FIELDS.map((fld) => (
+          {fields.map((fld) => (
             <div key={fld.key}>
               <Label className="text-xs text-slate-500">{fld.label}</Label>
               <Input value={c[fld.key] || ''} onChange={(e) => f(fld.key)(e.target.value)} className="mt-1 h-10 rounded-xl border-slate-200" data-testid={`page-field-${page}-${fld.key}`} />

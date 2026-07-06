@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Phone, ArrowRight, Scale, Star, DollarSign, ShieldCheck, Clock, Gavel } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -44,6 +44,33 @@ function useTeamFunnel({ sourcePage, phone, phoneHref }) {
   };
 
   return { start, navigate };
+}
+
+// Editable copy defaults — mirror backend DEFAULT_TM_CONTENT / DEFAULT_TM2_CONTENT.
+// Each page fetches /page-content/{tm|tm2} (Pages CMS overrides) and falls back
+// to these so it never breaks.
+const TM_DEFAULTS = {
+  headline_line1: 'We Fight',
+  headline_line2: 'For You',
+  subhead: "California's dedicated Lemon Law team — no fees unless we win.",
+  cta: 'See If You Qualify',
+};
+const TM2_DEFAULTS = {
+  headline_line1: 'We Fight',
+  headline_line2: 'For You',
+  subhead: 'Meet the attorney team taking on the automakers for California drivers.',
+  cta: 'Check Your Vehicle',
+};
+
+// Fetch editable page copy from the CMS, falling back to defaults.
+function useTeamContent(page, defaults) {
+  const [c, setC] = useState(defaults);
+  useEffect(() => {
+    api.get(`/page-content/${page}`)
+      .then((res) => setC({ ...defaults, ...(res.data || {}) }))
+      .catch(() => {});
+  }, [page]);
+  return c;
 }
 
 const TRUST = [
@@ -108,6 +135,7 @@ const CallButton = ({ phone, phoneHref, dark = false }) => (
 // ---------------------------------------------------------------------------
 export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-overlay-page' } = {}) {
   const { start, navigate } = useTeamFunnel({ sourcePage, phone, phoneHref });
+  const c = useTeamContent('tm', TM_DEFAULTS);
   return (
     <div className="min-h-[100dvh] flex flex-col bg-[#0B2545] font-sans" data-testid={rootTestId}>
       {/* Separate header (matches the PA pages) */}
@@ -138,20 +166,20 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
           <div className="flex-1 flex flex-col justify-end pb-2">
             <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 flex flex-col items-center text-center mt-[12vh]">
               <h1 className="font-slab font-extrabold uppercase text-white leading-[0.86] text-4xl sm:text-6xl lg:text-7xl tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]" data-testid="team-overlay-headline">
-                We Fight<br />For You
+                {c.headline_line1}<br />{c.headline_line2}
               </h1>
               <svg viewBox="0 0 420 22" preserveAspectRatio="none" aria-hidden="true" className="w-64 sm:w-96 h-4 sm:h-5 mt-1">
                 <path d="M6 15 C 130 3, 300 3, 414 12" stroke="#FACC15" strokeWidth="9" fill="none" strokeLinecap="round" />
               </svg>
               <p className="mt-4 text-white text-lg sm:text-2xl max-w-xl font-medium drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">
-                California's dedicated Lemon Law team — no fees unless we win.
+                {c.subhead}
               </p>
               <button
                 onClick={start}
                 data-testid="team-overlay-cta"
                 className="mt-6 inline-flex items-center rounded-full bg-[#FACC15] hover:bg-[#eabf08] text-[#0B2545] font-extrabold text-xl px-9 py-4 shadow-lg shadow-black/30 transition-colors"
               >
-                See If You Qualify
+                {c.cta}
               </button>
             </div>
           </div>
@@ -174,6 +202,7 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
 // ---------------------------------------------------------------------------
 export function TeamSplit({ sourcePage = 'tm2', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-split-page' } = {}) {
   const { start, navigate } = useTeamFunnel({ sourcePage, phone, phoneHref });
+  const c = useTeamContent('tm2', TM2_DEFAULTS);
   return (
     <div className="min-h-[100dvh] bg-slate-50 font-sans flex flex-col" data-testid={rootTestId}>
       {/* Top bar: navy logo block + white nav */}
@@ -194,18 +223,18 @@ export function TeamSplit({ sourcePage = 'tm2', phone = COMPANY.phone, phoneHref
           {/* Left navy panel */}
           <div className="bg-[#0B2545] text-white px-6 sm:px-10 py-10 sm:py-16 flex flex-col justify-center">
             <h1 className="font-slab font-extrabold uppercase leading-[0.95] text-4xl sm:text-5xl lg:text-6xl tracking-tight" data-testid="team-split-headline">
-              We Fight<br />
-              <span className="inline-block bg-[#FACC15] text-[#0B2545] px-2 leading-tight mt-1">For You</span>
+              {c.headline_line1}<br />
+              <span className="inline-block bg-[#FACC15] text-[#0B2545] px-2 leading-tight mt-1">{c.headline_line2}</span>
             </h1>
             <p className="mt-6 text-white/90 text-lg sm:text-xl max-w-md">
-              Meet the attorney team taking on the automakers for California drivers.
+              {c.subhead}
             </p>
             <button
               onClick={start}
               data-testid="team-split-cta"
               className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#FACC15] hover:bg-[#eabf08] text-[#0B2545] font-extrabold text-lg px-8 py-4 shadow-lg shadow-black/20 transition-colors w-fit"
             >
-              Check Your Vehicle <ArrowRight className="h-5 w-5" />
+              {c.cta} <ArrowRight className="h-5 w-5" />
             </button>
             <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-300">
               <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-emerald-400" /> 100% Free</span>

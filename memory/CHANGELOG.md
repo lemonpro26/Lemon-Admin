@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-06 (cont.)
+- FEATURE: `/tm` (overlay) and `/tm2` (split) team landing pages are now editable in the Pages CMS like all other pages. Added `DEFAULT_TM_CONTENT`/`DEFAULT_TM2_CONTENT` to backend `PAGE_CONTENT_DEFAULTS` (reuses generic `/page-content/{page}` + `/admin/page-content/{page}` GET/PUT). Editable fields: headline line 1, headline line 2 (highlighted), subheadline, CTA button text. `TeamLanding.jsx` now fetches copy via `useTeamContent(page, defaults)` with safe fallbacks. `AdminPageContent.jsx` gained per-page field sets (TEAM_FIELDS) + team pages entries; `AdminPages.jsx` Team Pages now carry `editor: 'tm'/'tm2'` so they show Edit + live preview + Save & Publish. Verified end-to-end via curl (login→PUT→public reflects) and /tm screenshot.
+
 ## 2026-07-06
 - FEATURE: Quickbase name/email now syncs to ALL leads + calls (not just retained). New `_quickbase_sync_loop` re-looks-up every lead + call by phone every 1 hour (batches of 8) so Quickbase edits propagate; retained items still sync instantly on mark. `qb_name` is shown as the caller ID across Calls tab, call detail, Leads tab, lead detail, unified search, and Retained (prefers qb_name over caller_name/full_name). Added qb_name to calls + leads search. Verified loop ("refreshed 8 records") and display ((323) 621-1347 → "Mauximo Garcia").
 

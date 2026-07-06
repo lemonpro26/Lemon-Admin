@@ -326,7 +326,25 @@ DEFAULT_SP_CONTENT = {
     "free_consult": "Consulta 100% Gratis",
     "no_win_no_fee": "Si No Gana, No Paga",
 }
-PAGE_CONTENT_DEFAULTS = {"home": DEFAULT_HOME_CONTENT, "sp": DEFAULT_SP_CONTENT}
+# Editable copy for the "We Fight For You" team landing pages (/tm overlay, /tm2 split).
+DEFAULT_TM_CONTENT = {
+    "headline_line1": "We Fight",
+    "headline_line2": "For You",
+    "subhead": "California's dedicated Lemon Law team — no fees unless we win.",
+    "cta": "See If You Qualify",
+}
+DEFAULT_TM2_CONTENT = {
+    "headline_line1": "We Fight",
+    "headline_line2": "For You",
+    "subhead": "Meet the attorney team taking on the automakers for California drivers.",
+    "cta": "Check Your Vehicle",
+}
+PAGE_CONTENT_DEFAULTS = {
+    "home": DEFAULT_HOME_CONTENT,
+    "sp": DEFAULT_SP_CONTENT,
+    "tm": DEFAULT_TM_CONTENT,
+    "tm2": DEFAULT_TM2_CONTENT,
+}
 
 
 def _merged_page_content(cfg: dict, page: str) -> dict:
@@ -2358,6 +2376,8 @@ async def calls_webhook(request: Request, token: str = ""):
     # Best-effort: try to attach Google Ads call type + campaign right away
     # (Google reporting lags, so the periodic loop is the reliable catch-up).
     asyncio.create_task(_enrich_calls_with_google(full=False))
+    # Look up the caller's name + email in Quickbase immediately (by phone).
+    asyncio.create_task(_enrich_from_quickbase(rec, db.calls))
     return {"success": True, "id": rec["id"]}
 
 
