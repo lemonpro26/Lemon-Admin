@@ -1,6 +1,8 @@
 # Changelog
 
-## 2026-07-02
+## 2026-07-06
+- FEATURE: Two new attorney-team landing pages. `/tm` (TeamOverlay) full-bleed hero with the team photo at natural height so all attorneys are always visible + "WE FIGHT FOR YOU" + yellow "See If You Qualify" CTA + trust badges. `/tm2` (TeamSplit) navy copy panel + team photo (object-cover keeps whole group) + "Check Your Vehicle" CTA. Both in `TeamLanding.jsx`, routed in App.js, wired to the funnel (start → /flow/year, source_page tm/tm2), click tracking, phone tracking, and attorney-advertising footer. Verified CTA routes into funnel with entry phone.
+
 - FIX: Hourly Analytics section counted 0 calls. Calls were bucketed by CTM `called_at` first and dropped when that string wasn't parseable (no fallback). Now bucket by our reliable `created_at` (UTC) with `called_at` fallback, and `_to_pacific_hour` handles ISO / 'YYYY-MM-DD HH:MM:SS' / US MM/DD/YYYY AM-PM / unix epoch. Section recomputes live on each Analytics load (no daily job needed).
 
 - FEATURE: "Calls & Leads by hour of day" section in the Analytics tab. Backend `GET /admin/analytics/hourly` buckets all calls (called_at) and leads (created_at) into 24 hour-of-day buckets converted to **Pacific (America/Los_Angeles)**; respects the date-range picker. Frontend `HourlyBreakdown` renders labelled rows (12am..11pm) with indigo (calls) + emerald (leads) bars and counts; shows only hours with activity. Verified (9am 2 calls/1 lead, 10am 3 leads, etc.).

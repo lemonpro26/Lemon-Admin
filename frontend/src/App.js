@@ -15,6 +15,7 @@ import MockupHome from '@/pages/MockupHome';
 import MockupFunnel from '@/pages/MockupFunnel';
 import PresellPA from '@/pages/PresellPA';
 import PresellSPA from '@/pages/PresellSPA';
+import { TeamOverlay, TeamSplit } from '@/pages/TeamLanding';
 import SplitEntry from '@/pages/SplitEntry';
 import { trackPageView } from '@/lib/analytics';
 
@@ -46,6 +47,8 @@ function App() {
           <Route path="/mockup/funnel" element={<MockupFunnel />} />
           <Route path="/pa" element={<PresellPA />} />
           <Route path="/spa" element={<PresellSPA />} />
+          <Route path="/tm" element={<TeamOverlay />} />
+          <Route path="/tm2" element={<TeamSplit />} />
           <Route
             path="/dg"
             element={<PresellPA contentPath="/dg-content" sourcePage="dg" phone="(833) 240-9312" phoneHref="tel:+18332409312" rootTestId="presell-dg-page" />}
