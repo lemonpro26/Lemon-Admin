@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, ArrowRight, Scale, Star, DollarSign, ShieldCheck, Clock } from 'lucide-react';
+import { Phone, ArrowRight, Scale, Star, DollarSign, ShieldCheck, Clock, Gavel } from 'lucide-react';
 import { api } from '@/lib/api';
 import { captureTracking, getSessionId } from '@/lib/tracking';
 import { useFunnel } from '@/context/FunnelContext';
@@ -47,18 +47,18 @@ function useTeamFunnel({ sourcePage, phone, phoneHref }) {
 }
 
 const TRUST = [
-  { icon: Scale, top: 'NO WIN', bottom: 'NO FEE' },
+  { icon: Gavel, top: 'NO WIN', bottom: 'NO FEE' },
   { icon: Star, top: '5-STAR', bottom: 'RATED' },
   { icon: DollarSign, top: 'MILLIONS', bottom: 'RECOVERED' },
 ];
 
 const TrustBadges = ({ light = false }) => (
-  <div className="flex items-center justify-center gap-6 sm:gap-10" data-testid="team-trust-badges">
+  <div className="flex items-center justify-center gap-5 sm:gap-8" data-testid="team-trust-badges">
     {TRUST.map((b) => {
       const Icon = b.icon;
       return (
-        <div key={b.top} className={`flex flex-col items-center justify-center h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 ${light ? 'border-white/70 text-white' : 'border-[#0B2545]/30 text-[#0B2545]'}`}>
-          <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-[#FACC15]" />
+        <div key={b.top} className={`flex flex-col items-center justify-center h-[4.5rem] w-[4.5rem] sm:h-24 sm:w-24 rounded-full border-2 ${light ? 'border-white/85 text-white bg-black/30 backdrop-blur-sm shadow-lg shadow-black/20' : 'border-[#0B2545]/30 text-[#0B2545]'}`}>
+          <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-[#FACC15]" fill={b.icon === Star ? '#FACC15' : 'none'} />
           <span className="mt-1 text-[9px] sm:text-[10px] font-extrabold leading-none tracking-wide text-center">{b.top}</span>
           <span className="text-[9px] sm:text-[10px] font-extrabold leading-none tracking-wide text-center">{b.bottom}</span>
         </div>
@@ -109,44 +109,49 @@ const CallButton = ({ phone, phoneHref, dark = false }) => (
 export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-overlay-page' } = {}) {
   const { start } = useTeamFunnel({ sourcePage, phone, phoneHref });
   return (
-    <div className="h-[100dvh] overflow-hidden flex flex-col bg-[#0B2545] font-sans" data-testid={rootTestId}>
-      {/* Header */}
-      <header className="shrink-0">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-          <Logo size="sm" light />
-          <CallButton phone={phone} phoneHref={phoneHref} dark />
-        </div>
-      </header>
+    <div className="relative h-[100dvh] overflow-hidden bg-[#0B2545]" data-testid={rootTestId}>
+      {/* Full-bleed team photo */}
+      <img src={TEAM_PHOTO_STONE} alt="The Lemon Pros attorney team" className="absolute inset-0 h-full w-full object-cover object-center" data-testid="team-overlay-photo" />
+      {/* Legibility gradients: darken top (header), bottom (badges) and left (copy) */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/5 to-black/80" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/5 to-transparent" />
 
-      {/* Copy + CTA (kept high, above the photo) */}
-      <div className="shrink-0 max-w-6xl mx-auto w-full px-4 sm:px-6 pb-4 sm:pb-5 text-center sm:text-left">
-        <h1 className="font-slab font-extrabold uppercase text-white leading-[0.9] text-4xl sm:text-6xl lg:text-7xl tracking-tight" data-testid="team-overlay-headline">
-          We Fight For You
-        </h1>
-        <div className="h-1.5 w-40 sm:w-56 bg-[#FACC15] rounded-full mt-2 mx-auto sm:mx-0" />
-        <p className="mt-3 text-white/90 text-base sm:text-xl lg:text-2xl max-w-xl mx-auto sm:mx-0 font-medium">
-          California's dedicated lemon law team — no fees unless we win.
-        </p>
-        <div className="mt-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-5">
-          <button
-            onClick={start}
-            data-testid="team-overlay-cta"
-            className="inline-flex items-center gap-2 rounded-full bg-[#FACC15] hover:bg-[#eabf08] text-[#0B2545] font-extrabold text-lg px-8 py-4 shadow-lg shadow-black/20 transition-colors"
-          >
-            See If You Qualify <ArrowRight className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap justify-center text-xs sm:text-sm text-slate-300 font-medium">
-            <span className="flex items-center gap-1.5"><Scale className="h-4 w-4 text-[#FACC15]" /> No Win, No Fee</span>
-            <span className="flex items-center gap-1.5"><Star className="h-4 w-4 text-[#FACC15]" /> 5-Star Rated</span>
-            <span className="flex items-center gap-1.5"><DollarSign className="h-4 w-4 text-[#FACC15]" /> Millions Recovered</span>
+      {/* Everything overlaid on the photo */}
+      <div className="absolute inset-0 z-10 flex flex-col">
+        {/* Transparent header over the photo */}
+        <header className="shrink-0">
+          <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between">
+            <Logo size="sm" light />
+            <CallButton phone={phone} phoneHref={phoneHref} dark />
+          </div>
+        </header>
+
+        {/* Copy block — lower-left */}
+        <div className="flex-1 flex flex-col justify-end">
+          <div className="max-w-6xl mx-auto w-full px-5 sm:px-8">
+            <h1 className="font-slab font-extrabold uppercase text-white leading-[0.86] text-5xl sm:text-7xl lg:text-8xl tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]" data-testid="team-overlay-headline">
+              We Fight<br />For You
+            </h1>
+            <svg viewBox="0 0 420 22" preserveAspectRatio="none" aria-hidden="true" className="w-64 sm:w-96 h-4 sm:h-5 mt-1">
+              <path d="M6 15 C 130 3, 300 3, 414 12" stroke="#FACC15" strokeWidth="9" fill="none" strokeLinecap="round" />
+            </svg>
+            <p className="mt-4 text-white text-lg sm:text-2xl max-w-xl font-medium drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">
+              California's dedicated lemon law team — no fees unless we win.
+            </p>
+            <button
+              onClick={start}
+              data-testid="team-overlay-cta"
+              className="mt-6 inline-flex items-center rounded-full bg-[#FACC15] hover:bg-[#eabf08] text-[#0B2545] font-extrabold text-xl px-9 py-4 shadow-lg shadow-black/30 transition-colors"
+            >
+              See If You Qualify
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Team photo fills the remaining screen (all attorneys stay in frame) */}
-      <div className="relative flex-1 min-h-0">
-        <img src={TEAM_PHOTO_STONE} alt="The Lemon Pros attorney team" className="absolute inset-0 h-full w-full object-cover object-center" data-testid="team-overlay-photo" />
-        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#0B2545] to-transparent" />
+        {/* Trust badges — bottom center */}
+        <div className="shrink-0 pt-6 pb-6 sm:pb-8">
+          <TrustBadges light />
+        </div>
       </div>
     </div>
   );
