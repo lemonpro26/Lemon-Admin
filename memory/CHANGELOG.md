@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-06 (cont. 5)
+- CHANGE: Renamed source_page attribution codes for the ad-landing flows to the "la" convention (matches lapa/laspa): `/dg`→`ladg`, `/dgs`→`ladgs`, `/tm`→`latm`, `/tm2`→`latm2`. Updated App.js route sourcePage props, TeamLanding.jsx TeamOverlay/TeamSplit defaults, backend `CRM_SOURCE_PAGE_PATHS` (new codes → correct /dg,/dgs,/tm,/tm2 public URLs; legacy codes kept as fallback), and the lead-detail Source label map. NOTE: CMS content keys + phone-number-group keys remain `dg`/`dgs`/`tm`/`tm2` (unchanged — those are page/content identifiers, not attribution).
+- MIGRATION: Renamed existing DB records to the new codes — leads: 2×`dg`→`ladg`, 1×`dgs`→`ladgs` (no tm/tm2 leads, no calls/clicks with old codes existed). Verified distinct lead source_pages now = [ladg, ladgs, sp]. CRM landing_page mapping confirmed: ladg→/dg, ladgs→/dgs, latm→/tm, latm2→/tm2.
+
 ## 2026-07-06 (cont. 4)
 - FEATURE: Click-to-call attribution — calls now show which Campaign AND Ad Group they came from. `_enrich_calls_with_hooks` now carries the matched click's `campaign_id`/`adgroup_id`/`ad_id`/`keyword` onto the call, which `_resolve_ad_names` then turns into real Google Ads names. Call detail (AdminCalls.jsx) gained an "Ad Group" row + prefers the click-attributed campaign name; Calls list Campaign column shows the ad-group name as a subtitle; CallDetailDialog.jsx (Retained tab) also shows Ad Group. Verified: a click-to-call matched to a click resolved Campaign "01. Los Angeles [E]" + Ad Group "Lemon Law". Note: calls matched only via Google call_view (area code/time) still show `google_campaign` but no ad group (Google's call_view doesn't expose ad group).
 

@@ -133,7 +133,7 @@ const CallButton = ({ phone, phoneHref, dark = false }) => (
 // /tm — Full-bleed overlay hero. The team photo renders at natural height
 // (w-full h-auto) so EVERY attorney is always visible, never cropped.
 // ---------------------------------------------------------------------------
-export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-overlay-page' } = {}) {
+export function TeamOverlay({ sourcePage = 'latm', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-overlay-page' } = {}) {
   const { start, navigate } = useTeamFunnel({ sourcePage, phone, phoneHref });
   const c = useTeamContent('tm', TM_DEFAULTS);
   return (
@@ -200,7 +200,7 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
 // /tm2 — Split layout. Navy copy panel on the left, team photo on the right.
 // object-cover only trims ceiling/floor, so all attorneys stay in frame.
 // ---------------------------------------------------------------------------
-export function TeamSplit({ sourcePage = 'tm2', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-split-page' } = {}) {
+export function TeamSplit({ sourcePage = 'latm2', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-split-page' } = {}) {
   const { start, navigate } = useTeamFunnel({ sourcePage, phone, phoneHref });
   const c = useTeamContent('tm2', TM2_DEFAULTS);
   return (

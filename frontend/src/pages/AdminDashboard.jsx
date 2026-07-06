@@ -764,7 +764,7 @@ export default function AdminDashboard() {
                   ['Vehicle Model', selected.car_model, 'lead-detail-car-model'],
                   ['Phone', formatPhone(selected.phone), 'lead-detail-phone'],
                   ['Email', selected.email, 'lead-detail-email'],
-                  ['Source', ({ lapa: 'PA page (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish Landing (sp)', dg: 'Demand Gen (dg)', dgs: 'Spanish Demand Gen (dgs)' }[selected.source_page]) || (selected.source_page || 'home'), 'lead-detail-source'],
+                  ['Source', ({ lapa: 'PA page (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish Landing (sp)', ladg: 'Demand Gen (ladg)', ladgs: 'Spanish Demand Gen (ladgs)', latm: 'Team — Overlay (latm)', latm2: 'Team — Split (latm2)', dg: 'Demand Gen (dg)', dgs: 'Spanish Demand Gen (dgs)', tm: 'Team — Overlay (tm)', tm2: 'Team — Split (tm2)' }[selected.source_page]) || (selected.source_page || 'home'), 'lead-detail-source'],
                   ['Campaign', selected.campaign_name || selected.campaign_id, 'lead-detail-campaign'],
                   ['Ad Group', selected.adgroup_name || selected.adgroup_id, 'lead-detail-adgroup'],
                   ['Ad', selected.ad_name || selected.ad_id, 'lead-detail-ad'],

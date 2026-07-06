@@ -51,11 +51,11 @@ function App() {
           <Route path="/tm2" element={<TeamSplit />} />
           <Route
             path="/dg"
-            element={<PresellPA contentPath="/dg-content" sourcePage="dg" phone="(833) 240-9312" phoneHref="tel:+18332409312" rootTestId="presell-dg-page" />}
+            element={<PresellPA contentPath="/dg-content" sourcePage="ladg" phone="(833) 240-9312" phoneHref="tel:+18332409312" rootTestId="presell-dg-page" />}
           />
           <Route
             path="/dgs"
-            element={<PresellSPA contentPath="/dgs-content" sourcePage="dgs" phone="(833) 868-1802" phoneHref="tel:+18338681802" rootTestId="presell-dgs-page" />}
+            element={<PresellSPA contentPath="/dgs-content" sourcePage="ladgs" phone="(833) 868-1802" phoneHref="tel:+18338681802" rootTestId="presell-dgs-page" />}
           />
           <Route path="/split" element={<SplitEntry />} />
           <Route path="/contact" element={<Contact />} />

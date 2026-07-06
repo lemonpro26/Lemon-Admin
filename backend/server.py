@@ -1112,8 +1112,15 @@ CRM_SOURCE_PAGE_PATHS = {
     "sp": "sp",       # /sp  (Spanish landing)
     "lapa": "pa",     # /pa  (English PA advertorial)
     "laspa": "spa",   # /spa (Spanish PA advertorial)
-    "dg": "dg",       # /dg  (English Demand Gen)
-    "dgs": "dgs",     # /dgs (Spanish Demand Gen)
+    "ladg": "dg",     # /dg  (English Demand Gen)
+    "ladgs": "dgs",   # /dgs (Spanish Demand Gen)
+    "latm": "tm",     # /tm  (We Fight For You — overlay)
+    "latm2": "tm2",   # /tm2 (We Fight For You — split)
+    # Legacy codes (pre-rename) kept so any stragglers still resolve correctly.
+    "dg": "dg",
+    "dgs": "dgs",
+    "tm": "tm",
+    "tm2": "tm2",
 }
 
 
