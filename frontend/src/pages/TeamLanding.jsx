@@ -130,14 +130,14 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
 
       {/* Hero photo section */}
       <section className="relative flex-1 min-h-[80vh] overflow-hidden">
-        <img src={TEAM_PHOTO_STONE} alt="The Lemon Pros attorney team" className="absolute inset-0 h-full w-full object-cover object-[50%_78%]" data-testid="team-overlay-photo" />
+        <img src={TEAM_PHOTO_STONE} alt="The Lemon Pros attorney team" className="absolute inset-0 h-full w-full object-cover object-[50%_58%]" data-testid="team-overlay-photo" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/5 to-black/80" />
 
         <div className="absolute inset-0 flex flex-col">
           {/* Copy — centered horizontally, lowered */}
           <div className="flex-1 flex flex-col justify-end pb-2">
             <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 flex flex-col items-center text-center mt-[12vh]">
-              <h1 className="font-slab font-extrabold uppercase text-white leading-[0.86] text-5xl sm:text-7xl lg:text-8xl tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]" data-testid="team-overlay-headline">
+              <h1 className="font-slab font-extrabold uppercase text-white leading-[0.86] text-4xl sm:text-6xl lg:text-7xl tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]" data-testid="team-overlay-headline">
                 We Fight<br />For You
               </h1>
               <svg viewBox="0 0 420 22" preserveAspectRatio="none" aria-hidden="true" className="w-64 sm:w-96 h-4 sm:h-5 mt-1">
