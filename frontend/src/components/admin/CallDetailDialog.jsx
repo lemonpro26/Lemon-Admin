@@ -58,7 +58,7 @@ export const CallDetailDialog = ({ call, open, onOpenChange, onChanged }) => {
   };
 
   const rows = [
-    ['Caller', c.caller_name, 'cd-name'],
+    ['Caller', c.qb_name || c.caller_name, 'cd-name'],
     ['Number', formatPhone(c.caller_number), 'cd-number'],
     ['Called #', c.tracked_number_display || c.tracking_number, 'cd-tracking'],
     ['Landing group', c.number_group_label, 'cd-group'],

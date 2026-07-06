@@ -578,7 +578,7 @@ export default function AdminDashboard() {
                       {shownLeads.map((lead) => (
                         <TableRow key={lead.id} data-testid={`admin-lead-row-${lead.id}`}>
                           <TableCell className="font-medium text-slate-900">
-                            {lead.full_name}
+                            {lead.qb_name || lead.full_name}
                             {lead.is_test && (
                               <Badge variant="outline" className="ml-2 bg-slate-100 text-slate-500 border-slate-200 text-[10px]">test</Badge>
                             )}
@@ -681,7 +681,7 @@ export default function AdminDashboard() {
                           {matchedCalls.map((c) => (
                             <TableRow key={c.id} data-testid={`matched-call-row-${c.id}`} className="cursor-pointer hover:bg-slate-50" onClick={() => setOpenedCall(c)}>
                               <TableCell className="font-medium text-slate-900">
-                                {c.caller_name || '\u2014'}
+                                {c.qb_name || c.caller_name || '\u2014'}
                                 <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">call</Badge>
                                 {c.retained && <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Retained</Badge>}
                               </TableCell>
@@ -716,7 +716,7 @@ export default function AdminDashboard() {
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-md" data-testid="admin-lead-detail">
           <DialogHeader>
-            <DialogTitle className="font-slab">{selected?.full_name}</DialogTitle>
+            <DialogTitle className="font-slab">{selected?.qb_name || selected?.full_name}</DialogTitle>
           </DialogHeader>
           {selected && (
             <div className="grid gap-4">

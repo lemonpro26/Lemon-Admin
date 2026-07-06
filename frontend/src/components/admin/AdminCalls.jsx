@@ -339,7 +339,7 @@ export const AdminCalls = () => {
                 </TableHeader>
                 <TableBody>
                   {matchedLeads.map((l) => {
-                    const name = l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '\u2014';
+                    const name = l.qb_name || l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '\u2014';
                     const vehicle = [l.car_year, l.car_make, l.car_model].filter(Boolean).join(' ');
                     return (
                       <TableRow key={l.id} data-testid={`matched-lead-row-${l.id}`} className="cursor-pointer hover:bg-slate-50" onClick={() => setOpenedLead(l)}>
@@ -389,7 +389,7 @@ export const AdminCalls = () => {
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
                 <TableCell className="font-medium text-slate-900">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span>{c.caller_name || '—'}</span>
+                    <span>{c.qb_name || c.caller_name || '—'}</span>
                     {c.number_group && c.number_group !== 'other' && (
                       <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`call-group-${c.number_group}-${c.id}`}>{c.number_group_label}</Badge>
                     )}
@@ -484,14 +484,14 @@ export const AdminCalls = () => {
         <DialogContent className="max-w-md" data-testid="admin-call-detail">
           <DialogHeader>
             <DialogTitle className="font-slab flex items-center gap-2">
-              <Phone className="h-4 w-4" /> {selected?.caller_name || formatPhone(selected?.caller_number) || 'Call'}
+              <Phone className="h-4 w-4" /> {selected?.qb_name || selected?.caller_name || formatPhone(selected?.caller_number) || 'Call'}
             </DialogTitle>
           </DialogHeader>
           {selected && (
             <div className="grid gap-4">
               <div className="grid gap-2 text-sm">
                 {[
-                  ['Caller', selected.caller_name, 'call-detail-name'],
+                  ['Caller', selected.qb_name || selected.caller_name, 'call-detail-name'],
                   ['Number', formatPhone(selected.caller_number), 'call-detail-number'],
                   ['Called #', selected.tracked_number_display || selected.tracking_number, 'call-detail-tracking'],
                   ['Landing group', selected.number_group_label, 'call-detail-group'],

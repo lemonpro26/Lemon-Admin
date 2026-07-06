@@ -2090,6 +2090,7 @@ async def admin_get_leads(
         digits = _re.sub(r"\D", "", search)
         ors = [
             {"full_name": {"$regex": rx, "$options": "i"}},
+            {"qb_name": {"$regex": rx, "$options": "i"}},
             {"first_name": {"$regex": rx, "$options": "i"}},
             {"last_name": {"$regex": rx, "$options": "i"}},
             {"email": {"$regex": rx, "$options": "i"}},
@@ -2553,6 +2554,7 @@ async def admin_get_calls(start: str = "", end: str = "", search: str = Query(""
         digits = _re.sub(r"\D", "", search)
         ors = [
             {"caller_name": {"$regex": rx, "$options": "i"}},
+            {"qb_name": {"$regex": rx, "$options": "i"}},
             {"caller_number": {"$regex": rx, "$options": "i"}},
         ]
         if digits:
@@ -2980,6 +2982,26 @@ async def _enrich_from_quickbase(doc: dict, collection) -> dict:
     return fields
 
 
+async def _quickbase_sync_loop():
+    """Every hour, refresh name + email from Quickbase for ALL leads and calls
+    (matched by phone). Keeps the admin caller ID in sync with Quickbase edits.
+    Retained items are also synced instantly at the moment they're marked."""
+    await asyncio.sleep(90)  # let the app boot
+    while True:
+        try:
+            if qb.is_configured():
+                leads = await db.leads.find({}, {"id": 1, "phone": 1}).to_list(3000)
+                calls = await db.calls.find({"is_test": {"$ne": True}}, {"id": 1, "caller_number": 1}).to_list(3000)
+                docs = [(l, db.leads) for l in leads] + [(c, db.calls) for c in calls]
+                for i in range(0, len(docs), 8):
+                    batch = docs[i:i + 8]
+                    await asyncio.gather(*[_enrich_from_quickbase(d, coll) for d, coll in batch])
+                logger.info("Quickbase hourly sync refreshed %s records", len(docs))
+        except Exception as e:
+            logger.warning("Quickbase sync loop error: %s", e)
+        await asyncio.sleep(3600)
+
+
 @api_router.post("/admin/leads/{lead_id}/retained")
 async def mark_lead_retained(lead_id: str, body: RetainedBody, _: dict = Depends(require_editor)):
     """Flag/unflag a lead as a retained client. Retained items appear in the Retained tab."""
@@ -3029,7 +3051,7 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
     for l in leads:
         items.append({
             "type": "lead", "id": l.get("id"),
-            "name": l.get("full_name") or l.get("first_name") or l.get("qb_name") or "—",
+            "name": l.get("qb_name") or l.get("full_name") or l.get("first_name") or "—",
             "phone": l.get("phone"), "email": l.get("email") or l.get("qb_email"),
             "qb_name": l.get("qb_name") or "", "qb_email": l.get("qb_email") or "",
             "vehicle": " ".join([str(x) for x in [l.get("car_year"), l.get("car_make"), l.get("car_model")] if x]),
@@ -3044,7 +3066,7 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
     for c in calls:
         items.append({
             "type": "call", "id": c.get("id"),
-            "name": c.get("caller_name") or c.get("qb_name") or "—",
+            "name": c.get("qb_name") or c.get("caller_name") or "—",
             "phone": c.get("caller_number"), "email": c.get("qb_email"),
             "qb_name": c.get("qb_name") or "", "qb_email": c.get("qb_email") or "",
             "vehicle": "",
@@ -3597,6 +3619,7 @@ async def startup():
     try:
         asyncio.create_task(_ad_label_sync_loop())
         asyncio.create_task(_google_call_sync_loop())
+        asyncio.create_task(_quickbase_sync_loop())
     except Exception as e:
         logger.error("failed to start ad-label sync loop: %s", e)
     logger.info("Lemon Pros API started")

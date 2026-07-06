@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-06
+- FEATURE: Quickbase name/email now syncs to ALL leads + calls (not just retained). New `_quickbase_sync_loop` re-looks-up every lead + call by phone every 1 hour (batches of 8) so Quickbase edits propagate; retained items still sync instantly on mark. `qb_name` is shown as the caller ID across Calls tab, call detail, Leads tab, lead detail, unified search, and Retained (prefers qb_name over caller_name/full_name). Added qb_name to calls + leads search. Verified loop ("refreshed 8 records") and display ((323) 621-1347 → "Mauximo Garcia").
+
 - FEATURE: Quickbase auto-enrichment for retained clients. New read-only `quickbase_service.py` looks up a client's full name + email by phone (matches Quickbase's `(XXX) XXX-XXXX` format, exact + contains fallback). Runs automatically when a lead/call is marked retained AND on Retained-tab load for any not-yet-looked-up item; persists `qb_name`/`qb_email` on the doc. `/admin/retained` now returns name/email (falling back to Quickbase values) + a `qb_*` fields; UI shows the email under the name with a "Quickbase" tag. Config in backend/.env: QUICKBASE_REALM/USER_TOKEN/TABLE_ID/FIELD_PHONE(7)/FIELD_NAME(6)/FIELD_EMAIL(8). Verified live: call phone (818) 916-5697 → "Nora Caceres" + email pulled from Quickbase.
 - FEATURE: Uniform phone formatting. New `lib/format.js` formatPhone() renders every admin phone as `(XXX) XXX-XXXX` (Calls, Leads, Retained tabs + both detail dialogs + unified search).
 

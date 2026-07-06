@@ -25,7 +25,7 @@ export const LeadDetailDialog = ({ lead, open, onOpenChange, onChanged }) => {
   }, [lead]);
 
   if (!l) return null;
-  const name = l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '\u2014';
+  const name = l.qb_name || l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '\u2014';
   const vehicle = [l.car_year, l.car_make, l.car_model].filter(Boolean).join(' ') || '\u2014';
 
   const markSold = async () => {
