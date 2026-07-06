@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-07-06
+- FEATURE: Quickbase auto-enrichment for retained clients. New read-only `quickbase_service.py` looks up a client's full name + email by phone (matches Quickbase's `(XXX) XXX-XXXX` format, exact + contains fallback). Runs automatically when a lead/call is marked retained AND on Retained-tab load for any not-yet-looked-up item; persists `qb_name`/`qb_email` on the doc. `/admin/retained` now returns name/email (falling back to Quickbase values) + a `qb_*` fields; UI shows the email under the name with a "Quickbase" tag. Config in backend/.env: QUICKBASE_REALM/USER_TOKEN/TABLE_ID/FIELD_PHONE(7)/FIELD_NAME(6)/FIELD_EMAIL(8). Verified live: call phone (818) 916-5697 → "Nora Caceres" + email pulled from Quickbase.
+- FEATURE: Uniform phone formatting. New `lib/format.js` formatPhone() renders every admin phone as `(XXX) XXX-XXXX` (Calls, Leads, Retained tabs + both detail dialogs + unified search).
+
 - FIX/REDESIGN: `/tm` rebuilt to match the approved screenshot. Team photo is now a full-bleed single-screen background (object-cover, h-[100dvh], no scroll). Header is a transparent overlay over the photo (was a navy band that pushed the image down and covered the attorneys). Headline "WE FIGHT FOR YOU" + yellow swoosh underline + subtext + yellow "See If You Qualify" CTA anchored lower-left; three circular trust badges (Gavel/Star/Dollar) centered at the bottom. Verified scrollHeight == innerHeight.
 
 - FEATURE: Editable revenue in the Retained tab. Inline "Add revenue" per client → POSTs to existing `/admin/{leads|calls}/{id}/sold`, which marks sold + uploads the offline conversion (revenue passback) to Google Ads. Added a green "✓ Google" / "Google pending" sync badge and a "Total revenue" stat card. Backend `/admin/retained` now returns `sale_currency`, `conversion_uploaded`, `conversion_status`, and `total_revenue`. Verified end-to-end (conversion uploaded, total = $5,000).

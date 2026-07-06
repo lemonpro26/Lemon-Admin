@@ -262,7 +262,15 @@ export const AdminRetained = () => {
               <TableBody>
                 {items.map((it) => (
                   <TableRow key={`${it.type}-${it.id}`} data-testid={`retained-row-${it.id}`}>
-                    <TableCell className="font-medium text-slate-900">{it.name}</TableCell>
+                    <TableCell className="font-medium text-slate-900">
+                      <div className="flex items-center gap-1.5">
+                        <span>{it.name}</span>
+                        {(it.qb_name || it.qb_email) && (
+                          <span className="text-[9px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-full px-1.5 py-0.5 whitespace-nowrap" title="Name/email pulled from Quickbase" data-testid={`retained-qb-tag-${it.id}`}>Quickbase</span>
+                        )}
+                      </div>
+                      {it.email && <div className="text-xs font-normal text-slate-500 truncate max-w-[220px]" data-testid={`retained-email-${it.id}`}>{it.email}</div>}
+                    </TableCell>
                     <TableCell>
                       {it.type === 'call' ? (
                         <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] gap-1"><Phone className="h-3 w-3" /> Call</Badge>

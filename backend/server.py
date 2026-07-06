@@ -23,6 +23,7 @@ from metrics_mock import build_metrics
 import google_ads_service as gads
 import datamanager_service as dm
 import google_names_service as gnames
+import quickbase_service as qb
 from email_service import (
     send_email,
     build_internal_notification_html,
@@ -2962,6 +2963,23 @@ def _normalize_retained_at(value: Optional[str]) -> str:
         return _now_iso()
 
 
+async def _enrich_from_quickbase(doc: dict, collection) -> dict:
+    """Look up the client's full name + email in Quickbase by phone and persist
+    them onto the doc as qb_name/qb_email. Best-effort, read-only, runs once."""
+    if not qb.is_configured():
+        return {}
+    phone = doc.get("phone") or doc.get("caller_number") or ""
+    res = await asyncio.to_thread(qb.lookup_by_phone, phone) if phone else None
+    fields = {
+        "qb_lookup_at": _now_iso(),
+        "qb_name": (res or {}).get("name", ""),
+        "qb_email": (res or {}).get("email", ""),
+    }
+    await collection.update_one({"id": doc["id"]}, {"$set": fields})
+    doc.update(fields)
+    return fields
+
+
 @api_router.post("/admin/leads/{lead_id}/retained")
 async def mark_lead_retained(lead_id: str, body: RetainedBody, _: dict = Depends(require_editor)):
     """Flag/unflag a lead as a retained client. Retained items appear in the Retained tab."""
@@ -2971,6 +2989,8 @@ async def mark_lead_retained(lead_id: str, body: RetainedBody, _: dict = Depends
     fields = {"retained": bool(body.retained),
               "retained_at": _normalize_retained_at(body.retained_at) if body.retained else None}
     await db.leads.update_one({"id": lead_id}, {"$set": fields})
+    if body.retained:
+        await _enrich_from_quickbase({**lead, **fields}, db.leads)
     return {"success": True, "lead_id": lead_id, **fields}
 
 
@@ -2983,6 +3003,8 @@ async def mark_call_retained(call_id: str, body: RetainedBody, _: dict = Depends
     fields = {"retained": bool(body.retained),
               "retained_at": _normalize_retained_at(body.retained_at) if body.retained else None}
     await db.calls.update_one({"id": call_id}, {"$set": fields})
+    if body.retained:
+        await _enrich_from_quickbase({**call, **fields}, db.calls)
     return {"success": True, "call_id": call_id, **fields}
 
 
@@ -2996,11 +3018,20 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
     leads = await db.leads.find(q, {"_id": 0}).sort("retained_at", -1).to_list(length=2000)
     calls = await db.calls.find(q, {"_id": 0}).sort("retained_at", -1).to_list(length=2000)
     calls = await _enrich_calls_with_hooks(calls)
+    # Auto-fill name + email from Quickbase (by phone) for any retained item that
+    # hasn't been looked up yet — so it happens automatically on tab load.
+    if qb.is_configured():
+        pending = ([(l, db.leads) for l in leads if not l.get("qb_lookup_at")]
+                   + [(c, db.calls) for c in calls if not c.get("qb_lookup_at")])
+        if pending:
+            await asyncio.gather(*[_enrich_from_quickbase(doc, coll) for doc, coll in pending])
     items = []
     for l in leads:
         items.append({
-            "type": "lead", "id": l.get("id"), "name": l.get("full_name") or l.get("first_name") or "—",
-            "phone": l.get("phone"), "email": l.get("email"),
+            "type": "lead", "id": l.get("id"),
+            "name": l.get("full_name") or l.get("first_name") or l.get("qb_name") or "—",
+            "phone": l.get("phone"), "email": l.get("email") or l.get("qb_email"),
+            "qb_name": l.get("qb_name") or "", "qb_email": l.get("qb_email") or "",
             "vehicle": " ".join([str(x) for x in [l.get("car_year"), l.get("car_make"), l.get("car_model")] if x]),
             "source_page": l.get("source_page") or "home",
             "sale_status": l.get("sale_status"), "sale_value": l.get("sale_value"),
@@ -3012,8 +3043,11 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
         })
     for c in calls:
         items.append({
-            "type": "call", "id": c.get("id"), "name": c.get("caller_name") or "—",
-            "phone": c.get("caller_number"), "email": None, "vehicle": "",
+            "type": "call", "id": c.get("id"),
+            "name": c.get("caller_name") or c.get("qb_name") or "—",
+            "phone": c.get("caller_number"), "email": c.get("qb_email"),
+            "qb_name": c.get("qb_name") or "", "qb_email": c.get("qb_email") or "",
+            "vehicle": "",
             "source_page": c.get("source_page") or "", "number_group_label": c.get("number_group_label"),
             "tracked_number_display": c.get("tracked_number_display"),
             "sale_status": c.get("sale_status"), "sale_value": c.get("sale_value"),
