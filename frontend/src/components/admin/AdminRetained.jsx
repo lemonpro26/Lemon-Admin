@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { formatPhone } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -269,7 +270,7 @@ export const AdminRetained = () => {
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] gap-1"><FileText className="h-3 w-3" /> Lead</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-slate-600">{it.phone || '\u2014'}</TableCell>
+                    <TableCell className="text-slate-600">{formatPhone(it.phone) || '\u2014'}</TableCell>
                     <TableCell className="hidden sm:table-cell text-slate-600" data-testid={`retained-source-${it.id}`}>
                       {it.type === 'call'
                         ? `Call from ${it.number_group_label || 'Unknown'}`

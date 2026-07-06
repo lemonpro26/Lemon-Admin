@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award, FileText, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
+import { formatPhone } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -347,7 +348,7 @@ export const AdminCalls = () => {
                           <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px]">lead</Badge>
                           {l.retained && <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Retained</Badge>}
                         </TableCell>
-                        <TableCell className="text-slate-600">{l.phone || '\u2014'}</TableCell>
+                        <TableCell className="text-slate-600">{formatPhone(l.phone) || '\u2014'}</TableCell>
                         <TableCell className="hidden sm:table-cell text-slate-600">{l.email || '\u2014'}</TableCell>
                         <TableCell className="hidden md:table-cell text-slate-600">{vehicle || '\u2014'}</TableCell>
                         <TableCell className="hidden sm:table-cell text-slate-500 text-sm">{fmtDate(l.created_at)}</TableCell>
@@ -402,7 +403,7 @@ export const AdminCalls = () => {
                     )}
                   </div>
                 </TableCell>
-                {cols.number && <TableCell className="text-slate-700">{c.caller_number || '—'}</TableCell>}
+                {cols.number && <TableCell className="text-slate-700">{formatPhone(c.caller_number) || '—'}</TableCell>}
                 {cols.called && (
                   <TableCell className="text-slate-700 whitespace-nowrap" data-testid={`call-called-number-${c.id}`}>
                     <div className="flex flex-col leading-tight">
@@ -483,7 +484,7 @@ export const AdminCalls = () => {
         <DialogContent className="max-w-md" data-testid="admin-call-detail">
           <DialogHeader>
             <DialogTitle className="font-slab flex items-center gap-2">
-              <Phone className="h-4 w-4" /> {selected?.caller_name || selected?.caller_number || 'Call'}
+              <Phone className="h-4 w-4" /> {selected?.caller_name || formatPhone(selected?.caller_number) || 'Call'}
             </DialogTitle>
           </DialogHeader>
           {selected && (
@@ -491,7 +492,7 @@ export const AdminCalls = () => {
               <div className="grid gap-2 text-sm">
                 {[
                   ['Caller', selected.caller_name, 'call-detail-name'],
-                  ['Number', selected.caller_number, 'call-detail-number'],
+                  ['Number', formatPhone(selected.caller_number), 'call-detail-number'],
                   ['Called #', selected.tracked_number_display || selected.tracking_number, 'call-detail-tracking'],
                   ['Landing group', selected.number_group_label, 'call-detail-group'],
                   ['Duration', fmtDuration(selected.duration), 'call-detail-duration'],

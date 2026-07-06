@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Phone, DollarSign, Trash2, Award } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
+import { formatPhone } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +59,7 @@ export const CallDetailDialog = ({ call, open, onOpenChange, onChanged }) => {
 
   const rows = [
     ['Caller', c.caller_name, 'cd-name'],
-    ['Number', c.caller_number, 'cd-number'],
+    ['Number', formatPhone(c.caller_number), 'cd-number'],
     ['Called #', c.tracked_number_display || c.tracking_number, 'cd-tracking'],
     ['Landing group', c.number_group_label, 'cd-group'],
     ['Duration', fmtDur(c.duration), 'cd-duration'],

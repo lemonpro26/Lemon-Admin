@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FileText, DollarSign, Trash2, Award } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
+import { formatPhone } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -60,7 +61,7 @@ export const LeadDetailDialog = ({ lead, open, onOpenChange, onChanged }) => {
 
   const rows = [
     ['Name', name, 'ld-name'],
-    ['Phone', l.phone, 'ld-phone'],
+    ['Phone', formatPhone(l.phone), 'ld-phone'],
     ['Email', l.email, 'ld-email'],
     ['Vehicle', vehicle, 'ld-vehicle'],
     ['Source', SRC[l.source_page] || l.source_page || 'home', 'ld-source'],

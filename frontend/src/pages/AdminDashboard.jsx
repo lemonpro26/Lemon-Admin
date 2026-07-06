@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { api, TOKEN_KEY, clearSession, canEdit as canEditFn, getRole, getUsername } from '@/lib/api';
+import { formatPhone } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -597,7 +598,7 @@ export default function AdminDashboard() {
                               <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`lead-retained-badge-${lead.id}`}>Retained</Badge>
                             )}
                           </TableCell>
-                          {leadCols.phone && <TableCell className="text-slate-600">{lead.phone}</TableCell>}
+                          {leadCols.phone && <TableCell className="text-slate-600">{formatPhone(lead.phone)}</TableCell>}
                           {leadCols.vehicle && <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>}
                           {leadCols.email && <TableCell className="hidden md:table-cell text-slate-600 break-all">{lead.email}</TableCell>}
                           {leadCols.revenue && (
@@ -684,7 +685,7 @@ export default function AdminDashboard() {
                                 <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">call</Badge>
                                 {c.retained && <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Retained</Badge>}
                               </TableCell>
-                              <TableCell className="text-slate-600">{c.caller_number || '\u2014'}</TableCell>
+                              <TableCell className="text-slate-600">{formatPhone(c.caller_number) || '\u2014'}</TableCell>
                               <TableCell className="hidden sm:table-cell text-slate-600">{c.duration ? `${c.duration}s` : '\u2014'}</TableCell>
                               <TableCell className="hidden md:table-cell text-slate-600">{c.campaign || '\u2014'}</TableCell>
                               <TableCell className="hidden sm:table-cell text-slate-500 text-sm">{fmtDate(c.created_at)}</TableCell>
@@ -724,7 +725,7 @@ export default function AdminDashboard() {
                   ['Vehicle Year', selected.car_year, 'lead-detail-car-year'],
                   ['Vehicle Make', selected.car_make, 'lead-detail-car-make'],
                   ['Vehicle Model', selected.car_model, 'lead-detail-car-model'],
-                  ['Phone', selected.phone, 'lead-detail-phone'],
+                  ['Phone', formatPhone(selected.phone), 'lead-detail-phone'],
                   ['Email', selected.email, 'lead-detail-email'],
                   ['Source', ({ lapa: 'PA page (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish Landing (sp)', dg: 'Demand Gen (dg)', dgs: 'Spanish Demand Gen (dgs)' }[selected.source_page]) || (selected.source_page || 'home'), 'lead-detail-source'],
                   ['Campaign ID', selected.campaign_id, 'lead-detail-campaign'],
