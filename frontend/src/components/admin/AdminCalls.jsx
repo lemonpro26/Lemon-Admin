@@ -97,6 +97,9 @@ export const AdminCalls = () => {
   const [matchedLeads, setMatchedLeads] = useState([]);
   const [openedLead, setOpenedLead] = useState(null);
   const [syncingGoogle, setSyncingGoogle] = useState(false);
+  const [testOpen, setTestOpen] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testName, setTestName] = useState('');
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
@@ -218,8 +221,17 @@ export const AdminCalls = () => {
 
   const addTestCall = async () => {
     try {
-      await api.post('/admin/calls/test');
-      toast.success('Test call added.');
+      const payload = {};
+      if (testPhone.trim()) payload.phone = testPhone.trim();
+      if (testName.trim()) payload.name = testName.trim();
+      const res = await api.post('/admin/calls/test', payload);
+      const c = res.data?.call || {};
+      toast.success(payload.phone
+        ? `Test call added for ${c.caller_number}${c.qb_name ? ` — matched "${c.qb_name}" in Quickbase` : ' — no Quickbase match'}.`
+        : 'Test call added.');
+      setTestOpen(false);
+      setTestPhone('');
+      setTestName('');
       load();
     } catch (e) {
       toast.error('Could not add test call.');
@@ -267,7 +279,7 @@ export const AdminCalls = () => {
             )}
           </div>
           {editable && (
-            <Button variant="outline" size="sm" onClick={addTestCall} className="rounded-xl border-slate-200" data-testid="calls-add-test">
+            <Button variant="outline" size="sm" onClick={() => setTestOpen(true)} className="rounded-xl border-slate-200" data-testid="calls-add-test">
               <Plus className="h-4 w-4 mr-2" /> Test call
             </Button>
           )}
@@ -480,6 +492,29 @@ export const AdminCalls = () => {
       </div>
 
       {/* CALL DETAIL DIALOG */}
+      <Dialog open={testOpen} onOpenChange={(o) => { if (!o) { setTestOpen(false); } }}>
+        <DialogContent className="max-w-md" data-testid="test-call-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-slab">Add a test call</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">Creates a sample inbound call. Enter a specific phone number to test the Quickbase name lookup, or leave blank for a random test number.</p>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Phone number (optional)</label>
+              <Input value={testPhone} onChange={(e) => setTestPhone(e.target.value)} placeholder="(760) 910-8655" className="mt-1 rounded-xl border-slate-200" data-testid="test-call-phone" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Caller name (optional)</label>
+              <Input value={testName} onChange={(e) => setTestName(e.target.value)} placeholder="Leave blank to auto-fill from Quickbase" className="mt-1 rounded-xl border-slate-200" data-testid="test-call-name" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setTestOpen(false)} className="rounded-xl" data-testid="test-call-cancel">Cancel</Button>
+              <Button onClick={addTestCall} className="rounded-xl bg-[#0F1B3D] hover:bg-[#0a1330]" data-testid="test-call-submit">Add test call</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-md" data-testid="admin-call-detail">
           <DialogHeader>

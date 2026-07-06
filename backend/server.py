@@ -2679,15 +2679,30 @@ async def delete_call(call_id: str, _: dict = Depends(require_editor)):
     return {"success": True}
 
 
+class TestCallBody(BaseModel):
+    phone: Optional[str] = None
+    name: Optional[str] = None
+
+
 @api_router.post("/admin/calls/test")
-async def create_test_call(_: dict = Depends(require_editor)):
-    """Create a realistic sample inbound call (with a sample GCLID) so the team can
-    practice the revenue-passback flow without dialing the tracking number."""
+async def create_test_call(body: Optional[TestCallBody] = None, _: dict = Depends(require_editor)):
+    """Create a sample inbound call so the team can practice the revenue-passback
+    flow without dialing the tracking number. Optionally pass a specific phone
+    number (and name) — useful to test the Quickbase name lookup."""
     rng = random.Random()
-    name = rng.choice(["Alex Johnson", "Jordan Smith", "Sam Garcia", "Taylor Lee", "Casey Brown"])
+    name = (body.name or "").strip() if body else ""
+    if not name:
+        name = rng.choice(["Alex Johnson", "Jordan Smith", "Sam Garcia", "Taylor Lee", "Casey Brown"])
     geo = rng.choice([("Los Angeles", "CA"), ("Phoenix", "AZ"), ("Houston", "TX"), ("Miami", "FL")])
     now = _now_iso()
-    _num = f"(555) {rng.randint(100,999)}-{rng.randint(1000,9999)}"
+    custom_phone = (body.phone or "").strip() if body else ""
+    if custom_phone:
+        digits = _re.sub(r"\D", "", custom_phone)
+        if len(digits) == 11 and digits.startswith("1"):
+            digits = digits[1:]
+        _num = f"({digits[0:3]}) {digits[3:6]}-{digits[6:]}" if len(digits) == 10 else custom_phone
+    else:
+        _num = f"(555) {rng.randint(100,999)}-{rng.randint(1000,9999)}"
     _tracked = rng.choice(CALL_NUMBER_GROUPS)
     rec = {
         "id": str(uuid.uuid4()),
@@ -2709,7 +2724,12 @@ async def create_test_call(_: dict = Depends(require_editor)):
         "created_at": now,
     }
     await db.calls.insert_one({**rec})
-    return {"success": True, "call": {k: v for k, v in rec.items() if k != "_id"}}
+    # If a specific phone was given, enrich from Quickbase right away so the
+    # caller ID (name/email) shows — handy for testing the lookup.
+    if custom_phone and qb.is_configured():
+        await _enrich_from_quickbase(rec, db.calls)
+    fresh = await db.calls.find_one({"id": rec["id"]}, {"_id": 0})
+    return {"success": True, "call": fresh or {k: v for k, v in rec.items() if k != "_id"}}
 
 
 
