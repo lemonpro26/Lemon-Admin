@@ -158,7 +158,6 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
 // ---------------------------------------------------------------------------
 export function TeamSplit({ sourcePage = 'tm2', phone = COMPANY.phone, phoneHref = COMPANY.phoneHref, rootTestId = 'team-split-page' } = {}) {
   const { start, navigate } = useTeamFunnel({ sourcePage, phone, phoneHref });
-  const NAV = ['About', 'Results', 'Cases'];
   return (
     <div className="min-h-[100dvh] bg-slate-50 font-sans flex flex-col" data-testid={rootTestId}>
       {/* Top bar: navy logo block + white nav */}
@@ -168,9 +167,6 @@ export function TeamSplit({ sourcePage = 'tm2', phone = COMPANY.phone, phoneHref
             <Logo size="sm" light />
           </div>
           <nav className="flex-1 flex items-center justify-end gap-5 sm:gap-8 px-4 sm:px-6">
-            {NAV.map((n) => (
-              <button key={n} onClick={start} className="hidden sm:inline text-slate-700 font-semibold hover:text-[#0B2545] transition-colors" data-testid={`team-nav-${n.toLowerCase()}`}>{n}</button>
-            ))}
             <CallButton phone={phone} phoneHref={phoneHref} />
           </nav>
         </div>
