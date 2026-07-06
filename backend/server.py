@@ -3211,8 +3211,13 @@ async def admin_stats(_: dict = Depends(require_admin), start: str = Query(""), 
     total_clicks = await db.clicks.count_documents({"first_seen": {"$gte": s_iso, "$lte": e_iso}})
     total_calls = await db.calls.count_documents({"created_at": {"$gte": s_iso, "$lte": e_iso}})
     conv = round((total / total_clicks * 100), 1) if total_clicks else 0.0
+    # Retained clients in range (leads + calls marked retained), matches Retained tab.
+    retained_q = {"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}
+    retained_leads = await db.leads.count_documents(retained_q)
+    retained_calls = await db.calls.count_documents(retained_q)
     return {"total_leads": total, "total_clicks": total_clicks,
-            "total_calls": total_calls, "conversion_rate": conv}
+            "total_calls": total_calls, "conversion_rate": conv,
+            "total_retained": retained_leads + retained_calls}
 
 
 # ----------------------------- Hooks (targeting merged in) -----------------------------

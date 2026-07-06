@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-06 (cont. 3)
+- FEATURE: Leads tab now has a secondary "campaign" dropdown next to the source segment filters (All/Home/Spanish/PA). It lists the distinct Google Ads campaigns present in the currently-selected source, with per-campaign lead counts, using real synced campaign names (falls back to "Direct / Untracked"). Selecting a campaign filters the table; switching source resets it. Client-side only (AdminDashboard.jsx): `leadCampaign` state, `segLeads`/`leadCampaignOptions` computed from enriched `campaign_name`/`campaign_id`, shadcn Select. Verified: Home segment → "01. Los Angeles [E] (2)", "The Lemon Law Lawyers (1)".
+- FEATURE: Retained tab trigger now shows a daily count `Retained (N)` matching the Calls/Leads tab badges. Added `total_retained` (leads + calls with retained_at in range) to `/admin/stats`; frontend reads `stats.total_retained`. Verified via curl (all-time=2, today=0).
+
 ## 2026-07-06 (cont. 2)
 - FEATURE: Lead/Call detail views now show real Google Ads NAMES instead of numeric IDs for Campaign, Ad Group, and Ad. Added backend `_resolve_ad_names()` helper that maps each lead/call's `campaign_id`/`adgroup_id`/`ad_id` against the synced `ad_labels` map (34 campaigns, 1219 ad groups, 1393 ads currently synced) and attaches `campaign_name`/`adgroup_name`/`ad_name`; wired into `/admin/leads` and `/admin/calls` list endpoints. Frontend lead detail (AdminDashboard.jsx), call detail (AdminCalls.jsx), and CallDetailDialog.jsx now display `name || id` (labels changed from "Campaign ID/Ad Group ID/Ad ID" to "Campaign/Ad Group/Ad"). Falls back to raw ID when no name. NOTE: Google's API returns no display name for responsive search ads, so `ad_name` shows "Ad {id}" for those (Google limitation). Verified via curl: campaign_id 14391026804 → "01. Los Angeles [E]", adgroup_id 125156576126 → "Lemon Law".
 

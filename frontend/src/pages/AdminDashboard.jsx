@@ -22,6 +22,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Logo } from '@/components/Logo';
 import { useSortable, SortLabel } from '@/lib/useSortable';
 import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
@@ -121,6 +122,7 @@ export default function AdminDashboard() {
   const [matchedCalls, setMatchedCalls] = useState([]);
   const [openedCall, setOpenedCall] = useState(null);
   const [leadSeg, setLeadSeg] = useState('all');
+  const [leadCampaign, setLeadCampaign] = useState('all');
   const [leadCols, setLeadCols] = useState(loadLeadCols);
   useEffect(() => { try { localStorage.setItem(LEAD_COLS_KEY, JSON.stringify(leadCols)); } catch { /* ignore */ } }, [leadCols]);
   const toggleLeadCol = (k) => setLeadCols((p) => ({ ...p, [k]: !p[k] }));
@@ -151,7 +153,27 @@ export default function AdminDashboard() {
     spanish: leads.filter((l) => inLeadSeg('spanish', l.source_page)).length,
     pa: leads.filter((l) => inLeadSeg('pa', l.source_page)).length,
   };
-  const shownLeads = sortedLeads.filter((l) => inLeadSeg(leadSeg, l.source_page));
+  // Campaign key + label for a lead (real Google Ads name when synced).
+  const leadCampaignKey = (l) => (l.campaign_id || l.campaign_name || '').trim() || '__none__';
+  const leadCampaignLabel = (l) => (l.campaign_name || l.campaign_id || '').trim() || 'Direct / Untracked';
+  // Leads in the active source segment (before the campaign sub-filter).
+  const segLeads = sortedLeads.filter((l) => inLeadSeg(leadSeg, l.source_page));
+  // Distinct campaigns present in the current segment, with counts, sorted by volume.
+  const leadCampaignOptions = (() => {
+    const map = new Map();
+    segLeads.forEach((l) => {
+      const key = leadCampaignKey(l);
+      const cur = map.get(key) || { key, label: leadCampaignLabel(l), count: 0 };
+      cur.count += 1;
+      map.set(key, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  })();
+  const shownLeads = segLeads.filter(
+    (l) => leadCampaign === 'all' || leadCampaignKey(l) === leadCampaign,
+  );
+  // Switching source segment resets the campaign sub-filter (campaigns differ per source).
+  const selectLeadSeg = (key) => { setLeadSeg(key); setLeadCampaign('all'); };
 
   const logout = useCallback(() => {
     clearSession();
@@ -400,7 +422,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="pages" data-testid="admin-tab-pages"><LayoutGrid className="h-4 w-4 mr-2" /> Pages</TabsTrigger>
             <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.total_calls ?? 0})</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
-            <TabsTrigger value="retained" data-testid="admin-tab-retained"><Award className="h-4 w-4 mr-2" /> Retained</TabsTrigger>
+            <TabsTrigger value="retained" data-testid="admin-tab-retained"><Award className="h-4 w-4 mr-2" /> Retained ({stats?.total_retained ?? 0})</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
           </TabsList>
 
@@ -515,7 +537,7 @@ export default function AdminDashboard() {
                 ].map((seg) => (
                   <button
                     key={seg.key}
-                    onClick={() => setLeadSeg(seg.key)}
+                    onClick={() => selectLeadSeg(seg.key)}
                     className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadSeg === seg.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
                     data-testid={`lead-seg-${seg.key}`}
                   >
@@ -523,6 +545,21 @@ export default function AdminDashboard() {
                     <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{seg.count}</span>
                   </button>
                 ))}
+                {/* Secondary filter: campaign within the selected source segment */}
+                <Select value={leadCampaign} onValueChange={setLeadCampaign}>
+                  <SelectTrigger className="h-9 w-auto min-w-[200px] rounded-full border-slate-200 bg-white text-sm font-semibold text-slate-600" data-testid="lead-campaign-filter">
+                    <Filter className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
+                    <SelectValue placeholder="All campaigns" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    <SelectItem value="all" data-testid="lead-campaign-opt-all">All campaigns ({segLeads.length})</SelectItem>
+                    {leadCampaignOptions.map((c) => (
+                      <SelectItem key={c.key} value={c.key} data-testid={`lead-campaign-opt-${c.key}`}>
+                        {c.label} ({c.count})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
