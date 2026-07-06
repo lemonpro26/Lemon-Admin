@@ -2123,6 +2123,8 @@ async def admin_get_leads(
     total = await db.leads.count_documents(q)
     cursor = db.leads.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit)
     leads = await cursor.to_list(length=limit)
+    cfg = await get_or_create_config()
+    leads = _resolve_ad_names(leads, cfg.get("ad_labels") or {})
     return {"total": total, "leads": leads, "range": {"start": start, "end": end}}
 
 
@@ -2405,6 +2407,32 @@ def _call_number_group(tracking_number: str) -> dict:
     return {"number_group": "other", "number_group_label": "Other", "tracked_number_display": (tracking_number or "")}
 
 
+def _resolve_ad_names(items: list, ad_labels: dict) -> list:
+    """Attach human-readable campaign / ad-group / ad names to each lead/call by
+    looking up their numeric Google Ads IDs in the synced ad_labels map. Leaves
+    the raw IDs intact (frontend falls back to the ID when no name is known)."""
+    if not items:
+        return items
+    camp = {str(k): v for k, v in (ad_labels.get("campaign") or {}).items() if v}
+    ag = {str(k): v for k, v in (ad_labels.get("adgroup") or {}).items() if v}
+    ad = {str(k): v for k, v in (ad_labels.get("ad") or {}).items() if v}
+    for it in items:
+        cid = str(it.get("campaign_id") or "").strip()
+        agid = str(it.get("adgroup_id") or "").strip()
+        adid = str(it.get("ad_id") or "").strip()
+        if cid and camp.get(cid):
+            it["campaign_name"] = camp[cid]
+        if agid and ag.get(agid):
+            it["adgroup_name"] = ag[agid]
+        if adid and ad.get(adid):
+            it["ad_name"] = ad[adid]
+        # Calls store a free-text `campaign` field; resolve it when it's a numeric id.
+        cval = str(it.get("campaign") or "").strip()
+        if cval.isdigit() and camp.get(cval) and not it.get("campaign_name"):
+            it["campaign_name"] = camp[cval]
+    return items
+
+
 async def _enrich_calls_with_hooks(items: list) -> list:
     """For each call, determine whether the caller saw the landing page and which
     hook variant they saw, by joining the call's gclid (or session_id) to a
@@ -2586,6 +2614,8 @@ async def admin_get_calls(start: str = "", end: str = "", search: str = Query(""
     docs = await db.calls.find(q).sort("created_at", -1).to_list(2000)
     items = [{k: v for k, v in c.items() if k != "_id"} for c in docs]
     items = await _enrich_calls_with_hooks(items)
+    cfg = await get_or_create_config()
+    items = _resolve_ad_names(items, cfg.get("ad_labels") or {})
     return {"calls": items, "total": len(items)}
 
 

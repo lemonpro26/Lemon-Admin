@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-06 (cont. 2)
+- FEATURE: Lead/Call detail views now show real Google Ads NAMES instead of numeric IDs for Campaign, Ad Group, and Ad. Added backend `_resolve_ad_names()` helper that maps each lead/call's `campaign_id`/`adgroup_id`/`ad_id` against the synced `ad_labels` map (34 campaigns, 1219 ad groups, 1393 ads currently synced) and attaches `campaign_name`/`adgroup_name`/`ad_name`; wired into `/admin/leads` and `/admin/calls` list endpoints. Frontend lead detail (AdminDashboard.jsx), call detail (AdminCalls.jsx), and CallDetailDialog.jsx now display `name || id` (labels changed from "Campaign ID/Ad Group ID/Ad ID" to "Campaign/Ad Group/Ad"). Falls back to raw ID when no name. NOTE: Google's API returns no display name for responsive search ads, so `ad_name` shows "Ad {id}" for those (Google limitation). Verified via curl: campaign_id 14391026804 → "01. Los Angeles [E]", adgroup_id 125156576126 → "Lemon Law".
+
 ## 2026-07-06 (cont.)
 - FEATURE: `/tm` (overlay) and `/tm2` (split) team landing pages are now editable in the Pages CMS like all other pages. Added `DEFAULT_TM_CONTENT`/`DEFAULT_TM2_CONTENT` to backend `PAGE_CONTENT_DEFAULTS` (reuses generic `/page-content/{page}` + `/admin/page-content/{page}` GET/PUT). Editable fields: headline line 1, headline line 2 (highlighted), subheadline, CTA button text. `TeamLanding.jsx` now fetches copy via `useTeamContent(page, defaults)` with safe fallbacks. `AdminPageContent.jsx` gained per-page field sets (TEAM_FIELDS) + team pages entries; `AdminPages.jsx` Team Pages now carry `editor: 'tm'/'tm2'` so they show Edit + live preview + Save & Publish. Verified end-to-end via curl (login→PUT→public reflects) and /tm screenshot.
 

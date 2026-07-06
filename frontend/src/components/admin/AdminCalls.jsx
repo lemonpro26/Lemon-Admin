@@ -551,7 +551,7 @@ export const AdminCalls = () => {
                   ['Called #', selected.tracked_number_display || selected.tracking_number, 'call-detail-tracking'],
                   ['Landing group', selected.number_group_label, 'call-detail-group'],
                   ['Duration', fmtDuration(selected.duration), 'call-detail-duration'],
-                  ['Campaign', selected.campaign, 'call-detail-campaign'],
+                  ['Campaign', selected.google_campaign || selected.campaign_name || selected.campaign, 'call-detail-campaign'],
                   ['Keyword', selected.keyword, 'call-detail-keyword'],
                   ['GCLID', selected.gclid, 'call-detail-gclid'],
                   ['Location', [selected.city, selected.state].filter(Boolean).join(', '), 'call-detail-location'],

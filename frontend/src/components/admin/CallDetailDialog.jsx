@@ -63,7 +63,7 @@ export const CallDetailDialog = ({ call, open, onOpenChange, onChanged }) => {
     ['Called #', c.tracked_number_display || c.tracking_number, 'cd-tracking'],
     ['Landing group', c.number_group_label, 'cd-group'],
     ['Duration', fmtDur(c.duration), 'cd-duration'],
-    ['Campaign', c.campaign, 'cd-campaign'],
+    ['Campaign', c.google_campaign || c.campaign_name || c.campaign, 'cd-campaign'],
     ['Location', [c.city, c.state].filter(Boolean).join(', '), 'cd-location'],
     ['When', fmtDate(c.called_at || c.created_at), 'cd-when'],
   ];
