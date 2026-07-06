@@ -126,9 +126,9 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
           </div>
         </header>
 
-        {/* Copy block — lower-left */}
-        <div className="flex-1 flex flex-col justify-end">
-          <div className="max-w-6xl mx-auto w-full px-5 sm:px-8">
+        {/* Copy block — centered */}
+        <div className="flex-1 flex flex-col justify-center">
+          <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 flex flex-col items-center text-center">
             <h1 className="font-slab font-extrabold uppercase text-white leading-[0.86] text-5xl sm:text-7xl lg:text-8xl tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]" data-testid="team-overlay-headline">
               We Fight<br />For You
             </h1>
@@ -136,7 +136,7 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
               <path d="M6 15 C 130 3, 300 3, 414 12" stroke="#FACC15" strokeWidth="9" fill="none" strokeLinecap="round" />
             </svg>
             <p className="mt-4 text-white text-lg sm:text-2xl max-w-xl font-medium drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">
-              California's dedicated lemon law team — no fees unless we win.
+              California's dedicated Lemon Law team — no fees unless we win.
             </p>
             <button
               onClick={start}
