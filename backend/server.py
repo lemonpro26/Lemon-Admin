@@ -2987,8 +2987,8 @@ async def _run_quickbase_sync() -> dict:
     Returns counts. Shared by the hourly loop and the manual 'Sync now' button."""
     if not qb.is_configured():
         return {"success": False, "configured": False, "leads": 0, "calls": 0, "matched": 0}
-    leads = await db.leads.find({}, {"id": 1, "phone": 1}).to_list(5000)
-    calls = await db.calls.find({"is_test": {"$ne": True}}, {"id": 1, "caller_number": 1}).to_list(5000)
+    leads = await db.leads.find({}, {"id": 1, "phone": 1}).to_list(100000)
+    calls = await db.calls.find({"is_test": {"$ne": True}}, {"id": 1, "caller_number": 1}).to_list(100000)
     docs = [(l, db.leads) for l in leads] + [(c, db.calls) for c in calls]
     matched = 0
     for i in range(0, len(docs), 8):
