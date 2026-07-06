@@ -126,9 +126,9 @@ export function TeamOverlay({ sourcePage = 'tm', phone = COMPANY.phone, phoneHre
           </div>
         </header>
 
-        {/* Copy block — centered */}
-        <div className="flex-1 flex flex-col justify-center">
-          <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 flex flex-col items-center text-center">
+        {/* Copy block — centered horizontally, lowered */}
+        <div className="flex-1 flex flex-col justify-end pb-2">
+          <div className="max-w-6xl mx-auto w-full px-5 sm:px-8 flex flex-col items-center text-center mt-[14vh]">
             <h1 className="font-slab font-extrabold uppercase text-white leading-[0.86] text-5xl sm:text-7xl lg:text-8xl tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]" data-testid="team-overlay-headline">
               We Fight<br />For You
             </h1>
