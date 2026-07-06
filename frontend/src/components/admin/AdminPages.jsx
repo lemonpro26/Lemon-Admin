@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { LayoutGrid, Copy, Check, ExternalLink, Plus, Trash2, Save, Home as HomeIcon, FileText, Languages, FlaskConical, Link as LinkIcon, Pencil, ArrowLeft } from 'lucide-react';
+import { LayoutGrid, Copy, Check, ExternalLink, Plus, Trash2, Save, Home as HomeIcon, FileText, Languages, FlaskConical, Link as LinkIcon, Pencil, ArrowLeft, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,13 @@ const PAGE_GROUPS = [
     pages: [
       { key: 'dg', label: 'Demand Gen Video Calls (English)', path: '/dg', icon: FileText, desc: 'Demand Gen video-calls advertorial · calls (833) 240-9312 · source = dg.', editor: 'dg' },
       { key: 'dgs', label: 'Demand Gen Spanish Video Calls', path: '/dgs', icon: Languages, desc: 'Spanish Demand Gen video-calls advertorial · calls (833) 868-1802 · source = dgs.', editor: 'dgs' },
+    ],
+  },
+  {
+    title: 'Team Pages',
+    pages: [
+      { key: 'tm', label: 'We Fight For You — Overlay', path: '/tm', icon: Users, desc: 'Full-bleed attorney team hero · "See If You Qualify" · source = tm.' },
+      { key: 'tm2', label: 'We Fight For You — Split', path: '/tm2', icon: Users, desc: 'Split attorney team hero · "Check Your Vehicle" · source = tm2.' },
     ],
   },
   {
