@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, DollarSign, Trash2, Award } from 'lucide-react';
+import { FileText, DollarSign, Trash2, Award, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
@@ -9,7 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const fmtDate = (s) => { try { return new Date(s).toLocaleString(); } catch { return s || '\u2014'; } };
-const SRC = { lapa: 'PA (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish (sp)', dg: 'Demand Gen (dg)', dgs: 'Spanish DG (dgs)' };
+const SRC = {
+  lapa: 'PA page (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish Landing (sp)',
+  ladg: 'Demand Gen (ladg)', ladgs: 'Spanish Demand Gen (ladgs)',
+  latm: 'Team Attorneys — Overlay (latm)', latm2: 'Team Attorneys — Split (latm2)',
+  dg: 'Demand Gen (dg)', dgs: 'Spanish Demand Gen (dgs)',
+  tm: 'Team Attorneys — Overlay (tm)', tm2: 'Team Attorneys — Split (tm2)',
+};
 
 // Self-contained lead detail dialog reused wherever a lead needs opening
 // (Leads tab and the Calls-tab unified search).
@@ -25,7 +31,7 @@ export const LeadDetailDialog = ({ lead, open, onOpenChange, onChanged }) => {
   }, [lead]);
 
   if (!l) return null;
-  const name = l.qb_name || l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '\u2014';
+  const name = l.qb_name || l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || l.name || '\u2014';
   const vehicle = [l.car_year, l.car_make, l.car_model].filter(Boolean).join(' ') || '\u2014';
 
   const markSold = async () => {
@@ -65,13 +71,18 @@ export const LeadDetailDialog = ({ lead, open, onOpenChange, onChanged }) => {
     ['Email', l.email, 'ld-email'],
     ['Vehicle', vehicle, 'ld-vehicle'],
     ['Source', SRC[l.source_page] || l.source_page || 'home', 'ld-source'],
+    ['Campaign', l.campaign_name || l.campaign_id, 'ld-campaign'],
+    ['Ad Group', l.adgroup_name || l.adgroup_id, 'ld-adgroup'],
+    ['Ad', l.ad_name || l.ad_id, 'ld-ad'],
+    ['Keyword', l.keyword, 'ld-keyword'],
+    ['GCLID', l.gclid, 'ld-gclid'],
     ['IP Address', l.ip, 'ld-ip'],
     ['When', fmtDate(l.created_at), 'ld-when'],
   ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" data-testid="shared-lead-detail">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="shared-lead-detail">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-blue-600" /> Lead detail
@@ -85,6 +96,38 @@ export const LeadDetailDialog = ({ lead, open, onOpenChange, onChanged }) => {
               <span className="font-medium text-slate-900 text-right break-all" data-testid={tid}>{val || '\u2014'}</span>
             </div>
           ))}
+
+          {l.saw_landing_page && (
+            <div className="mt-2 rounded-xl border border-slate-200 p-4 bg-white" data-testid="ld-hook-section">
+              <div className="flex items-center gap-2 mb-2">
+                <FlaskConical className="h-4 w-4 text-indigo-600" />
+                <span className="font-semibold text-slate-900 text-sm">Landing page &amp; hook</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700" data-testid="ld-hook-label">
+                  {l.hook_label || 'Default hook'}
+                </span>
+                {l.hook1 && <p className="text-slate-900 font-semibold mt-2" data-testid="ld-hook1">{l.hook1}</p>}
+                {l.hook2 && <p className="text-slate-600 mt-1" data-testid="ld-hook2">{l.hook2}</p>}
+                <div className="mt-3 grid gap-1.5 border-t border-slate-100 pt-3">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Landing page</span>
+                    <span className="font-medium text-slate-900 text-right break-all" data-testid="ld-landing-path">{l.landing_path || '\u2014'}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Last click</span>
+                    <span className="font-medium text-slate-900 text-right" data-testid="ld-last-click">{l.last_click_at ? fmtDate(l.last_click_at) : '\u2014'}</span>
+                  </div>
+                  {l.click_visits > 1 && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-slate-500">Visits before submitting</span>
+                      <span className="font-medium text-slate-900 text-right" data-testid="ld-visits">{l.click_visits}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {editable && (
             <div className="mt-2 grid gap-2">

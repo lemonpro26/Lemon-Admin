@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign, Database } from 'lucide-react';
+import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign, Database, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
@@ -9,6 +9,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { DateRangeFilter, allTimeRange } from '@/components/admin/DateRangeFilter';
+import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
+import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
 
 const fmtDate = (s) => {
   if (!s) return '\u2014';
@@ -133,6 +135,7 @@ export const AdminRetained = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [syncingQb, setSyncingQb] = useState(false);
+  const [viewing, setViewing] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -275,6 +278,7 @@ export const AdminRetained = () => {
                   <TableHead className="hidden sm:table-cell">Revenue</TableHead>
                   <TableHead className="hidden md:table-cell">Came in on</TableHead>
                   <TableHead>Retained on</TableHead>
+                  <TableHead className="text-right">Detail</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -307,6 +311,15 @@ export const AdminRetained = () => {
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-slate-500 text-sm whitespace-nowrap" data-testid={`retained-camein-${it.id}`}>{fmtDate(it.created_at)}</TableCell>
                     <TableCell className="text-slate-500 text-sm whitespace-nowrap"><RetainedDateCell item={it} onSave={saveRetainedDate} /></TableCell>
+                    <TableCell className="text-right">
+                      <button
+                        onClick={() => setViewing(it)}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0F1B3D] hover:text-indigo-600 transition-colors"
+                        data-testid={`retained-view-${it.id}`}
+                      >
+                        <Eye className="h-4 w-4" /> View
+                      </button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -314,6 +327,19 @@ export const AdminRetained = () => {
           </div>
         )}
       </div>
+
+      <CallDetailDialog
+        call={viewing?.type === 'call' ? viewing : null}
+        open={!!viewing && viewing.type === 'call'}
+        onOpenChange={(o) => !o && setViewing(null)}
+        onChanged={load}
+      />
+      <LeadDetailDialog
+        lead={viewing?.type === 'lead' ? viewing : null}
+        open={!!viewing && viewing.type === 'lead'}
+        onOpenChange={(o) => !o && setViewing(null)}
+        onChanged={load}
+      />
     </div>
   );
 };

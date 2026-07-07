@@ -3226,6 +3226,15 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
             "conversion_status": l.get("conversion_status"),
             "conversion_validate_only": bool(l.get("conversion_validate_only")),
             "retained_at": l.get("retained_at"), "created_at": l.get("created_at"),
+            "retained": True,
+            # Vehicle parts + attribution for the rich detail popup
+            "car_year": l.get("car_year"), "car_make": l.get("car_make"), "car_model": l.get("car_model"),
+            "campaign_id": l.get("campaign_id"), "campaign_name": l.get("campaign_name"),
+            "adgroup_id": l.get("adgroup_id"), "adgroup_name": l.get("adgroup_name"),
+            "ad_id": l.get("ad_id"), "ad_name": l.get("ad_name"),
+            "keyword": l.get("keyword"), "gclid": l.get("gclid"),
+            "network": l.get("network"), "ip": l.get("ip"),
+            "conversion_detail": l.get("conversion_detail"),
         })
     for c in calls:
         items.append({
@@ -3242,6 +3251,23 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
             "conversion_status": c.get("conversion_status"),
             "conversion_validate_only": bool(c.get("conversion_validate_only")),
             "retained_at": c.get("retained_at"), "created_at": c.get("created_at"),
+            "retained": True,
+            # Attribution + hook/landing details for the rich detail popup
+            "caller_number": c.get("caller_number"), "caller_name": c.get("caller_name"),
+            "tracking_number": c.get("tracking_number"), "duration": c.get("duration"),
+            "called_at": c.get("called_at"), "city": c.get("city"), "state": c.get("state"),
+            "campaign_id": c.get("campaign_id"), "campaign_name": c.get("campaign_name"),
+            "google_campaign": c.get("google_campaign"), "campaign": c.get("campaign"),
+            "adgroup_id": c.get("adgroup_id"), "adgroup_name": c.get("adgroup_name"),
+            "ad_id": c.get("ad_id"), "ad_name": c.get("ad_name"),
+            "keyword": c.get("keyword"), "gclid": c.get("gclid"), "network": c.get("network"),
+            "saw_landing_page": c.get("saw_landing_page"), "hook_label": c.get("hook_label"),
+            "hook1": c.get("hook1"), "hook2": c.get("hook2"),
+            "landing_path": c.get("landing_path"), "last_click_at": c.get("last_click_at"),
+            "click_visits": c.get("click_visits"),
+            "google_matched": c.get("google_matched"), "google_call_type": c.get("google_call_type"),
+            "google_call_status": c.get("google_call_status"),
+            "conversion_detail": c.get("conversion_detail"),
         })
     items.sort(key=lambda x: x.get("retained_at") or "", reverse=True)
     total_revenue = round(sum(float(i.get("sale_value") or 0) for i in items if i.get("sale_status") == "sold"), 2)
