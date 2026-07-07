@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07 (cont. 3)
+- FEATURE: Team pages (/tm, /tm2) now available in the Split Test tab, and future pages auto-appear. Extracted the built-in landing-page registry into a single source of truth `lib/landingPages.jsx` (`PAGE_GROUPS` + derived `SPLIT_TESTABLE_PAGES`, excludes the /split router entry). AdminPages.jsx and AdminSplitTest.jsx both consume it, so any built-in page added to the registry is automatically split-testable. Custom pages created in the Pages tab already auto-merge into Split Test (existing logic). Verified via screenshot: split-test page dropdown now lists /tm and /tm2 with all other pages.
+
 ## 2026-07-07 (cont. 2)
 - FEATURE: Real Google Ads spend in the Channels tab (by day). Added `google_names_service.fetch_spend_by_day(start,end)` (GAQL `SELECT segments.date, metrics.cost_micros FROM customer WHERE segments.date BETWEEN ...`) and endpoint `GET /admin/channels/summary?start&end`. Google column is now REAL — spend + daily breakdown from Google Ads API; calls/leads/retained/revenue from our DB (all current traffic = Google). Facebook/Instagram/Native return 0. `AdminChannels.jsx` rewritten to fetch live data, added a DateRangeFilter (default last 30 days), a "Google spend by day" bar chart, and CPL/ROAS computed from real spend (show "—" when spend/leads are 0). Verified via curl: last-7d total $17,185.56 with correct per-day values; others 0. Screenshot confirmed rendering.
 

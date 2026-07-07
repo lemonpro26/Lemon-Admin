@@ -6,15 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
+import { SPLIT_TESTABLE_PAGES } from '@/lib/landingPages';
 
-const BUILTIN_PAGES = [
-  { label: 'Home (Main)', path: '/' },
-  { label: 'PA Advertorial', path: '/pa' },
-  { label: 'Spanish', path: '/sp' },
-  { label: 'Spanish PA', path: '/spa' },
-  { label: 'Demand Gen', path: '/dg' },
-  { label: 'Demand Gen Spanish', path: '/dgs' },
-];
+// All built-in landing pages come from the shared registry, so any page added
+// to the Pages directory (incl. Team pages) is automatically split-testable.
+const BUILTIN_PAGES = SPLIT_TESTABLE_PAGES;
 
 const STATUS_STYLE = {
   running: 'bg-emerald-50 text-emerald-700 border-emerald-200',

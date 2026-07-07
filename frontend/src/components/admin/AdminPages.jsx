@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { LayoutGrid, Copy, Check, ExternalLink, Plus, Trash2, Save, Home as HomeIcon, FileText, Languages, FlaskConical, Link as LinkIcon, Pencil, ArrowLeft, Users } from 'lucide-react';
+import { LayoutGrid, Copy, Check, ExternalLink, Plus, Trash2, Save, Link as LinkIcon, Pencil, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -7,45 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AdminPAContent } from '@/components/admin/AdminPAContent';
 import { AdminPageContent } from '@/components/admin/AdminPageContent';
-
-// Built-in pages that ship with the app (real routes), organized into groups.
-// `editor` marks pages with an inline content CMS (preview + publish).
-const PAGE_GROUPS = [
-  {
-    title: 'Home Pages',
-    pages: [
-      { key: 'home', label: 'Home (Main Landing)', path: '/', icon: HomeIcon, desc: 'Primary English landing page.', editor: 'home' },
-      { key: 'sp', label: 'Spanish Landing', path: '/sp', icon: Languages, desc: 'Full Spanish funnel (source = sp).', editor: 'sp' },
-    ],
-  },
-  {
-    title: 'PA Pages',
-    pages: [
-      { key: 'pa', label: 'PA Advertorial (English)', path: '/pa', icon: FileText, desc: 'Presell / advertorial page (source = lapa).', editor: 'pa' },
-      { key: 'spa', label: 'PA Advertorial (Spanish)', path: '/spa', icon: Languages, desc: 'Spanish presell / advertorial page (source = laspa).', editor: 'spa' },
-    ],
-  },
-  {
-    title: 'Demand Gen Pages',
-    pages: [
-      { key: 'dg', label: 'Demand Gen Video Calls (English)', path: '/dg', icon: FileText, desc: 'Demand Gen video-calls advertorial · calls (833) 240-9312 · source = dg.', editor: 'dg' },
-      { key: 'dgs', label: 'Demand Gen Spanish Video Calls', path: '/dgs', icon: Languages, desc: 'Spanish Demand Gen video-calls advertorial · calls (833) 868-1802 · source = dgs.', editor: 'dgs' },
-    ],
-  },
-  {
-    title: 'Team Pages',
-    pages: [
-      { key: 'tm', label: 'We Fight For You — Overlay', path: '/tm', icon: Users, desc: 'Full-bleed attorney team hero · "See If You Qualify" · source = tm.', editor: 'tm' },
-      { key: 'tm2', label: 'We Fight For You — Split', path: '/tm2', icon: Users, desc: 'Split attorney team hero · "Check Your Vehicle" · source = tm2.', editor: 'tm2' },
-    ],
-  },
-  {
-    title: 'Split Tests',
-    pages: [
-      { key: 'split', label: 'A/B Split Test Entry', path: '/split', icon: FlaskConical, desc: 'Routes visitors between pages by your split weight (managed in the Split Test tab).' },
-    ],
-  },
-];
+import { PAGE_GROUPS } from '@/lib/landingPages';
 
 const AD_EDITORS = ['pa', 'spa', 'dg', 'dgs'];
 
