@@ -136,6 +136,34 @@ def _search(c, token, query):
     return rows
 
 
+def fetch_spend_by_day(start: str, end: str) -> dict:
+    """Return real Google Ads account spend for a date range:
+    {"total": float, "by_day": [{"date": "YYYY-MM-DD", "cost": float}], "currency": str}.
+    Dates are 'YYYY-MM-DD'. Returns zeros if not configured / on error."""
+    empty = {"total": 0.0, "by_day": [], "currency": "USD"}
+    if not is_configured():
+        return empty
+    c = _cfg()
+    try:
+        token = _access_token(c)
+        q = (f"SELECT segments.date, metrics.cost_micros, customer.currency_code "
+             f"FROM customer WHERE segments.date BETWEEN '{start}' AND '{end}' "
+             f"ORDER BY segments.date")
+        rows = _search(c, token, q)
+        by_day, total, currency = [], 0, "USD"
+        for r in rows:
+            micros = int(r.get("metrics", {}).get("costMicros", 0) or 0)
+            date = r.get("segments", {}).get("date", "")
+            currency = r.get("customer", {}).get("currencyCode", currency)
+            total += micros
+            by_day.append({"date": date, "cost": round(micros / 1_000_000, 2)})
+        return {"total": round(total / 1_000_000, 2), "by_day": by_day, "currency": currency}
+    except Exception as e:
+        logger.info("Google spend fetch failed: %s", e)
+        return empty
+
+
+
 def fetch_names() -> dict:
     """Return {"campaign": {id: name}, "adgroup": {id: name}, "ad": {id: name},
     "sitelink": {id: link_text}, "campaign_type": {id: channel_type},

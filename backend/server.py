@@ -3158,6 +3158,41 @@ async def mark_call_retained(call_id: str, body: RetainedBody, _: dict = Depends
     return {"success": True, "call_id": call_id, **fields}
 
 
+@api_router.get("/admin/channels/summary")
+async def admin_channels_summary(start: str = "", end: str = "", _: dict = Depends(require_admin)):
+    """Per-network breakdown for the Channels tab. Google is REAL (spend from the
+    Google Ads API by day; calls/leads/retained/revenue from our DB — all current
+    traffic is Google). Facebook / Instagram / Native return zeros until network
+    attribution goes live."""
+    from datetime import date, timedelta
+    if not end:
+        end = date.today().isoformat()
+    if not start:
+        start = (date.today() - timedelta(days=29)).isoformat()
+    s_iso, e_iso, _d = _date_range(start, end)
+
+    leads_count = await db.leads.count_documents({"created_at": {"$gte": s_iso, "$lte": e_iso}})
+    calls_count = await db.calls.count_documents({"is_test": {"$ne": True}, "created_at": {"$gte": s_iso, "$lte": e_iso}})
+    retained_count = (await db.leads.count_documents({"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}})
+                      + await db.calls.count_documents({"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}))
+    revenue = 0.0
+    for coll in (db.leads, db.calls):
+        async for d in coll.find({"sale_status": "sold", "created_at": {"$gte": s_iso, "$lte": e_iso}}, {"sale_value": 1, "_id": 0}):
+            revenue += float(d.get("sale_value") or 0)
+
+    spend = await asyncio.to_thread(gnames.fetch_spend_by_day, start, end)
+    google = {
+        "calls": calls_count, "leads": leads_count, "retained": retained_count,
+        "revenue": round(revenue, 2), "spend": spend.get("total", 0.0),
+        "spend_by_day": spend.get("by_day", []), "currency": spend.get("currency", "USD"),
+        "live": True,
+    }
+    zero = {"calls": 0, "leads": 0, "retained": 0, "revenue": 0.0, "spend": 0.0, "spend_by_day": [], "live": False}
+    return {"range": {"start": start, "end": end},
+            "networks": {"google": google, "facebook": dict(zero), "instagram": dict(zero), "native": dict(zero)}}
+
+
+
 @api_router.get("/admin/retained")
 async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(require_admin)):
     """Combined list of every retained lead + call (your retained clients)."""
