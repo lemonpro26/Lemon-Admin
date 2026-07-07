@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07 (cont. 8)
+- FEATURE: Added a "Meet Your Legal Team" section with the group attorney photo to /pa (English) and /spa (Spanish), placed between the qualify section and Step 1. Downloaded + optimized the team photo to /public/team-attorneys.jpg (1400px, 194KB). Section matches page style (amber eyebrow, slab heading, rounded full-width photo, red CTA → funnel start). Fully responsive/mobile-optimized (w-full auto-height image, max-w-3xl container, scaling headline). Approved by user. Copy currently hardcoded (not CMS-editable yet). Pending user Redeploy to reach production.
+
 ## 2026-07-07 (cont. 7)
 - CHANGE: Pages tab now DISPLAYS the full Google Ads tracking URL (not just on copy) for every row — built-in pages and custom saved pages alike (all render via `PageRow`, shown value switched to `trackedUrl`). Verified via screenshot: all rows show `{origin}{path}/?tg_ref={campaignid}&…&target={target}`.
 
