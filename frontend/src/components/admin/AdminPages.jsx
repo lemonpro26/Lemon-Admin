@@ -37,7 +37,7 @@ function PageRow({ icon: Icon, label, desc, path, origin, onDelete, onEdit, canE
           {onEdit && <span className="text-[10px] font-sans font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">Editable</span>}
         </div>
         {desc && <div className="text-xs text-slate-500 truncate">{desc}</div>}
-        <code className="text-xs text-slate-600 break-all">{url}</code>
+        <code className="text-xs text-slate-600 break-all">{trackedUrl}</code>
       </div>
       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
         {onEdit && canEdit && (

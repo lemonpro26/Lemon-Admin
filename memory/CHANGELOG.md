@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07 (cont. 7)
+- CHANGE: Pages tab now DISPLAYS the full Google Ads tracking URL (not just on copy) for every row — built-in pages and custom saved pages alike (all render via `PageRow`, shown value switched to `trackedUrl`). Verified via screenshot: all rows show `{origin}{path}/?tg_ref={campaignid}&…&target={target}`.
+
 ## 2026-07-07 (cont. 6)
 - FEATURE: Every landing-page link copied from the admin now includes the Google Ads ValueTrack tracking suffix (`/?tg_ref={campaignid}&adgroup_id={adgroupid}&keyword={keyword}&sub2={creative}&feeditemid=…&target={target}`). Added `AD_TRACKING_QS` + `withAdTracking(base)` to `lib/tracking.js`; Pages tab Copy button (AdminPages.jsx `PageRow`) and Split Test entry-URL copy (AdminSplitTest.jsx) now copy the tracked URL (display + Open stay clean). Params map to existing capture (tg_ref→campaign_id, adgroup_id, keyword, sub2→ad_id + passthrough). Verified via clipboard read: copied home URL = `{origin}/?tg_ref={campaignid}&…&target={target}`.
 
