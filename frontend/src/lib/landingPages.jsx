@@ -29,8 +29,8 @@ export const PAGE_GROUPS = [
   {
     title: 'Team Pages',
     pages: [
-      { key: 'tm', label: 'We Fight For You — Overlay', path: '/tm', icon: Users, desc: 'Full-bleed attorney team hero · "See If You Qualify" · source = tm.', editor: 'tm' },
-      { key: 'tm2', label: 'We Fight For You — Split', path: '/tm2', icon: Users, desc: 'Split attorney team hero · "Check Your Vehicle" · source = tm2.', editor: 'tm2' },
+      { key: 'tm', label: 'Team Attorneys — Overlay', path: '/tm', icon: Users, desc: 'Full-bleed attorney team hero · "See If You Qualify" · source = tm.', editor: 'tm' },
+      { key: 'tm2', label: 'Team Attorneys — Split', path: '/tm2', icon: Users, desc: 'Split attorney team hero · "Check Your Vehicle" · source = tm2.', editor: 'tm2' },
     ],
   },
   {

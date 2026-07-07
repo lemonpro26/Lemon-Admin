@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07 (cont. 4)
+- CHANGE: Renamed the team landing pages from "We Fight For You" to "Team Attorneys" everywhere — on-page headline (line1 "Team" / line2 "Attorneys") on /tm & /tm2, Pages tab labels, Split Test dropdown (via shared landingPages.jsx), AdminPageContent editor titles, lead-detail Source labels, and backend/frontend DEFAULT_TM/TM2 content. Cleared the stored `tm_content` override in site_config so the new default headline applies. Verified: /tm and /tm2 render "TEAM ATTORNEYS".
+
 ## 2026-07-07 (cont. 3)
 - FEATURE: Team pages (/tm, /tm2) now available in the Split Test tab, and future pages auto-appear. Extracted the built-in landing-page registry into a single source of truth `lib/landingPages.jsx` (`PAGE_GROUPS` + derived `SPLIT_TESTABLE_PAGES`, excludes the /split router entry). AdminPages.jsx and AdminSplitTest.jsx both consume it, so any built-in page added to the registry is automatically split-testable. Custom pages created in the Pages tab already auto-merge into Split Test (existing logic). Verified via screenshot: split-test page dropdown now lists /tm and /tm2 with all other pages.
 

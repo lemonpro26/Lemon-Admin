@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 const PAGE_META = {
   home: { path: '/', label: 'Home', noun: 'home' },
   sp: { path: '/sp', label: 'Spanish', noun: 'Spanish' },
-  tm: { path: '/tm', label: 'We Fight For You — Overlay', noun: 'tm' },
-  tm2: { path: '/tm2', label: 'We Fight For You — Split', noun: 'tm2' },
+  tm: { path: '/tm', label: 'Team Attorneys — Overlay', noun: 'tm' },
+  tm2: { path: '/tm2', label: 'Team Attorneys — Split', noun: 'tm2' },
 };
 
 const LANDING_FIELDS = [

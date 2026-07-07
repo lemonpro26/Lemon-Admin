@@ -326,16 +326,16 @@ DEFAULT_SP_CONTENT = {
     "free_consult": "Consulta 100% Gratis",
     "no_win_no_fee": "Si No Gana, No Paga",
 }
-# Editable copy for the "We Fight For You" team landing pages (/tm overlay, /tm2 split).
+# Editable copy for the "Team Attorneys" team landing pages (/tm overlay, /tm2 split).
 DEFAULT_TM_CONTENT = {
-    "headline_line1": "We Fight",
-    "headline_line2": "For You",
+    "headline_line1": "Team",
+    "headline_line2": "Attorneys",
     "subhead": "California's dedicated Lemon Law team — no fees unless we win.",
     "cta": "See If You Qualify",
 }
 DEFAULT_TM2_CONTENT = {
-    "headline_line1": "We Fight",
-    "headline_line2": "For You",
+    "headline_line1": "Team",
+    "headline_line2": "Attorneys",
     "subhead": "Meet the attorney team taking on the automakers for California drivers.",
     "cta": "Check Your Vehicle",
 }

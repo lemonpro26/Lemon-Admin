@@ -50,14 +50,14 @@ function useTeamFunnel({ sourcePage, phone, phoneHref }) {
 // Each page fetches /page-content/{tm|tm2} (Pages CMS overrides) and falls back
 // to these so it never breaks.
 const TM_DEFAULTS = {
-  headline_line1: 'We Fight',
-  headline_line2: 'For You',
+  headline_line1: 'Team',
+  headline_line2: 'Attorneys',
   subhead: "California's dedicated Lemon Law team — no fees unless we win.",
   cta: 'See If You Qualify',
 };
 const TM2_DEFAULTS = {
-  headline_line1: 'We Fight',
-  headline_line2: 'For You',
+  headline_line1: 'Team',
+  headline_line2: 'Attorneys',
   subhead: 'Meet the attorney team taking on the automakers for California drivers.',
   cta: 'Check Your Vehicle',
 };
