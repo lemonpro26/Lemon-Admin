@@ -282,6 +282,31 @@ export default function PresellPA({
           className="w-full h-44 sm:h-56 object-cover rounded-2xl shadow-md mt-6"
         />
 
+        {/* Meet the team */}
+        <div className="mt-10" data-testid="pa-team">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">Meet Your Legal Team</p>
+          <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-1">
+            A Full Team of California Lemon Law Attorneys
+          </h2>
+          <img
+            src="/team-attorneys.jpg"
+            alt="The Lemon Pros attorney team"
+            className="w-full object-cover rounded-2xl shadow-md mt-4"
+            data-testid="pa-team-photo"
+          />
+          <p className="mt-4 text-[17px] leading-relaxed text-slate-700">
+            When you call The Lemon Pros, an entire team of experienced attorneys goes to work for you — not a call center. We take on the automakers directly, and you pay <span className="font-semibold text-slate-900">nothing unless we win</span>.
+          </p>
+          <button
+            onClick={() => start()}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold px-6 py-3 transition-colors"
+            data-testid="pa-team-cta"
+          >
+            See If You Qualify <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+
+
         {/* Step 1 */}
         <div className="mt-10">
           <p className="font-bold text-slate-900 text-lg">

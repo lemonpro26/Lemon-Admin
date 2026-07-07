@@ -233,6 +233,31 @@ export default function PresellSPA({
 
         <img src={LOT_PA} alt="Fila de vehículos en un concesionario" className="w-full h-44 sm:h-56 object-cover rounded-2xl shadow-md mt-6" />
 
+        {/* Conozca al equipo */}
+        <div className="mt-10" data-testid="spa-team">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">Conozca a Su Equipo Legal</p>
+          <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-1">
+            Un Equipo Completo de Abogados de Ley Limón en California
+          </h2>
+          <img
+            src="/team-attorneys.jpg"
+            alt="El equipo de abogados de The Lemon Pros"
+            className="w-full object-cover rounded-2xl shadow-md mt-4"
+            data-testid="spa-team-photo"
+          />
+          <p className="mt-4 text-[17px] leading-relaxed text-slate-700">
+            Cuando llama a The Lemon Pros, un equipo completo de abogados con experiencia trabaja para usted — no un centro de llamadas. Enfrentamos a los fabricantes directamente y usted no paga <span className="font-semibold text-slate-900">nada a menos que ganemos</span>.
+          </p>
+          <button
+            onClick={() => start()}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold px-6 py-3 transition-colors"
+            data-testid="spa-team-cta"
+          >
+            Vea Si Califica <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+
+
         <div className="mt-10">
           <p className="font-bold text-slate-900 text-lg"><span className="text-[#E0A800]">Paso 1:</span> {c.step1_label}</p>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3" data-testid="spa-make-grid">
