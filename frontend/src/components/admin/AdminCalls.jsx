@@ -3,6 +3,7 @@ import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus,
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
+import { NetworkChips, getNetwork } from '@/lib/networks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -97,6 +98,7 @@ export const AdminCalls = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [seg, setSeg] = useState('all');
+  const [network, setNetwork] = useState('all');
   const [cols, setCols] = useState(loadCols);
   const [matchedLeads, setMatchedLeads] = useState([]);
   const [openedLead, setOpenedLead] = useState(null);
@@ -121,7 +123,7 @@ export const AdminCalls = () => {
     acc[s.key] = s.key === 'all' ? calls.length : calls.filter((c) => inSeg(s.key, c)).length;
     return acc;
   }, {});
-  const shownCalls = sortedCalls.filter((c) => inSeg(seg, c));
+  const shownCalls = sortedCalls.filter((c) => inSeg(seg, c) && (network === 'all' || getNetwork(c) === network));
   const colSpanCount = COLS.filter((k) => cols[k.key]).length + 2; // + Caller + Actions
 
   useEffect(() => {
@@ -341,6 +343,11 @@ export const AdminCalls = () => {
             <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${seg === s.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`call-seg-count-${s.key}`}>{segCounts[s.key]}</span>
           </button>
         ))}
+      </div>
+
+      {/* Network filter (mockup) — separate calls by traffic source */}
+      <div className="mt-3">
+        <NetworkChips items={sortedCalls} value={network} onChange={setNetwork} testidPrefix="call-network" />
       </div>
 
       {debouncedSearch.trim() && matchedLeads.length > 0 && (

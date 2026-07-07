@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid, Filter,
-  FileText, Percent, Sigma, Search, X, AlertTriangle, Award, SlidersHorizontal,
+  FileText, Percent, Sigma, Search, X, AlertTriangle, Award, SlidersHorizontal, Share2,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -35,6 +35,8 @@ import { AdminSpanish } from '@/components/admin/AdminSpanish';
 import { AdminPages } from '@/components/admin/AdminPages';
 import { AdminFunnel } from '@/components/admin/AdminFunnel';
 import { AdminRetained } from '@/components/admin/AdminRetained';
+import { AdminChannels } from '@/components/admin/AdminChannels';
+import { NetworkChips, getNetwork } from '@/lib/networks';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
@@ -123,6 +125,7 @@ export default function AdminDashboard() {
   const [openedCall, setOpenedCall] = useState(null);
   const [leadSeg, setLeadSeg] = useState('all');
   const [leadCampaign, setLeadCampaign] = useState('all');
+  const [leadNetwork, setLeadNetwork] = useState('all');
   const [leadCols, setLeadCols] = useState(loadLeadCols);
   useEffect(() => { try { localStorage.setItem(LEAD_COLS_KEY, JSON.stringify(leadCols)); } catch { /* ignore */ } }, [leadCols]);
   const toggleLeadCol = (k) => setLeadCols((p) => ({ ...p, [k]: !p[k] }));
@@ -184,7 +187,8 @@ export default function AdminDashboard() {
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   })();
   const shownLeads = segLeads.filter(
-    (l) => leadCampaign === 'all' || leadCampaignKey(l) === leadCampaign,
+    (l) => (leadCampaign === 'all' || leadCampaignKey(l) === leadCampaign)
+      && (leadNetwork === 'all' || getNetwork(l) === leadNetwork),
   );
   // Switching source segment resets the campaign sub-filter (campaigns differ per source).
   const selectLeadSeg = (key) => { setLeadSeg(key); setLeadCampaign('all'); };
@@ -437,6 +441,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.total_calls ?? 0})</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
             <TabsTrigger value="retained" data-testid="admin-tab-retained"><Award className="h-4 w-4 mr-2" /> Retained ({stats?.total_retained ?? 0})</TabsTrigger>
+            <TabsTrigger value="channels" data-testid="admin-tab-channels"><Share2 className="h-4 w-4 mr-2" /> Channels</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
           </TabsList>
 
@@ -594,6 +599,11 @@ export default function AdminDashboard() {
               </DropdownMenu>
             </div>
 
+            {/* Network filter (mockup) — separate a lead by traffic source */}
+            <div className="mb-4 -mt-1">
+              <NetworkChips items={segLeads} value={leadNetwork} onChange={setLeadNetwork} testidPrefix="lead-network" />
+            </div>
+
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               {loading ? (
                 <div className="p-12 text-center text-slate-500" data-testid="admin-leads-loading">Loading leads…</div>
@@ -749,6 +759,11 @@ export default function AdminDashboard() {
           {/* RETAINED */}
           <TabsContent value="retained">
             <AdminRetained />
+          </TabsContent>
+
+          {/* CHANNELS (mockup) */}
+          <TabsContent value="channels">
+            <AdminChannels />
           </TabsContent>
 
           {/* SETTINGS */}

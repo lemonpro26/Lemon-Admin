@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07
+- FEATURE (MOCKUP, visual-only): Multi-network (traffic source) separation preview. Added new "Channels" admin tab (`AdminChannels.jsx`) with a per-network breakdown — Google / Facebook / Instagram / Native — showing Calls, Leads, Retained, Revenue, Spend, CPL, ROAS + revenue-share bars and totals, all placeholder numbers with a clear "design preview" banner. Added `NetworkChips` + shared config in `lib/networks.jsx` (backend-ready: `network` derived from utm_source/utm_medium + click IDs fbclid/gclid/ttclid; `getNetwork()` defaults existing records to `google`). Wired network filter chip rows into Calls (AdminCalls.jsx) and Leads (AdminDashboard.jsx) tabs with a "Preview" badge. NO backend/DB changes yet — next step is to make it real (add `network` field, capture UTM+click IDs on landing, group API stats by network). Verified via screenshot: 4 cards + table render; chips present on both tabs.
+
 ## 2026-07-06 (cont. 10)
 - FEATURE: Added an "Attributed" filter chip to the Calls tab (next to All / Home & PA / Spanish / Demand Gen). Shows only calls tied to an ad/campaign (`campaign_name` or `google_campaign`), with a live count. `callHasAttribution()` helper + `inSeg` handles the new segment key. Verified: with 2 calls (1 attributed), chip counted 1 and filtered to just that call.
 
