@@ -44,11 +44,15 @@ const loadCols = () => {
 // Call segments keyed on the DIALED tracking number (reliable for every call).
 const CALL_SEGMENTS = [
   { key: 'all', label: 'All' },
+  { key: 'attributed', label: 'Attributed' },
   { key: 'home_pa', label: 'Home & PA', hint: '844-335-8911' },
   { key: 'spanish', label: 'Spanish', hint: '866-524-3722' },
   { key: 'dg', label: 'Demand Gen', hint: '833-240-9312' },
   { key: 'dgs', label: 'Demand Gen Spanish', hint: '833-868-1802' },
 ];
+
+// A call is "attributed" when we can tie it to an ad/campaign.
+const callHasAttribution = (c) => !!(c.campaign_name || c.google_campaign);
 
 
 const GCALL_TYPE_LABELS = {
@@ -110,8 +114,9 @@ export const AdminCalls = () => {
   }, [cols]);
   const toggleCol = (k) => setCols((prev) => ({ ...prev, [k]: !prev[k] }));
 
-  // Segment calls by the DIALED tracking number (number_group from the backend).
-  const inSeg = (s, c) => s === 'all' || (c.number_group || 'other') === s;
+  // Segment calls by the DIALED tracking number (number_group), plus an
+  // "attributed" segment that shows only calls tied to an ad/campaign.
+  const inSeg = (s, c) => s === 'all' || (s === 'attributed' ? callHasAttribution(c) : (c.number_group || 'other') === s);
   const segCounts = CALL_SEGMENTS.reduce((acc, s) => {
     acc[s.key] = s.key === 'all' ? calls.length : calls.filter((c) => inSeg(s.key, c)).length;
     return acc;

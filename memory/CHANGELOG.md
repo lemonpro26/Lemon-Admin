@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-06 (cont. 10)
+- FEATURE: Added an "Attributed" filter chip to the Calls tab (next to All / Home & PA / Spanish / Demand Gen). Shows only calls tied to an ad/campaign (`campaign_name` or `google_campaign`), with a live count. `callHasAttribution()` helper + `inSeg` handles the new segment key. Verified: with 2 calls (1 attributed), chip counted 1 and filtered to just that call.
+
 ## 2026-07-06 (cont. 9)
 - FEATURE: Calls list now shows a violet "attribution" pill (Target icon + campaign name) under the caller name whenever a call has ad/campaign attribution (`campaign_name` from click match or `google_campaign` from call_view). Hover tooltip shows "Ad attribution: {campaign} › {ad group}". Lets the owner scan which calls are tied to ads at a glance. `data-testid=call-attribution-badge-{id}`. Verified via screenshot: attributed call showed "🎯 01. Los Angeles [E]".
 
