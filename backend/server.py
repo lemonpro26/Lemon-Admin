@@ -3070,16 +3070,22 @@ def _normalize_retained_at(value: Optional[str]) -> str:
 
 async def _enrich_from_quickbase(doc: dict, collection) -> dict:
     """Look up the client's full name + email in Quickbase by phone and persist
-    them onto the doc as qb_name/qb_email. Best-effort, read-only, runs once."""
+    them onto the doc as qb_name/qb_email. Best-effort, read-only.
+
+    IMPORTANT: only writes a name/email when Quickbase actually returns one. A
+    failed / rate-limited / no-match lookup must NEVER overwrite a previously
+    found name with a blank (that used to blank out good names on transient
+    errors during the hourly sweep)."""
     if not qb.is_configured():
         return {}
     phone = doc.get("phone") or doc.get("caller_number") or ""
     res = await asyncio.to_thread(qb.lookup_by_phone, phone) if phone else None
-    fields = {
-        "qb_lookup_at": _now_iso(),
-        "qb_name": (res or {}).get("name", ""),
-        "qb_email": (res or {}).get("email", ""),
-    }
+    name = (res or {}).get("name", "").strip()
+    fields = {"qb_lookup_at": _now_iso()}
+    if name:
+        fields["qb_name"] = name
+        fields["qb_email"] = (res or {}).get("email", "")
+    # else: leave any existing qb_name/qb_email untouched (never clobber a good name)
     await collection.update_one({"id": doc["id"]}, {"$set": fields})
     doc.update(fields)
     return fields
@@ -3096,8 +3102,8 @@ async def _run_quickbase_sync() -> dict:
     matched = 0
     for i in range(0, len(docs), 8):
         batch = docs[i:i + 8]
-        results = await asyncio.gather(*[_enrich_from_quickbase(d, coll) for d, coll in batch])
-        matched += sum(1 for r in results if (r or {}).get("qb_name"))
+        results = await asyncio.gather(*[_enrich_from_quickbase(d, coll) for d, coll in batch], return_exceptions=True)
+        matched += sum(1 for r in results if isinstance(r, dict) and r.get("qb_name"))
     logger.info("Quickbase sync: %s leads + %s calls, %s matched to a name", len(leads), len(calls), matched)
     return {"success": True, "leads": len(leads), "calls": len(calls), "matched": matched}
 
@@ -3163,12 +3169,13 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
     calls = await db.calls.find(q, {"_id": 0}).sort("retained_at", -1).to_list(length=2000)
     calls = await _enrich_calls_with_hooks(calls)
     # Auto-fill name + email from Quickbase (by phone) for any retained item that
-    # hasn't been looked up yet — so it happens automatically on tab load.
+    # still has no name — so nameless clients (e.g. calls showing only a city)
+    # get re-attempted every time the tab loads, and self-heal.
     if qb.is_configured():
-        pending = ([(l, db.leads) for l in leads if not l.get("qb_lookup_at")]
-                   + [(c, db.calls) for c in calls if not c.get("qb_lookup_at")])
+        pending = ([(l, db.leads) for l in leads if not l.get("qb_name")]
+                   + [(c, db.calls) for c in calls if not c.get("qb_name")])
         if pending:
-            await asyncio.gather(*[_enrich_from_quickbase(doc, coll) for doc, coll in pending])
+            await asyncio.gather(*[_enrich_from_quickbase(doc, coll) for doc, coll in pending], return_exceptions=True)
     items = []
     for l in leads:
         items.append({
