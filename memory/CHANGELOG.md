@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-07 (cont. 10)
+- CHANGE (approved): /pa top credibility card now features the full LEGAL TEAM photo (/team-attorneys.jpg) instead of the single attorney — eyebrow "Meet Your Legal Team", heading "A Full Team of California Lemon Law Attorneys", kept the award pill + trust badges + no-win-no-fee line. Removed the lower duplicate team section so the team shows once. Mobile-optimized (full-width scaling photo). Verified desktop + mobile screenshots. Pending user Redeploy.
+- CONFIRMED: Calls & Leads tabs already auto-refresh via useLivePoll — silent reload every 30s while tab open + browser visible, plus instant refresh on tab refocus; "Live" badge shown. No change needed.
+
 ## 2026-07-07 (cont. 9)
 - CHANGE: Channels tab date filter now defaults to Today (was last 30 days) — drives the summary cards + performance table. The "Google spend by day" chart is a separate fetch pinned to Past 30 Days (labeled), independent of the date filter, so it always shows the 30-day trend. Verified via screenshot: filter="Today" (Google spend $2,481 today), chart="PAST 30 DAYS" total $96,591.
 
