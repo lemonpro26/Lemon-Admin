@@ -160,26 +160,27 @@ export default function PresellSPA({
       </div>
 
       <article className="relative z-10 max-w-3xl mx-auto px-4 py-8">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-7" data-testid="spa-attorney">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-            <img src={ATTORNEY_PHOTO} alt="Michael Saeedian, Esq." className="h-32 w-32 rounded-2xl object-cover ring-2 ring-[#E0A800] shrink-0" data-testid="spa-attorney-photo" />
-            <div className="text-center sm:text-left">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">{c.attorney_eyebrow}</p>
-              <h2 className="font-slab font-extrabold text-slate-900 text-2xl mt-1">{c.attorney_name}</h2>
-              <p className="text-slate-500 text-sm">{c.attorney_title}</p>
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0B2545] text-white px-4 py-1.5 font-bold text-sm" data-testid="spa-attorney-award">
-                <Award className="h-4 w-4 text-[#FACC15]" />
-                {c.attorney_award}
-              </div>
-              <p className="mt-3 text-slate-700 leading-relaxed">{c.attorney_bio}</p>
-              <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
-                {c.attorney_badges.map((b) => (
-                  <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 whitespace-nowrap">{b}</span>
-                ))}
-              </div>
-              <p className="mt-3 text-xs font-bold text-slate-600 flex items-center justify-center sm:justify-start gap-1.5">
-                <GraduationCap className="h-4 w-4" /> {c.attorney_school}
-              </p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm mb-7" data-testid="spa-attorney">
+          <img
+            src="/team-attorneys.jpg"
+            alt="El equipo de abogados de The Lemon Pros"
+            className="w-full object-cover rounded-xl shadow-sm"
+            data-testid="spa-team-photo"
+          />
+          <div className="mt-5 text-center sm:text-left">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">Conozca a Su Equipo Legal</p>
+            <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-1">Un Equipo Completo de Abogados de Ley Limón en California</h2>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0B2545] text-white px-4 py-1.5 font-bold text-sm" data-testid="spa-attorney-award">
+              <Award className="h-4 w-4 text-[#FACC15]" />
+              {c.attorney_award}
+            </div>
+            <p className="mt-3 text-slate-700 leading-relaxed">
+              Cuando llama a The Lemon Pros, un equipo completo de abogados con experiencia trabaja para usted — no un centro de llamadas. Enfrentamos a los fabricantes directamente y usted no paga <span className="font-semibold text-slate-900">nada a menos que ganemos</span>.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center sm:justify-start gap-2">
+              {c.attorney_badges.map((b) => (
+                <span key={b} className="text-xs font-semibold rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 whitespace-nowrap">{b}</span>
+              ))}
             </div>
           </div>
         </div>
@@ -232,30 +233,6 @@ export default function PresellSPA({
         </ul>
 
         <img src={LOT_PA} alt="Fila de vehículos en un concesionario" className="w-full h-44 sm:h-56 object-cover rounded-2xl shadow-md mt-6" />
-
-        {/* Conozca al equipo */}
-        <div className="mt-10" data-testid="spa-team">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#E0A800] font-bold">Conozca a Su Equipo Legal</p>
-          <h2 className="font-slab font-extrabold text-slate-900 text-2xl sm:text-3xl mt-1">
-            Un Equipo Completo de Abogados de Ley Limón en California
-          </h2>
-          <img
-            src="/team-attorneys.jpg"
-            alt="El equipo de abogados de The Lemon Pros"
-            className="w-full object-cover rounded-2xl shadow-md mt-4"
-            data-testid="spa-team-photo"
-          />
-          <p className="mt-4 text-[17px] leading-relaxed text-slate-700">
-            Cuando llama a The Lemon Pros, un equipo completo de abogados con experiencia trabaja para usted — no un centro de llamadas. Enfrentamos a los fabricantes directamente y usted no paga <span className="font-semibold text-slate-900">nada a menos que ganemos</span>.
-          </p>
-          <button
-            onClick={() => start()}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-bold px-6 py-3 transition-colors"
-            data-testid="spa-team-cta"
-          >
-            Vea Si Califica <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
 
 
         <div className="mt-10">

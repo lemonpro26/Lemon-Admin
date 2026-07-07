@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07 (cont. 11)
+- CHANGE: Applied the team-at-top treatment to /spa (Spanish) to match /pa — replaced the single-attorney card with the full team photo (/team-attorneys.jpg), Spanish eyebrow "Conozca a Su Equipo Legal" + heading "Un Equipo Completo de Abogados de Ley Limón en California", kept award pill + badges, removed the lower duplicate team section. Verified via screenshot. Pending user Redeploy.
+
 ## 2026-07-07 (cont. 10)
 - CHANGE (approved): /pa top credibility card now features the full LEGAL TEAM photo (/team-attorneys.jpg) instead of the single attorney — eyebrow "Meet Your Legal Team", heading "A Full Team of California Lemon Law Attorneys", kept the award pill + trust badges + no-win-no-fee line. Removed the lower duplicate team section so the team shows once. Mobile-optimized (full-width scaling photo). Verified desktop + mobile screenshots. Pending user Redeploy.
 - CONFIRMED: Calls & Leads tabs already auto-refresh via useLivePoll — silent reload every 30s while tab open + browser visible, plus instant refresh on tab refocus; "Live" badge shown. No change needed.
