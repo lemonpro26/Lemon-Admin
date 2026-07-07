@@ -6,11 +6,44 @@ reports "not configured" and the caller falls back to showing raw IDs.
 """
 import os
 import logging
+import re
 import requests
 
 logger = logging.getLogger("server")
 
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+# Google Ads ad-customizer / location macros embedded in RSA headlines, e.g.
+# {LOCATION(City):California} -> California, {Keyword:Lemon Law Help} -> Lemon Law Help,
+# {LOCATION(City)} -> "" (no default, dropped). Cleans headlines into readable text.
+_MACRO_RE = re.compile(r"\{([^}]*)\}")
+
+
+def _clean_macros(text: str) -> str:
+    def repl(m):
+        inner = m.group(1)
+        if ":" in inner:
+            return inner.split(":", 1)[1].strip()
+        return ""
+    return _MACRO_RE.sub(repl, text or "").strip()
+
+
+def _build_ad_label(adobj: dict) -> str:
+    """Build a human-readable label for an ad. Uses the ad's own name when set
+    (Demand Gen / image ads), otherwise the first responsive-search-ad headlines
+    (macros cleaned), falling back to a type label or the raw id."""
+    aid = adobj.get("id")
+    name = (adobj.get("name") or "").strip()
+    if name:
+        return name
+    rsa = adobj.get("responsiveSearchAd") or {}
+    heads = [_clean_macros(h.get("text")) for h in (rsa.get("headlines") or [])]
+    heads = [h for h in heads if h]
+    if heads:
+        label = " | ".join(heads[:2])
+        return (label[:67] + "…") if len(label) > 70 else label
+    atype = (adobj.get("type") or "").replace("_", " ").title().strip()
+    return f"{atype} {aid}".strip() if atype else f"Ad {aid}"
 
 
 def _cfg():
@@ -138,15 +171,16 @@ def fetch_names() -> dict:
             adgroup[agid] = ag.get("name", "")
             live_adgroups.append(agid)
 
-    # Ad creatives — label by ad id with a readable fallback.
+    # Ad creatives — build a readable label from the ad name or its RSA headlines.
     try:
         for row in _search(c, token,
-                           "SELECT ad_group_ad.ad.id, ad_group_ad.ad.name FROM ad_group_ad "
+                           "SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.ad.type, "
+                           "ad_group_ad.ad.responsive_search_ad.headlines FROM ad_group_ad "
                            "WHERE ad_group_ad.status = 'ENABLED' AND ad_group.status = 'ENABLED' "
                            "AND campaign.status = 'ENABLED'"):
             adobj = row.get("adGroupAd", {}).get("ad", {})
             if adobj.get("id"):
-                ad[str(adobj["id"])] = adobj.get("name") or f"Ad {adobj['id']}"
+                ad[str(adobj["id"])] = _build_ad_label(adobj)
     except Exception as e:
         logger.info("Ad-name fetch skipped: %s", e)
 

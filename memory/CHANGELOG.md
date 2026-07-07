@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-06 (cont. 8)
+- FEATURE: Ad IDs now resolve to real ad names. Google's API returns no `name` for responsive search ads, so `google_names_service` now builds a readable label from the ad's headlines (macros like `{LOCATION(City):California}` cleaned → "California"), joins the first two, and falls back to the ad's own name (Demand Gen/image ads, e.g. "Lawyer Images") or a type+id label. Added `_build_ad_label()`/`_clean_macros()`; ad query now pulls `type` + `responsive_search_ad.headlines`. Force-synced: 35 live ads relabeled (e.g. "California Lemon Law Attorneys | Top Lemon Law Firm"). The 3h auto-sync loop keeps them fresh. Verified end-to-end: lead ad_id 813249299917 → Campaign "01. Los Angeles [E]" / Ad Group "Lemon Law" / Ad "California Lemon Law Attorneys | Top Lemon Law Firm". NOTE: historical/paused ads Google no longer returns keep the "Ad {id}" fallback.
+
 ## 2026-07-06 (cont. 7)
 - FEATURE: Call detail now shows the caller's landing page + last-click activity. `_enrich_calls_with_hooks` carries the matched click's `landing_path`, `first_seen`, `last_seen`, `visits` onto the call as `landing_path`/`first_click_at`/`last_click_at`/`click_visits`. Call detail "Landing page & hook" section (AdminCalls.jsx) now displays the exact landing page path, the last-click timestamp, and visit count (when >1). Only populated for calls matched to a recorded click (GCLID/session). Verified: seeded click on /tm matched a call → landing_path=/tm, last_click_at, click_visits=3.
 
