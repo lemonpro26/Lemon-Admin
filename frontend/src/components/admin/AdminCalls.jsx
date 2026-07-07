@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award, FileText, Sparkles } from 'lucide-react';
+import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award, FileText, Sparkles, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
@@ -410,6 +410,11 @@ export const AdminCalls = () => {
                     <span>{c.qb_name || c.caller_name || '—'}</span>
                     {c.number_group && c.number_group !== 'other' && (
                       <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`call-group-${c.number_group}-${c.id}`}>{c.number_group_label}</Badge>
+                    )}
+                    {(c.campaign_name || c.google_campaign) && (
+                      <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200 text-[10px] gap-1 max-w-[170px]" data-testid={`call-attribution-badge-${c.id}`} title={`Ad attribution: ${c.campaign_name || c.google_campaign}${c.adgroup_name ? ' › ' + c.adgroup_name : ''}`}>
+                        <Target className="h-3 w-3 shrink-0" /> <span className="truncate">{c.campaign_name || c.google_campaign}</span>
+                      </Badge>
                     )}
                     {c.retained && (
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-retained-badge-${c.id}`}>Retained</Badge>

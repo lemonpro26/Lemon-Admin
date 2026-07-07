@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-06 (cont. 9)
+- FEATURE: Calls list now shows a violet "attribution" pill (Target icon + campaign name) under the caller name whenever a call has ad/campaign attribution (`campaign_name` from click match or `google_campaign` from call_view). Hover tooltip shows "Ad attribution: {campaign} › {ad group}". Lets the owner scan which calls are tied to ads at a glance. `data-testid=call-attribution-badge-{id}`. Verified via screenshot: attributed call showed "🎯 01. Los Angeles [E]".
+
 ## 2026-07-06 (cont. 8)
 - FEATURE: Ad IDs now resolve to real ad names. Google's API returns no `name` for responsive search ads, so `google_names_service` now builds a readable label from the ad's headlines (macros like `{LOCATION(City):California}` cleaned → "California"), joins the first two, and falls back to the ad's own name (Demand Gen/image ads, e.g. "Lawyer Images") or a type+id label. Added `_build_ad_label()`/`_clean_macros()`; ad query now pulls `type` + `responsive_search_ad.headlines`. Force-synced: 35 live ads relabeled (e.g. "California Lemon Law Attorneys | Top Lemon Law Firm"). The 3h auto-sync loop keeps them fresh. Verified end-to-end: lead ad_id 813249299917 → Campaign "01. Los Angeles [E]" / Ad Group "Lemon Law" / Ad "California Lemon Law Attorneys | Top Lemon Law Firm". NOTE: historical/paused ads Google no longer returns keep the "Ad {id}" fallback.
 
