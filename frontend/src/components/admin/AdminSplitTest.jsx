@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker, Pencil, CalendarRange, SlidersHorizontal } from 'lucide-react';
+import { withAdTracking } from '@/lib/tracking';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -101,7 +102,7 @@ function ExperimentCard({ exp, origin, canEdit, defaultRange, onStart, onStop, o
   };
 
   const copyUrl = () => {
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(withAdTracking(url));
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 1500);
   };
@@ -176,7 +177,7 @@ function ExperimentCard({ exp, origin, canEdit, defaultRange, onStart, onStop, o
         ) : (
           <>
             <code className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-800" data-testid={`exp-url-${exp.id}`}>{url}</code>
-            <Button size="sm" variant="outline" onClick={copyUrl} className="rounded-lg border-slate-200 h-8 px-2" data-testid={`exp-url-copy-${exp.id}`}>
+            <Button size="sm" variant="outline" onClick={copyUrl} className="rounded-lg border-slate-200 h-8 px-2" data-testid={`exp-url-copy-${exp.id}`} title="Copy entry URL with Google Ads tracking parameters">
               {copiedUrl ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
             </Button>
             {canEdit && (

@@ -8,15 +8,17 @@ import { Label } from '@/components/ui/label';
 import { AdminPAContent } from '@/components/admin/AdminPAContent';
 import { AdminPageContent } from '@/components/admin/AdminPageContent';
 import { PAGE_GROUPS } from '@/lib/landingPages';
+import { withAdTracking } from '@/lib/tracking';
 
 const AD_EDITORS = ['pa', 'spa', 'dg', 'dgs'];
 
 function PageRow({ icon: Icon, label, desc, path, origin, onDelete, onEdit, canEdit, testid }) {
   const [copied, setCopied] = useState(false);
   const url = `${origin}${path}`;
+  const trackedUrl = withAdTracking(url);
   const copy = (e) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(trackedUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -43,7 +45,7 @@ function PageRow({ icon: Icon, label, desc, path, origin, onDelete, onEdit, canE
             <Pencil className="h-4 w-4 mr-1.5" /> Edit
           </Button>
         )}
-        <Button variant="outline" size="sm" className="rounded-lg border-slate-200" onClick={copy} data-testid={`${testid}-copy`}>
+        <Button variant="outline" size="sm" className="rounded-lg border-slate-200" onClick={copy} data-testid={`${testid}-copy`} title="Copy URL with Google Ads tracking parameters">
           {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
         </Button>
         <a href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50" data-testid={`${testid}-open`} title="Open page">

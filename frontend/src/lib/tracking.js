@@ -26,6 +26,15 @@ const PASSTHROUGH = [
   'network', 'device', 'devicemodel', 'placement', 'adposition', 'target',
 ];
 
+// Google Ads ValueTrack suffix appended to every landing-page link copied from
+// the admin, so campaign/ad-group/keyword/creative attribution is captured.
+// tg_ref=campaign, adgroup_id, keyword, sub2=creative(ad), + passthrough params.
+export const AD_TRACKING_QS = 'tg_ref={campaignid}&adgroup_id={adgroupid}&keyword={keyword}&sub2={creative}&feeditemid={feeditemid}&targetid={targetid}&loc_interest_ms={loc_interest_ms}&loc_physical_ms={loc_physical_ms}&matchtype={matchtype}&network={network}&device={device}&devicemodel={devicemodel}&placement={placement}&adposition={adposition}&target={target}';
+
+// Append the tracking suffix to a base URL, e.g. https://x.com/split2/?tg_ref=...
+export const withAdTracking = (base) => `${String(base).replace(/\/+$/, '')}/?${AD_TRACKING_QS}`;
+
+
 const EMPTY = { campaign_id: '', adgroup_id: '', ad_id: '', keyword: '', gclid: '', gbraid: '', wbraid: '', referrer: '', feeditemid: '', extensionid: '', split_experiment_id: '', split_variant: '', params: {} };
 
 export function getTracking() {

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07 (cont. 6)
+- FEATURE: Every landing-page link copied from the admin now includes the Google Ads ValueTrack tracking suffix (`/?tg_ref={campaignid}&adgroup_id={adgroupid}&keyword={keyword}&sub2={creative}&feeditemid=…&target={target}`). Added `AD_TRACKING_QS` + `withAdTracking(base)` to `lib/tracking.js`; Pages tab Copy button (AdminPages.jsx `PageRow`) and Split Test entry-URL copy (AdminSplitTest.jsx) now copy the tracked URL (display + Open stay clean). Params map to existing capture (tg_ref→campaign_id, adgroup_id, keyword, sub2→ad_id + passthrough). Verified via clipboard read: copied home URL = `{origin}/?tg_ref={campaignid}&…&target={target}`.
+
 ## 2026-07-07 (cont. 5)
 - CHANGE: Channels tab now shows CPA alongside Revenue/CPL/ROAS on each network card and in the performance table. Redefined CPL = Spend ÷ (Calls + Leads) (was Spend ÷ Leads); added CPA = Spend ÷ Retained. Card metrics laid out in a 2×2 grid with hover tooltips explaining each formula; table gained a CPA column; totals row updated. Verified via screenshot: Google CPL $11,905.32, CPA $47,621.26 (preview data).
 
