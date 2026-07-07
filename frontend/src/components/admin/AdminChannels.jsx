@@ -61,7 +61,9 @@ export function AdminChannels() {
       {/* Per-network summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rows.map((r) => {
-          const cpl = r.leads ? r.spend / r.leads : 0;
+          const contacts = (r.calls || 0) + (r.leads || 0);
+          const cpl = contacts ? r.spend / contacts : 0;
+          const cpa = r.retained ? r.spend / r.retained : 0;
           const roas = r.spend ? r.revenue / r.spend : 0;
           return (
             <div key={r.key} className={`rounded-2xl border ${r.border} bg-white p-5`} data-testid={`channel-card-${r.key}`}>
@@ -84,10 +86,11 @@ export function AdminChannels() {
                 <Metric icon={<Award className="h-3.5 w-3.5" />} label="Retained" value={r.retained} />
                 <Metric icon={<TrendingUp className="h-3.5 w-3.5" />} label="Spend" value={usd(r.spend)} highlight={r.live} />
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs">
+              <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                 <span className="text-slate-500">Revenue <span className="font-semibold text-slate-800">{usd(r.revenue)}</span></span>
-                <span className="text-slate-500">CPL <span className="font-semibold text-slate-800">{r.leads ? money(cpl) : '—'}</span></span>
                 <span className="text-slate-500">ROAS <span className="font-semibold text-slate-800">{r.spend ? `${roas.toFixed(1)}x` : '—'}</span></span>
+                <span className="text-slate-500" title="Spend ÷ (Calls + Leads)">CPL <span className="font-semibold text-slate-800">{contacts ? money(cpl) : '—'}</span></span>
+                <span className="text-slate-500" title="Spend ÷ Retained">CPA <span className="font-semibold text-slate-800">{r.retained ? money(cpa) : '—'}</span></span>
               </div>
             </div>
           );
@@ -130,14 +133,17 @@ export function AdminChannels() {
                 <th className="px-5 py-3 font-semibold text-right">Retained</th>
                 <th className="px-5 py-3 font-semibold text-right">Revenue</th>
                 <th className="px-5 py-3 font-semibold text-right">Spend</th>
-                <th className="px-5 py-3 font-semibold text-right">CPL</th>
+                <th className="px-5 py-3 font-semibold text-right" title="Spend ÷ (Calls + Leads)">CPL</th>
+                <th className="px-5 py-3 font-semibold text-right" title="Spend ÷ Retained">CPA</th>
                 <th className="px-5 py-3 font-semibold text-right">ROAS</th>
                 <th className="px-5 py-3 font-semibold w-40">Spend share</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
-                const cpl = r.leads ? r.spend / r.leads : 0;
+                const contacts = (r.calls || 0) + (r.leads || 0);
+                const cpl = contacts ? r.spend / contacts : 0;
+                const cpa = r.retained ? r.spend / r.retained : 0;
                 const roas = r.spend ? r.revenue / r.spend : 0;
                 return (
                   <tr key={r.key} className="border-b border-slate-50 hover:bg-slate-50/60" data-testid={`channels-row-${r.key}`}>
@@ -151,7 +157,8 @@ export function AdminChannels() {
                     <td className="px-5 py-3 text-right text-slate-700">{r.retained}</td>
                     <td className="px-5 py-3 text-right text-slate-700">{usd(r.revenue)}</td>
                     <td className="px-5 py-3 text-right font-semibold text-slate-900">{usd(r.spend)}</td>
-                    <td className="px-5 py-3 text-right text-slate-700">{r.leads ? money(cpl) : '—'}</td>
+                    <td className="px-5 py-3 text-right text-slate-700">{contacts ? money(cpl) : '—'}</td>
+                    <td className="px-5 py-3 text-right text-slate-700">{r.retained ? money(cpa) : '—'}</td>
                     <td className="px-5 py-3 text-right text-slate-700">{r.spend ? `${roas.toFixed(1)}x` : '—'}</td>
                     <td className="px-5 py-3">
                       <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
@@ -170,7 +177,8 @@ export function AdminChannels() {
                 <td className="px-5 py-3 text-right">{totals.retained}</td>
                 <td className="px-5 py-3 text-right">{usd(totals.revenue)}</td>
                 <td className="px-5 py-3 text-right">{usd(totals.spend)}</td>
-                <td className="px-5 py-3 text-right">{totals.leads ? money(totals.spend / totals.leads) : '—'}</td>
+                <td className="px-5 py-3 text-right">{(totals.calls + totals.leads) ? money(totals.spend / (totals.calls + totals.leads)) : '—'}</td>
+                <td className="px-5 py-3 text-right">{totals.retained ? money(totals.spend / totals.retained) : '—'}</td>
                 <td className="px-5 py-3 text-right">{totals.spend ? `${(totals.revenue / totals.spend).toFixed(1)}x` : '—'}</td>
                 <td className="px-5 py-3" />
               </tr>

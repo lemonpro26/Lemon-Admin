@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07 (cont. 5)
+- CHANGE: Channels tab now shows CPA alongside Revenue/CPL/ROAS on each network card and in the performance table. Redefined CPL = Spend ÷ (Calls + Leads) (was Spend ÷ Leads); added CPA = Spend ÷ Retained. Card metrics laid out in a 2×2 grid with hover tooltips explaining each formula; table gained a CPA column; totals row updated. Verified via screenshot: Google CPL $11,905.32, CPA $47,621.26 (preview data).
+
 ## 2026-07-07 (cont. 4)
 - CHANGE: Renamed the team landing pages from "We Fight For You" to "Team Attorneys" everywhere — on-page headline (line1 "Team" / line2 "Attorneys") on /tm & /tm2, Pages tab labels, Split Test dropdown (via shared landingPages.jsx), AdminPageContent editor titles, lead-detail Source labels, and backend/frontend DEFAULT_TM/TM2 content. Cleared the stored `tm_content` override in site_config so the new default headline applies. Verified: /tm and /tm2 render "TEAM ATTORNEYS".
 
