@@ -65,6 +65,7 @@ export const CallDetailDialog = ({ call, open, onOpenChange, onChanged }) => {
     ['Duration', fmtDur(c.duration), 'cd-duration'],
     ['Campaign', c.campaign_name || c.google_campaign || c.campaign, 'cd-campaign'],
     ['Ad Group', c.adgroup_name || c.adgroup_id, 'cd-adgroup'],
+    ['Ad', c.ad_name || c.ad_id, 'cd-ad'],
     ['Location', [c.city, c.state].filter(Boolean).join(', '), 'cd-location'],
     ['When', fmtDate(c.called_at || c.created_at), 'cd-when'],
   ];

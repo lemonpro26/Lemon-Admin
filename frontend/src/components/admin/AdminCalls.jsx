@@ -556,6 +556,7 @@ export const AdminCalls = () => {
                   ['Duration', fmtDuration(selected.duration), 'call-detail-duration'],
                   ['Campaign', selected.campaign_name || selected.google_campaign || selected.campaign, 'call-detail-campaign'],
                   ['Ad Group', selected.adgroup_name || selected.adgroup_id, 'call-detail-adgroup'],
+                  ['Ad', selected.ad_name || selected.ad_id, 'call-detail-ad'],
                   ['Keyword', selected.keyword, 'call-detail-keyword'],
                   ['GCLID', selected.gclid, 'call-detail-gclid'],
                   ['Location', [selected.city, selected.state].filter(Boolean).join(', '), 'call-detail-location'],
