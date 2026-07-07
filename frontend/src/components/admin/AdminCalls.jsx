@@ -587,6 +587,22 @@ export const AdminCalls = () => {
                     {selected.hook2 && (
                       <p className="text-slate-600 mt-1" data-testid="call-detail-hook2">{selected.hook2}</p>
                     )}
+                    <div className="mt-3 grid gap-1.5 border-t border-slate-100 pt-3">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-slate-500">Landing page</span>
+                        <span className="font-medium text-slate-900 text-right break-all" data-testid="call-detail-landing-path">{selected.landing_path || '—'}</span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-slate-500">Last click</span>
+                        <span className="font-medium text-slate-900 text-right" data-testid="call-detail-last-click">{selected.last_click_at ? fmtDate(selected.last_click_at) : '—'}</span>
+                      </div>
+                      {selected.click_visits > 1 && (
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-500">Visits before calling</span>
+                          <span className="font-medium text-slate-900 text-right" data-testid="call-detail-visits">{selected.click_visits}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-sm text-slate-500" data-testid="call-detail-nopage">

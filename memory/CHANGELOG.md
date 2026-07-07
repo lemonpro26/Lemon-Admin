@@ -1,6 +1,11 @@
 # Changelog
 
+## 2026-07-06 (cont. 7)
+- FEATURE: Call detail now shows the caller's landing page + last-click activity. `_enrich_calls_with_hooks` carries the matched click's `landing_path`, `first_seen`, `last_seen`, `visits` onto the call as `landing_path`/`first_click_at`/`last_click_at`/`click_visits`. Call detail "Landing page & hook" section (AdminCalls.jsx) now displays the exact landing page path, the last-click timestamp, and visit count (when >1). Only populated for calls matched to a recorded click (GCLID/session). Verified: seeded click on /tm matched a call → landing_path=/tm, last_click_at, click_visits=3.
+
 ## 2026-07-06 (cont. 6)
+
+- SEO: Added static `/robots.txt` (User-agent: * / Allow: /) so the domain serves valid crawl directives instead of the HTML app shell (fixes audit error).
 - FEATURE: Leads tab now has dedicated source filter chips for the four ad-landing flows — Demand Gen (ladg), Demand Gen ES (ladgs), Team /tm (latm), Team /tm2 (latm2) — alongside All / Home / Spanish / PA Page, each with a live count. Refactored chips to a `LEAD_SEGMENTS` array; `inLeadSeg`/`leadCounts` extended; empty-state label now generic. The campaign sub-dropdown works within each chip. Verified via screenshot (each new chip showed count 1 with seeded leads).
 
 ## 2026-07-06 (cont. 5)

@@ -2458,7 +2458,8 @@ async def _enrich_calls_with_hooks(items: list) -> list:
         if sessions:
             q["$or"].append({"session_id": {"$in": sessions}})
         async for ck in db.clicks.find(q, {"gclid": 1, "session_id": 1, "matched_rule_id": 1, "source_page": 1,
-                                            "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "keyword": 1}):
+                                            "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "keyword": 1,
+                                            "landing_path": 1, "first_seen": 1, "last_seen": 1, "visits": 1}):
             if ck.get("gclid"):
                 clicks_by_gclid[ck["gclid"]] = ck
             if ck.get("session_id"):
@@ -2507,6 +2508,11 @@ async def _enrich_calls_with_hooks(items: list) -> list:
                 c["ad_id"] = ck["ad_id"]
             if ck.get("keyword") and not c.get("keyword"):
                 c["keyword"] = ck["keyword"]
+            # Landing page they were on + their last click/visit time before calling.
+            c["landing_path"] = ck.get("landing_path") or ""
+            c["first_click_at"] = ck.get("first_seen") or ""
+            c["last_click_at"] = ck.get("last_seen") or ""
+            c["click_visits"] = ck.get("visits") or 1
     return items
 
 
