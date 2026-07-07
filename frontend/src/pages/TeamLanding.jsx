@@ -50,14 +50,14 @@ function useTeamFunnel({ sourcePage, phone, phoneHref }) {
 // Each page fetches /page-content/{tm|tm2} (Pages CMS overrides) and falls back
 // to these so it never breaks.
 const TM_DEFAULTS = {
-  headline_line1: 'Team',
-  headline_line2: 'Attorneys',
+  headline_line1: 'We Fight',
+  headline_line2: 'For You',
   subhead: "California's dedicated Lemon Law team — no fees unless we win.",
   cta: 'See If You Qualify',
 };
 const TM2_DEFAULTS = {
-  headline_line1: 'Team',
-  headline_line2: 'Attorneys',
+  headline_line1: 'We Fight',
+  headline_line2: 'For You',
   subhead: 'Meet the attorney team taking on the automakers for California drivers.',
   cta: 'Check Your Vehicle',
 };
@@ -123,9 +123,9 @@ const CallButton = ({ phone, phoneHref, dark = false }) => (
     href={phoneHref}
     onClick={trackPhoneCallConversion}
     data-testid="team-header-call"
-    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 sm:px-5 sm:py-2.5 font-bold text-sm sm:text-base transition-colors ${dark ? 'bg-white/10 hover:bg-white/20 text-white ring-1 ring-white/30' : 'bg-[#0B2545] hover:bg-[#0a1e3a] text-white'}`}
+    className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 sm:px-5 sm:py-2.5 font-bold text-sm sm:text-base whitespace-nowrap transition-colors ${dark ? 'bg-white/10 hover:bg-white/20 text-white ring-1 ring-white/30' : 'bg-[#0B2545] hover:bg-[#0a1e3a] text-white'}`}
   >
-    <Phone className="h-4 w-4 text-[#FACC15]" /> Call {phone}
+    <Phone className="h-4 w-4 text-[#FACC15] shrink-0" /> <span className="hidden sm:inline">Call </span>{phone}
   </a>
 );
 
