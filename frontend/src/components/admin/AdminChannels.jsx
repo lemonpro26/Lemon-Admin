@@ -7,8 +7,9 @@ import { DateRangeFilter } from '@/components/admin/DateRangeFilter';
 const usd = (n) => `$${Math.round(n || 0).toLocaleString('en-US')}`;
 const money = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const iso = (d) => d.toISOString().slice(0, 10);
+const todayRangeLocal = () => { const t = iso(new Date()); return { start: t, end: t }; };
 const last30 = () => {
-  const iso = (d) => d.toISOString().slice(0, 10);
   const end = new Date();
   const start = new Date();
   start.setDate(end.getDate() - 29);
@@ -16,10 +17,13 @@ const last30 = () => {
 };
 
 export function AdminChannels() {
-  const [range, setRange] = useState(last30);
+  const [range, setRange] = useState(todayRangeLocal);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [spend30, setSpend30] = useState(null);
+  const [spendLoading, setSpendLoading] = useState(true);
 
+  // Summary cards + table follow the selected range (defaults to Today).
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -30,6 +34,18 @@ export function AdminChannels() {
     return () => { alive = false; };
   }, [range.start, range.end]);
 
+  // "Google spend by day" is always Past 30 Days, independent of the range filter.
+  useEffect(() => {
+    let alive = true;
+    const r = last30();
+    setSpendLoading(true);
+    api.get(`/admin/channels/summary?start=${r.start}&end=${r.end}`)
+      .then((res) => { if (alive) setSpend30(res.data); })
+      .catch(() => { if (alive) setSpend30(null); })
+      .finally(() => { if (alive) setSpendLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
   const net = data?.networks || {};
   const rows = NETWORKS.map((n) => ({ ...n, ...(net[n.key] || { calls: 0, leads: 0, retained: 0, revenue: 0, spend: 0, spend_by_day: [] }) }));
   const totals = rows.reduce((t, r) => ({
@@ -37,7 +53,8 @@ export function AdminChannels() {
     revenue: t.revenue + (r.revenue || 0), spend: t.spend + (r.spend || 0),
   }), { calls: 0, leads: 0, retained: 0, revenue: 0, spend: 0 });
   const maxSpend = Math.max(...rows.map((r) => r.spend || 0), 1);
-  const googleByDay = (net.google?.spend_by_day) || [];
+  const spend30Google = spend30?.networks?.google || {};
+  const googleByDay = spend30Google.spend_by_day || [];
   const maxDay = Math.max(...googleByDay.map((d) => d.cost || 0), 1);
 
   return (
@@ -100,10 +117,13 @@ export function AdminChannels() {
       {/* Google spend by day */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="channels-google-spend-by-day">
         <div className="flex items-center justify-between mb-4">
-          <div className="font-slab font-bold text-slate-900">Google spend by day</div>
-          <div className="text-sm text-slate-500">Total <span className="font-bold text-slate-900">{usd(net.google?.spend || 0)}</span></div>
+          <div>
+            <div className="font-slab font-bold text-slate-900">Google spend by day</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Past 30 days</div>
+          </div>
+          <div className="text-sm text-slate-500">Total <span className="font-bold text-slate-900">{usd(spend30Google.spend || 0)}</span></div>
         </div>
-        {loading ? (
+        {spendLoading ? (
           <div className="text-sm text-slate-400 py-6 text-center">Loading Google Ads spend…</div>
         ) : googleByDay.length === 0 ? (
           <div className="text-sm text-slate-400 py-6 text-center">No Google Ads spend in this range.</div>

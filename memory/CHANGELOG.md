@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-07 (cont. 9)
+- CHANGE: Channels tab date filter now defaults to Today (was last 30 days) — drives the summary cards + performance table. The "Google spend by day" chart is a separate fetch pinned to Past 30 Days (labeled), independent of the date filter, so it always shows the 30-day trend. Verified via screenshot: filter="Today" (Google spend $2,481 today), chart="PAST 30 DAYS" total $96,591.
+
 ## 2026-07-07 (cont. 8)
 - FEATURE: Added a "Meet Your Legal Team" section with the group attorney photo to /pa (English) and /spa (Spanish), placed between the qualify section and Step 1. Downloaded + optimized the team photo to /public/team-attorneys.jpg (1400px, 194KB). Section matches page style (amber eyebrow, slab heading, rounded full-width photo, red CTA → funnel start). Fully responsive/mobile-optimized (w-full auto-height image, max-w-3xl container, scaling headline). Approved by user. Copy currently hardcoded (not CMS-editable yet). Pending user Redeploy to reach production.
 
