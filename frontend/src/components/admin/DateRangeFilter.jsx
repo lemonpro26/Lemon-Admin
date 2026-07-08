@@ -29,11 +29,21 @@ export const allTimeRange = () => ({ start: ALL_TIME_START, end: toISO(new Date(
 
 const presets = [
   { key: 'today', label: 'Today', days: 0 },
+  { key: 'thisweek', label: 'This week', week: 'this' },
+  { key: 'lastweek', label: 'Last week', week: 'last' },
   { key: '7d', label: 'Last 7 days', days: 6 },
   { key: '30d', label: 'Last 30 days', days: 29 },
   { key: '90d', label: 'Last 90 days', days: 89 },
   { key: 'all', label: 'All time', all: true },
 ];
+
+// Sunday-start week (matches the calendar). Returns midnight of that week's Sunday.
+const startOfWeek = (d) => {
+  const x = new Date(d);
+  x.setDate(x.getDate() - x.getDay());
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
 
 /** Reusable date-range filter. value={start,end} (YYYY-MM-DD). */
 export const DateRangeFilter = ({ value, onChange }) => {
@@ -54,6 +64,21 @@ export const DateRangeFilter = ({ value, onChange }) => {
     const end = new Date();
     setRange({ from: start, to: end });
     onChange({ start: ALL_TIME_START, end: toISO(end) });
+    setOpen(false);
+  };
+
+  const applyWeek = (which) => {
+    const sow = startOfWeek(new Date());
+    let start, end;
+    if (which === 'this') {
+      start = sow;
+      end = new Date();
+    } else {
+      end = new Date(sow); end.setDate(sow.getDate() - 1);   // last Saturday
+      start = new Date(sow); start.setDate(sow.getDate() - 7); // previous Sunday
+    }
+    setRange({ from: start, to: end });
+    onChange({ start: toISO(start), end: toISO(end) });
     setOpen(false);
   };
 
@@ -124,7 +149,7 @@ export const DateRangeFilter = ({ value, onChange }) => {
               {presets.map((p) => (
                 <button
                   key={p.key}
-                  onClick={() => (p.all ? applyAllTime() : applyPreset(p.days))}
+                  onClick={() => (p.all ? applyAllTime() : p.week ? applyWeek(p.week) : applyPreset(p.days))}
                   className="text-left text-sm px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
                   data-testid={`date-preset-${p.key}`}
                 >

@@ -441,7 +441,7 @@ export default function AdminDashboard() {
           <TabsList className="mb-6 flex-wrap h-auto">
             <TabsTrigger value="hooks" data-testid="admin-tab-hooks"><Megaphone className="h-4 w-4 mr-2" /> Hooks</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="admin-tab-analytics"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</TabsTrigger>
-            <TabsTrigger value="funnel" data-testid="admin-tab-funnel"><Filter className="h-4 w-4 mr-2" /> Funnel</TabsTrigger>
+            <TabsTrigger value="funnel" data-testid="admin-tab-funnel"><Filter className="h-4 w-4 mr-2" /> Funnel Analytics</TabsTrigger>
             <TabsTrigger value="split" data-testid="admin-tab-split"><FlaskConical className="h-4 w-4 mr-2" /> Split Test</TabsTrigger>
             <TabsTrigger value="spanish" data-testid="admin-tab-spanish"><Languages className="h-4 w-4 mr-2" /> Spanish</TabsTrigger>
             <TabsTrigger value="pages" data-testid="admin-tab-pages"><LayoutGrid className="h-4 w-4 mr-2" /> Pages</TabsTrigger>

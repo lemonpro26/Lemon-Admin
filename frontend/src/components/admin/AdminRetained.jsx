@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { DateRangeFilter, allTimeRange } from '@/components/admin/DateRangeFilter';
+import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
 import { NetworkChips, getNetwork } from '@/lib/networks';
@@ -130,8 +130,8 @@ const RevenueCell = ({ item, onSave }) => {
 };
 
 export const AdminRetained = () => {
-  // Defaults to All-time so the tab shows every retained client.
-  const [range, setRange] = useState(allTimeRange());
+  // Defaults to Today; use the date filter (This week / Last week / All time) to widen.
+  const [range, setRange] = useState(todayRange());
   const [data, setData] = useState({ items: [], total: 0, lead_count: 0, call_count: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
