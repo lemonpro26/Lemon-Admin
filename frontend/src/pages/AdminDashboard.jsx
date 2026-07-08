@@ -445,7 +445,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="split" data-testid="admin-tab-split"><FlaskConical className="h-4 w-4 mr-2" /> Split Test</TabsTrigger>
             <TabsTrigger value="spanish" data-testid="admin-tab-spanish"><Languages className="h-4 w-4 mr-2" /> Spanish</TabsTrigger>
             <TabsTrigger value="pages" data-testid="admin-tab-pages"><LayoutGrid className="h-4 w-4 mr-2" /> Pages</TabsTrigger>
-            <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.total_calls ?? 0})</TabsTrigger>
+            <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.unique_callers ?? stats?.total_calls ?? 0})</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
             <TabsTrigger value="retained" data-testid="admin-tab-retained"><Award className="h-4 w-4 mr-2" /> Retained ({stats?.total_retained ?? 0})</TabsTrigger>
             <TabsTrigger value="channels" data-testid="admin-tab-channels"><Share2 className="h-4 w-4 mr-2" /> Channels</TabsTrigger>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award, FileText, Sparkles, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
@@ -54,6 +54,35 @@ const CALL_SEGMENTS = [
 
 // A call is "attributed" when we can tie it to an ad/campaign.
 const callHasAttribution = (c) => !!(c.campaign_name || c.google_campaign);
+
+const _callTime = (c) => new Date(c.called_at || c.created_at || 0).getTime();
+
+// Collapse repeat callers: one row per phone number, represented by their MOST
+// RECENT call, with the full call history + combined revenue attached.
+const groupByCaller = (list) => {
+  const map = new Map();
+  const order = [];
+  for (const c of list) {
+    const key = c.caller_number ? `n:${c.caller_number}` : `id:${c.id}`;
+    if (!map.has(key)) { map.set(key, []); order.push(key); }
+    map.get(key).push(c);
+  }
+  return order.map((key) => {
+    const hist = map.get(key);
+    const rep = hist.reduce((a, b) => (_callTime(b) > _callTime(a) ? b : a), hist[0]);
+    const groupRevenue = hist.reduce((s, c) => s + (c.sale_status === 'sold' ? Number(c.sale_value || 0) : 0), 0);
+    const firstCall = hist.reduce((a, b) => (_callTime(b) < _callTime(a) ? b : a), hist[0]);
+    return {
+      ...rep,
+      __group: hist,
+      __count: hist.length,
+      __groupRevenue: Math.round(groupRevenue * 100) / 100,
+      __soldCount: hist.filter((c) => c.sale_status === 'sold').length,
+      __anyRetained: hist.some((c) => c.retained),
+      __firstCallAt: firstCall.called_at || firstCall.created_at,
+    };
+  });
+};
 
 
 const GCALL_TYPE_LABELS = {
@@ -118,12 +147,17 @@ export const AdminCalls = () => {
 
   // Segment calls by the DIALED tracking number (number_group), plus an
   // "attributed" segment that shows only calls tied to an ad/campaign.
+  // Counts are UNIQUE CALLERS (repeat calls from one number count once).
   const inSeg = (s, c) => s === 'all' || (s === 'attributed' ? callHasAttribution(c) : (c.number_group || 'other') === s);
   const segCounts = CALL_SEGMENTS.reduce((acc, s) => {
-    acc[s.key] = s.key === 'all' ? calls.length : calls.filter((c) => inSeg(s.key, c)).length;
+    const list = s.key === 'all' ? calls : calls.filter((c) => inSeg(s.key, c));
+    acc[s.key] = groupByCaller(list).length;
     return acc;
   }, {});
   const shownCalls = sortedCalls.filter((c) => inSeg(seg, c) && (network === 'all' || getNetwork(c) === network));
+  // Grouped rows for the table (one per caller) + grouped set for the network chip counts.
+  const groupedCalls = useMemo(() => groupByCaller(shownCalls), [shownCalls]);
+  const groupedForNetwork = useMemo(() => groupByCaller(sortedCalls), [sortedCalls]);
   const colSpanCount = COLS.filter((k) => cols[k.key]).length + 2; // + Caller + Actions
 
   useEffect(() => {
@@ -347,7 +381,7 @@ export const AdminCalls = () => {
 
       {/* Network filter (mockup) — separate calls by traffic source */}
       <div className="mt-3">
-        <NetworkChips items={sortedCalls} value={network} onChange={setNetwork} testidPrefix="call-network" />
+        <NetworkChips items={groupedForNetwork} value={network} onChange={setNetwork} testidPrefix="call-network" />
       </div>
 
       {debouncedSearch.trim() && matchedLeads.length > 0 && (
@@ -415,11 +449,16 @@ export const AdminCalls = () => {
               <TableRow><TableCell colSpan={colSpanCount} className="text-center text-slate-400 py-10" data-testid="calls-empty">No calls in this period yet.</TableCell></TableRow>
             ) : shownCalls.length === 0 ? (
               <TableRow><TableCell colSpan={colSpanCount} className="text-center text-slate-400 py-10" data-testid="calls-seg-empty">No {(CALL_SEGMENTS.find((s) => s.key === seg) || {}).label || ''} calls in this period.</TableCell></TableRow>
-            ) : shownCalls.map((c) => (
+            ) : groupedCalls.map((c) => (
               <TableRow key={c.id} data-testid={`call-row-${c.id}`}>
                 <TableCell className="font-medium text-slate-900">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span>{c.qb_name || c.caller_name || '—'}</span>
+                    {c.__count > 1 && (
+                      <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-300 text-[10px] gap-1 font-semibold" data-testid={`call-repeat-badge-${c.id}`} title={`${c.__count} calls from this number — open to see all`}>
+                        <Phone className="h-3 w-3" /> {c.__count}
+                      </Badge>
+                    )}
                     {c.number_group && c.number_group !== 'other' && (
                       <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]" data-testid={`call-group-${c.number_group}-${c.id}`}>{c.number_group_label}</Badge>
                     )}
@@ -428,7 +467,7 @@ export const AdminCalls = () => {
                         <Target className="h-3 w-3 shrink-0" /> <span className="truncate">{c.campaign_name || c.google_campaign}</span>
                       </Badge>
                     )}
-                    {c.retained && (
+                    {(c.retained || c.__anyRetained) && (
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-retained-badge-${c.id}`}>Retained</Badge>
                     )}
                     {c.google_matched && (
@@ -476,12 +515,14 @@ export const AdminCalls = () => {
                 )}
                 {cols.revenue && (
                 <TableCell className="hidden sm:table-cell">
-                  {c.sale_status === 'sold' ? (
+                  {c.__soldCount > 0 ? (
                     <div className="flex flex-col gap-1">
                       <span className="font-semibold text-slate-900" data-testid={`call-revenue-${c.id}`}>
-                        ${Number(c.sale_value).toLocaleString()}
+                        ${Number(c.__groupRevenue).toLocaleString()}
                       </span>
-                      {convBadge(c) && (
+                      {c.__soldCount > 1 ? (
+                        <span className="text-[10px] text-slate-400" data-testid={`call-sales-count-${c.id}`}>{c.__soldCount} sales</span>
+                      ) : convBadge(c) && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full w-fit ${convBadge(c).cls}`} data-testid={`call-conv-badge-${c.id}`}>
                           {convBadge(c).txt}
                         </span>
@@ -493,7 +534,14 @@ export const AdminCalls = () => {
                 </TableCell>
                 )}
                 {cols.location && <TableCell className="hidden lg:table-cell text-slate-600">{[c.city, c.state].filter(Boolean).join(', ') || '—'}</TableCell>}
-                {cols.when && <TableCell className="text-slate-600 whitespace-nowrap">{fmtDate(c.called_at || c.created_at)}</TableCell>}
+                {cols.when && (
+                  <TableCell className="text-slate-600 whitespace-nowrap">
+                    {fmtDate(c.called_at || c.created_at)}
+                    {c.__count > 1 && c.__firstCallAt && (
+                      <span className="block text-[10px] text-slate-400" data-testid={`call-first-${c.id}`}>First: {fmtDate(c.__firstCallAt)}</span>
+                    )}
+                  </TableCell>
+                )}
                 <TableCell>
                   <div className="flex items-center justify-end gap-1.5">
                     {c.recording_url && (
@@ -556,10 +604,15 @@ export const AdminCalls = () => {
       </Dialog>
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-md" data-testid="admin-call-detail">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="admin-call-detail">
           <DialogHeader>
             <DialogTitle className="font-slab flex items-center gap-2">
               <Phone className="h-4 w-4" /> {selected?.qb_name || selected?.caller_name || formatPhone(selected?.caller_number) || 'Call'}
+              {selected?.__count > 1 && (
+                <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-300 text-[10px] gap-1" data-testid="call-detail-repeat">
+                  <Phone className="h-3 w-3" /> {selected.__count} calls
+                </Badge>
+              )}
             </DialogTitle>
           </DialogHeader>
           {selected && (
@@ -585,6 +638,46 @@ export const AdminCalls = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Call history — every time this number called (repeat callers) */}
+              {selected.__group && selected.__group.length > 1 && (
+                <div className="rounded-xl border border-slate-200 p-4 bg-white" data-testid="call-history-section">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Phone className="h-4 w-4 text-slate-600" />
+                    <span className="font-semibold text-slate-900">Call history ({selected.__group.length})</span>
+                  </div>
+                  <div className="grid gap-2">
+                    {[...selected.__group].sort((a, b) => _callTime(b) - _callTime(a)).map((h, i) => (
+                      <div key={h.id} className="flex items-center justify-between gap-3 border border-slate-100 rounded-lg px-3 py-2" data-testid={`call-history-item-${h.id}`}>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-slate-900">{fmtDate(h.called_at || h.created_at)}</div>
+                          <div className="text-[11px] text-slate-500 truncate">
+                            {fmtDuration(h.duration)}
+                            {(h.campaign_name || h.google_campaign) ? ` · ${h.campaign_name || h.google_campaign}` : ''}
+                            {h.sale_status === 'sold' ? ` · $${Number(h.sale_value).toLocaleString()}` : ''}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {i === 0 && <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200">Latest</Badge>}
+                          {h.retained && <Badge variant="outline" className="text-[9px] bg-amber-50 text-amber-700 border-amber-200">Retained</Badge>}
+                          {h.recording_url && (
+                            <a href={h.recording_url} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-slate-800" title="Play recording" data-testid={`call-history-recording-${h.id}`}>
+                              <PlayCircle className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {selected.__groupRevenue > 0 && (
+                    <div className="mt-3 flex justify-between text-sm border-t border-slate-100 pt-2" data-testid="call-history-combined-revenue">
+                      <span className="text-slate-500">Combined revenue</span>
+                      <span className="font-semibold text-slate-900">${Number(selected.__groupRevenue).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-400 mt-2">Details above show this caller&apos;s most recent call. Marking sold/retained applies to the caller.</p>
+                </div>
+              )}
 
               {/* Hook seen / landing-page attribution */}
               <div className="rounded-xl border border-slate-200 p-4 bg-white" data-testid="call-hook-section">
