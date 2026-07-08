@@ -372,6 +372,7 @@ export const AdminAnalytics = () => {
   const metricCols = [
     { key: 'clicks', label: 'Clicks', num: true },
     { key: 'leads', label: 'Leads', num: true },
+    { key: 'calls', label: 'Calls', num: true, render: (r) => (r.calls || 0) },
     { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },
     { key: 'bounce_rate', label: 'Bounce Rate', num: true, render: bounceCell },
   ];

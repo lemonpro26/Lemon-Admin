@@ -3570,7 +3570,8 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     async def breakdown(fields: list):
         clicks = await _agg_clicks(fields, s_iso, e_iso)
         leads = await _agg_count(db.leads, fields, "created_at", s_iso, e_iso)
-        keys = set(clicks) | set(leads)
+        calls = await _agg_count(db.calls, fields, "created_at", s_iso, e_iso)
+        keys = set(clicks) | set(leads) | set(calls)
         rows = []
         for k in keys:
             entry = {fields[i]: k[i] for i in range(len(fields))}
@@ -3591,6 +3592,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             bounced = max(0, min(bounced, c - lc))
             entry["clicks"] = c
             entry["leads"] = lc
+            entry["calls"] = calls.get(k, 0)
             entry["bounced"] = bounced
             entry["conversion_rate"] = round((lc / c * 100), 1) if c else (100.0 if lc else 0.0)
             entry["bounce_rate"] = round((bounced / c * 100), 1) if c else 0.0
@@ -3633,7 +3635,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         c, lc, bounced = b["clicks"], b["leads"], b["bounced"]
         bounced = max(0, min(bounced, c - lc))
         return {"campaign_id": "", "kind": kind, "display": display,
-                "clicks": c, "leads": lc, "bounced": bounced,
+                "clicks": c, "leads": lc, "calls": 0, "bounced": bounced,
                 "conversion_rate": round((lc / c * 100), 1) if c else (100.0 if lc else 0.0),
                 "bounce_rate": round((bounced / c * 100), 1) if c else 0.0}
 
