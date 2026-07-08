@@ -1808,7 +1808,12 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
                 "stages": stages}
 
     # Total inbound calls in range — counted as conversions on the overall view.
-    total_calls = await db.calls.count_documents({"created_at": {"$gte": s_iso, "$lte": e_iso}})
+    # Dedupe repeat callers by phone number (unique callers), matching the Calls
+    # tab, so the funnel's phone-call volume doesn't double-count the same person.
+    _call_match = {"created_at": {"$gte": s_iso, "$lte": e_iso}}
+    _numbered = await db.calls.distinct("caller_number", {**_call_match, "caller_number": {"$nin": [None, ""]}})
+    _unnumbered = await db.calls.count_documents({**_call_match, "$or": [{"caller_number": None}, {"caller_number": ""}, {"caller_number": {"$exists": False}}]})
+    total_calls = len(_numbered) + _unnumbered
 
     # Overall (sum of all pages)
     overall = {"views": 0, "hist": {}, "converted": 0}

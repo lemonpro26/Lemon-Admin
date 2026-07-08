@@ -13,7 +13,6 @@ import LegalPage from '@/pages/LegalPage';
 import Contact from '@/pages/Contact';
 import MockupHome from '@/pages/MockupHome';
 import MockupFunnel from '@/pages/MockupFunnel';
-import MockupCondition from '@/pages/MockupCondition';
 import PresellPA from '@/pages/PresellPA';
 import PresellSPA from '@/pages/PresellSPA';
 import { TeamOverlay, TeamSplit } from '@/pages/TeamLanding';
@@ -46,7 +45,6 @@ function App() {
           {/* Standalone pages keep their own simple scrollable layout. */}
           <Route path="/mockup" element={<MockupHome />} />
           <Route path="/mockup/funnel" element={<MockupFunnel />} />
-          <Route path="/mockup/condition" element={<MockupCondition />} />
           <Route path="/pa" element={<PresellPA />} />
           <Route path="/spa" element={<PresellSPA />} />
           <Route path="/tm" element={<TeamOverlay />} />
