@@ -15,6 +15,15 @@ import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter'
 
 const NONE = '(untracked / direct)';
 
+// Friendly names for the internal source_page codes (landing-page analytics).
+const PAGE_LABELS = {
+  '': 'Home / Direct', home: 'Home', lapa: 'PA (/pa)', laspa: 'Spanish PA (/spa)',
+  sp: 'Spanish (/sp)', ladg: 'Demand Gen (/dg)', ladgs: 'Spanish Demand Gen (/dgs)',
+  latm: 'Team Overlay (/tm)', latm2: 'Team Split (/tm2)',
+  dg: 'Demand Gen (/dg)', dgs: 'Spanish Demand Gen (/dgs)', tm: 'Team Overlay (/tm)', tm2: 'Team Split (/tm2)',
+};
+const pageLabel = (sp) => PAGE_LABELS[sp] ?? (sp || 'Home / Direct');
+
 const PRETTY_TYPE = {
   SEARCH: 'Search', PERFORMANCE_MAX: 'Performance Max', DEMAND_GEN: 'Demand Gen',
   DISPLAY: 'Display', VIDEO: 'Video', SHOPPING: 'Shopping', MULTI_CHANNEL: 'Demand Gen',
@@ -121,6 +130,32 @@ function DrillTable({ title, columns, rows, onRowClick, testid }) {
     </div>
   );
 }
+
+// Per-landing-page performance (visits, leads, calls, conv, bounce).
+const LandingPageTable = ({ rows, directCalls }) => {
+  const cols = [
+    { key: 'source_page', label: 'Landing Page', render: (r) => <span className="font-medium text-slate-900">{pageLabel(r.source_page)}</span> },
+    { key: 'clicks', label: 'Visits', num: true },
+    { key: 'leads', label: 'Leads', num: true },
+    { key: 'calls', label: 'Calls', num: true, render: (r) => (r.calls || 0) },
+    { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },
+    { key: 'bounce_rate', label: 'Bounce Rate', num: true, render: bounceCell },
+  ];
+  return (
+    <div data-testid="analytics-by-landing-page">
+      <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-slate-500">
+        <BarChart3 className="h-4 w-4" /> Performance by landing page
+      </div>
+      <DrillTable title="By Landing Page" columns={cols} rows={rows || []} testid="analytics-landing-table" />
+      {directCalls > 0 && (
+        <p className="mt-2 text-[11px] text-slate-400" data-testid="analytics-direct-calls-note">
+          + {directCalls} direct call{directCalls === 1 ? '' : 's'} (dialed straight from the ad without visiting a landing page — not tied to any page above).
+        </p>
+      )}
+    </div>
+  );
+};
+
 
 // Compact "calls + closed revenue per tracked number" strip for the top of Analytics.
 const CallsByNumberStrip = ({ rows }) => {
@@ -453,6 +488,8 @@ export const AdminAnalytics = () => {
       <CallsByNumberStrip rows={data.calls_by_number || []} />
 
       <HourlyBreakdown data={hourly} loading={hourlyLoading} />
+
+      <LandingPageTable rows={data.by_landing_page || []} directCalls={data.direct_calls || 0} />
 
       {/* Breadcrumb + (campaign-level) type filter */}
       <div className="flex items-center justify-between flex-wrap gap-3">

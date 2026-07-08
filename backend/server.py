@@ -3645,8 +3645,48 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             by_campaign.append(_split_row(kind, display))
     by_campaign.sort(key=lambda r: (r["leads"], r["clicks"]), reverse=True)
 
+    # By landing page (source_page). Clicks + leads are stored per page; calls are
+    # attributed to the page the caller actually VISITED before calling (from the
+    # matched click). Callers who dialed straight from the ad without loading a
+    # page are counted separately as "direct calls" (they have no landing page).
+    async def landing_breakdown():
+        clicks = await _agg_clicks(["source_page"], s_iso, e_iso)
+        leads = await _agg_count(db.leads, ["source_page"], "created_at", s_iso, e_iso)
+        call_docs = await db.calls.find(
+            {"created_at": {"$gte": s_iso, "$lte": e_iso}},
+            {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1, "created_at": 1},
+        ).to_list(length=5000)
+        call_docs = await _enrich_calls_with_hooks(call_docs)
+        call_counts, direct_calls = {}, 0
+        for c in call_docs:
+            sp = (c.get("source_page") or "").lower()
+            if sp:
+                call_counts[sp] = call_counts.get(sp, 0) + 1
+            else:
+                direct_calls += 1
+        keys = {k[0] for k in clicks} | {k[0] for k in leads} | set(call_counts)
+        rows = []
+        for sp in keys:
+            cinfo = clicks.get((sp,), {})
+            c = cinfo.get("clicks", 0)
+            lc = leads.get((sp,), 0)
+            cl = call_counts.get(sp, 0)
+            bounced = max(0, min(cinfo.get("bounced", 0), c - lc))
+            rows.append({
+                "source_page": sp,
+                "clicks": c, "leads": lc, "calls": cl, "bounced": bounced,
+                "conversion_rate": round((lc / c * 100), 1) if c else (100.0 if lc else 0.0),
+                "bounce_rate": round((bounced / c * 100), 1) if c else 0.0,
+            })
+        rows.sort(key=lambda r: (r["leads"], r["clicks"], r["calls"]), reverse=True)
+        return rows, direct_calls
+
+    by_landing_page, direct_calls = await landing_breakdown()
+
     return {
         "by_campaign": by_campaign,
+        "by_landing_page": by_landing_page,
+        "direct_calls": direct_calls,
         "by_adgroup": await breakdown(["campaign_id", "adgroup_id"]),
         "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
         "by_keyword": await breakdown(["campaign_id", "adgroup_id", "ad_id", "keyword"]),
