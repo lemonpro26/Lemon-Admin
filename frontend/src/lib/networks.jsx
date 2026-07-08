@@ -17,6 +17,23 @@ export const NETWORKS = [
 
 export const NETWORK_MAP = NETWORKS.reduce((m, n) => { m[n.key] = n; return m; }, {});
 
+// Small badge for a lead/call's traffic source. Google is the default network,
+// so it renders nothing (keeps rows clean); FB / Instagram / Native get a badge.
+// BACKEND-READY: shows automatically once records carry a `network` field.
+export function NetworkBadge({ network, testid, className = '' }) {
+  const n = NETWORK_MAP[network];
+  if (!n || network === 'google') return null;
+  const { Icon, bg, text, border, label } = n;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${bg} ${text} ${border} ${className}`}
+      data-testid={testid}
+    >
+      <Icon className="h-3 w-3" /> {label}
+    </span>
+  );
+}
+
 // Existing records aren't tagged yet — treat them as Google for the mockup.
 export const getNetwork = (item) => (item && item.network) || 'google';
 

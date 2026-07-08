@@ -36,7 +36,7 @@ import { AdminPages } from '@/components/admin/AdminPages';
 import { AdminFunnel } from '@/components/admin/AdminFunnel';
 import { AdminRetained } from '@/components/admin/AdminRetained';
 import { AdminChannels } from '@/components/admin/AdminChannels';
-import { NetworkChips, getNetwork } from '@/lib/networks';
+import { NetworkChips, getNetwork, NetworkBadge } from '@/lib/networks';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
@@ -670,6 +670,7 @@ export default function AdminDashboard() {
                             {lead.retained && (
                               <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`lead-retained-badge-${lead.id}`}>Retained</Badge>
                             )}
+                            <NetworkBadge network={lead.network} testid={`lead-network-${lead.id}`} className="ml-2" />
                           </TableCell>
                           {leadCols.phone && <TableCell className="text-slate-600">{formatPhone(lead.phone)}</TableCell>}
                           {leadCols.vehicle && <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>}

@@ -3,7 +3,7 @@ import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus,
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
-import { NetworkChips, getNetwork } from '@/lib/networks';
+import { NetworkChips, getNetwork, NetworkBadge } from '@/lib/networks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -470,6 +470,7 @@ export const AdminCalls = () => {
                     {(c.retained || c.__anyRetained) && (
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`call-retained-badge-${c.id}`}>Retained</Badge>
                     )}
+                    <NetworkBadge network={c.network} testid={`call-network-${c.id}`} />
                     {c.google_matched && (
                       <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] gap-1" data-testid={`call-google-badge-${c.id}`} title={`Verified via Google Ads${c.google_call_type ? ' — ' + gcallType(c.google_call_type) : ''}`}>
                         <Sparkles className="h-3 w-3" /> Google Ads
