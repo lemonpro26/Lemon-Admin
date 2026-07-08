@@ -19,7 +19,8 @@ export default function SplitEntry() {
       if (se) params.set('se', se);
       if (sv) params.set('sv', sv);
       const qs = params.toString();
-      const path = target && target.startsWith('/') ? target : '/';
+      let path = target && target.startsWith('/') ? target : '/';
+      if (!path.endsWith('/')) path += '/';  // land on /tm2/?... for URL consistency
       navigate(`${path}${qs ? `?${qs}` : ''}`, { replace: true });
     };
     api
