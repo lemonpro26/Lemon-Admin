@@ -280,6 +280,13 @@ export default function AdminDashboard() {
     { intervalMs: 30000, enabled: activeTab === 'leads' },
   );
 
+  // Keep the top tab counts (Calls / Retained) fresh while those tabs are open,
+  // so the numbers update live without a browser refresh.
+  useLivePoll(
+    () => { loadStats(); },
+    { intervalMs: 30000, enabled: activeTab === 'calls' || activeTab === 'retained' },
+  );
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
     return () => clearTimeout(t);
