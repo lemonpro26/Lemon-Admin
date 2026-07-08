@@ -654,6 +654,16 @@ export default function AdminDashboard() {
                             {lead.source_page === 'laspa' && (
                               <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" data-testid={`lead-source-laspa-${lead.id}`}>Spanish · PA</Badge>
                             )}
+                            {['ladg', 'dg'].includes(lead.source_page) && (
+                              <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] gap-1 inline-flex items-center" data-testid={`lead-source-ladg-${lead.id}`}>
+                                <Megaphone className="h-3 w-3" /> Demand Gen
+                              </Badge>
+                            )}
+                            {['ladgs', 'dgs'].includes(lead.source_page) && (
+                              <Badge variant="outline" className="ml-2 bg-teal-50 text-teal-700 border-teal-200 text-[10px] gap-1 inline-flex items-center" data-testid={`lead-source-ladgs-${lead.id}`}>
+                                <Megaphone className="h-3 w-3" /> Demand Gen · Spanish
+                              </Badge>
+                            )}
                             {lead.crm_duplicate_skipped && (
                               <Badge variant="outline" className="ml-2 bg-rose-50 text-rose-700 border-rose-200 text-[10px]" data-testid={`lead-crm-dup-${lead.id}`}>Duplicate · not sent to CRM</Badge>
                             )}
