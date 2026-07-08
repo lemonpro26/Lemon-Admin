@@ -260,7 +260,7 @@ export const AdminHooks = ({ canEdit, lang = 'en' }) => {
       // 1) create the new hook on the new target
       await api.post('/admin/hook-rules', {
         label: `${r.label} → ${suffix}`, hook1: r.hook1, hook2: r.hook2,
-        weight: r.weight ?? 50, enabled: true, ...tgt,
+        weight: r.weight ?? 50, enabled: true, lang, ...tgt,
       });
       // 2) pause the original (keeps its accumulated stats)
       await api.put(`/admin/hook-rules/${r.id}`, {
