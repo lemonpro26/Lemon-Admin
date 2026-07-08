@@ -11,6 +11,7 @@ import {
 import { DateRangeFilter, allTimeRange } from '@/components/admin/DateRangeFilter';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
+import { NetworkChips, getNetwork } from '@/lib/networks';
 
 const fmtDate = (s) => {
   if (!s) return '\u2014';
@@ -136,6 +137,7 @@ export const AdminRetained = () => {
   const [search, setSearch] = useState('');
   const [syncingQb, setSyncingQb] = useState(false);
   const [viewing, setViewing] = useState(null);
+  const [network, setNetwork] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -211,6 +213,20 @@ export const AdminRetained = () => {
     });
   }, [allItems, search]);
 
+  // Network filter: clicking a network chip narrows the list AND the stat cards
+  // to just that traffic source (same behaviour as the Calls & Leads tabs).
+  const shownItems = useMemo(
+    () => items.filter((it) => network === 'all' || getNetwork(it) === network),
+    [items, network],
+  );
+  const stats = useMemo(() => {
+    const leadCount = shownItems.filter((i) => i.type === 'lead').length;
+    const callCount = shownItems.filter((i) => i.type === 'call').length;
+    const revenue = shownItems.reduce(
+      (sum, i) => sum + (i.sale_status === 'sold' ? Number(i.sale_value || 0) : 0), 0);
+    return { total: shownItems.length, leadCount, callCount, revenue: Math.round(revenue * 100) / 100 };
+  }, [shownItems]);
+
   return (
     <div className="space-y-5" data-testid="admin-retained">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -245,10 +261,10 @@ export const AdminRetained = () => {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { k: 'total', label: 'Retained clients', v: data.total, cls: 'text-amber-600' },
-          { k: 'leads', label: 'From form leads', v: data.lead_count, cls: 'text-blue-600' },
-          { k: 'calls', label: 'From phone calls', v: data.call_count, cls: 'text-emerald-600' },
-          { k: 'revenue', label: 'Total revenue', v: `$${Number(data.total_revenue || 0).toLocaleString()}`, cls: 'text-slate-900' },
+          { k: 'total', label: 'Retained clients', v: stats.total, cls: 'text-amber-600' },
+          { k: 'leads', label: 'From form leads', v: stats.leadCount, cls: 'text-blue-600' },
+          { k: 'calls', label: 'From phone calls', v: stats.callCount, cls: 'text-emerald-600' },
+          { k: 'revenue', label: 'Total revenue', v: `$${Number(stats.revenue || 0).toLocaleString()}`, cls: 'text-slate-900' },
         ].map((c) => (
           <div key={c.k} className="rounded-2xl border border-slate-200 bg-white p-4" data-testid={`retained-stat-${c.k}`}>
             <div className="text-sm text-slate-500">{c.label}</div>
@@ -257,14 +273,19 @@ export const AdminRetained = () => {
         ))}
       </div>
 
+      {/* Network filter — clicking a network narrows the table AND the stats above. */}
+      <NetworkChips items={items} value={network} onChange={setNetwork} testidPrefix="retained-network" />
+
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-slate-500" data-testid="retained-loading">Loading…</div>
-        ) : items.length === 0 ? (
+        ) : shownItems.length === 0 ? (
           <div className="p-12 text-center text-slate-500" data-testid="retained-empty">
             {search.trim()
               ? `No retained clients match "${search.trim()}".`
-              : 'No retained clients yet. Open a lead or call and mark it as retained — it will appear here.'}
+              : network !== 'all'
+                ? `No retained clients from ${network} yet.`
+                : 'No retained clients yet. Open a lead or call and mark it as retained — it will appear here.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -282,7 +303,7 @@ export const AdminRetained = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((it) => (
+                {shownItems.map((it) => (
                   <TableRow key={`${it.type}-${it.id}`} data-testid={`retained-row-${it.id}`}>
                     <TableCell className="font-medium text-slate-900">
                       <div className="flex items-center gap-1.5">
