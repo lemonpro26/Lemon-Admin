@@ -2711,9 +2711,22 @@ async def admin_analytics_hourly(start: str = "", end: str = "", _: dict = Depen
 
     calls = await db.calls.find(
         {"is_test": {"$ne": True}, "created_at": {"$gte": s_iso, "$lte": e_iso}},
-        {"called_at": 1, "created_at": 1},
+        {"called_at": 1, "created_at": 1, "caller_number": 1},
     ).to_list(20000)
+    # Dedupe repeat callers by phone number (unique callers), matching the Calls
+    # tab. Each unique caller is bucketed by their MOST RECENT call. Calls with no
+    # number count individually.
+    latest, individuals = {}, []
     for c in calls:
+        num = c.get("caller_number")
+        if not num:
+            individuals.append(c)
+            continue
+        t = c.get("created_at") or c.get("called_at") or ""
+        prev = latest.get(num)
+        if prev is None or t > (prev.get("created_at") or prev.get("called_at") or ""):
+            latest[num] = c
+    for c in list(latest.values()) + individuals:
         # Bucket by OUR own record of when the call arrived (created_at, reliable
         # UTC). Fall back to the CTM-provided called_at only if created_at is
         # somehow missing/unparseable.
@@ -3542,21 +3555,48 @@ async def _agg_clicks(group_fields: list, s_iso: str, e_iso: str) -> dict:
 
 
 async def _calls_by_number(s_iso: str, e_iso: str) -> list:
-    """Aggregate calls + closed revenue within a range, grouped by dialed number."""
+    """Aggregate calls + closed revenue within a range, grouped by dialed number.
+    Repeat callers are deduped by phone number (unique callers) — the most recent
+    call decides the group — matching the Calls tab. Calls with no number count
+    individually."""
     buckets = {g["key"]: {"key": g["key"], "label": g["label"], "display": g["display"],
                           "calls": 0, "sold": 0, "revenue": 0.0} for g in CALL_NUMBER_GROUPS}
     buckets["other"] = {"key": "other", "label": "Other", "display": "Other / untracked",
                         "calls": 0, "sold": 0, "revenue": 0.0}
+    latest = {}       # caller_number -> most-recent call (representative)
+    agg = {}          # caller_number -> {"sold": n, "revenue": x}
+    individuals = []  # calls with no caller_number (each counts once)
     async for c in db.calls.find(
         {"created_at": {"$gte": s_iso, "$lte": e_iso}},
-        {"tracking_number": 1, "sale_status": 1, "sale_value": 1},
+        {"tracking_number": 1, "sale_status": 1, "sale_value": 1, "caller_number": 1, "created_at": 1, "called_at": 1},
     ):
-        grp = _call_number_group(c.get("tracking_number"))["number_group"]
+        sold = c.get("sale_status") == "sold"
+        rev = float(c.get("sale_value") or 0) if sold else 0.0
+        num = c.get("caller_number")
+        if not num:
+            individuals.append((c, sold, rev))
+            continue
+        a = agg.setdefault(num, {"sold": 0, "revenue": 0.0})
+        if sold:
+            a["sold"] += 1
+            a["revenue"] += rev
+        t = c.get("created_at") or c.get("called_at") or ""
+        prev = latest.get(num)
+        if prev is None or t > (prev.get("created_at") or prev.get("called_at") or ""):
+            latest[num] = c
+
+    def _add(rep, sold_count, revenue):
+        grp = _call_number_group(rep.get("tracking_number"))["number_group"]
         b = buckets.get(grp) or buckets["other"]
         b["calls"] += 1
-        if c.get("sale_status") == "sold":
-            b["sold"] += 1
-            b["revenue"] += float(c.get("sale_value") or 0)
+        b["sold"] += sold_count
+        b["revenue"] += revenue
+
+    for num, rep in latest.items():
+        a = agg[num]
+        _add(rep, 1 if a["sold"] > 0 else 0, a["revenue"])
+    for c, sold, rev in individuals:
+        _add(c, 1 if sold else 0, rev)
     order = [g["key"] for g in CALL_NUMBER_GROUPS] + ["other"]
     return [buckets[k] for k in order if k != "other" or buckets["other"]["calls"] > 0]
 
