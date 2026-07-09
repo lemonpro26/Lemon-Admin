@@ -2748,6 +2748,10 @@ async def admin_get_calls(start: str = "", end: str = "", search: str = Query(""
     docs = await db.calls.find(q).sort("created_at", -1).to_list(2000)
     items = [{k: v for k, v in c.items() if k != "_id"} for c in docs]
     items = await _enrich_calls_with_hooks(items)
+    # Defensive read-time guard: only surface calls dialed to one of our tracked
+    # landing-page numbers. Ingestion already filters these out, but this hides any
+    # legacy/untracked docs that predate the webhook filter.
+    items = [c for c in items if (c.get("number_group") or "other") != "other"]
     cfg = await get_or_create_config()
     items = _resolve_ad_names(items, cfg.get("ad_labels") or {})
     return {"calls": items, "total": len(items)}
