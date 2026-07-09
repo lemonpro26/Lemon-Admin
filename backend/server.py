@@ -2399,12 +2399,21 @@ async def calls_webhook(request: Request, token: str = ""):
 
     now = _now_iso()
     _caller = g("caller_number", "caller_id", "from", "caller")
+    _tracking = g("tracking_number", "called_number", "dialed_number", "to")
+    # Only accept calls that came through one of OUR landing-page tracking numbers.
+    # Calls dialed to any other number (office lines, numbers surfaced by Quickbase,
+    # etc.) are ignored so they never pollute the Calls tab or analytics.
+    _grp = _call_number_group(_tracking)["number_group"]
+    if _grp == "other":
+        logger.info("Call webhook IGNORED (untracked number %r): not a landing-page number", _tracking)
+        return {"success": True, "ignored": True}
     rec = {
         "id": str(uuid.uuid4()),
         "caller_number": _caller,
         "caller_name": g("caller_name", "name"),
         "caller_digits": _re.sub(r"\D", "", _caller),
-        "tracking_number": g("tracking_number", "called_number", "dialed_number", "to"),
+        "tracking_number": _tracking,
+        "number_group": _grp,
         "duration": duration,
         "source": g("source"),
         "keyword": g("keyword"),
@@ -4080,6 +4089,26 @@ async def startup():
             )
     except Exception as e:
         logger.error("caller_digits backfill failed: %s", e)
+    # One-time cleanup: keep ONLY calls that came through our landing-page tracking
+    # numbers. Delete calls dialed to any other number (office lines / Quickbase-
+    # sourced numbers) and backfill number_group on the ones we keep, so the Calls
+    # tab and all analytics reflect only real tracked-number calls.
+    try:
+        _to_delete = []
+        # Only scan calls not yet tagged with a number_group (legacy rows). New
+        # calls are tagged/rejected at ingestion, so this is a no-op after the
+        # first run.
+        async for c in db.calls.find({"number_group": {"$exists": False}}, {"tracking_number": 1}):
+            grp = _call_number_group(c.get("tracking_number")).get("number_group")
+            if grp == "other":
+                _to_delete.append(c["_id"])
+            else:
+                await db.calls.update_one({"_id": c["_id"]}, {"$set": {"number_group": grp}})
+        if _to_delete:
+            res = await db.calls.delete_many({"_id": {"$in": _to_delete}})
+            logger.info("Untracked-number call cleanup: removed %s calls", res.deleted_count)
+    except Exception as e:
+        logger.error("untracked-call cleanup failed: %s", e)
     # One-time backfill: give every experiment its own split entry slug
     # (split, split2, …), preferring the running one for the bare "/split".
     try:
