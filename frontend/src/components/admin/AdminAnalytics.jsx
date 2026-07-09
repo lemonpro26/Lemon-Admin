@@ -149,7 +149,7 @@ const LandingPageTable = ({ rows, directCalls }) => {
       <DrillTable title="By Landing Page" columns={cols} rows={rows || []} testid="analytics-landing-table" />
       {directCalls > 0 && (
         <p className="mt-2 text-[11px] text-slate-400" data-testid="analytics-direct-calls-note">
-          + {directCalls} direct call{directCalls === 1 ? '' : 's'} (dialed straight from the ad without visiting a landing page — not tied to any page above).
+          + {directCalls} call{directCalls === 1 ? '' : 's'} from untracked numbers (couldn&apos;t be tied to a specific landing page above).
         </p>
       )}
     </div>

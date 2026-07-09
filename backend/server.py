@@ -3694,23 +3694,45 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             by_campaign.append(_split_row(kind, display))
     by_campaign.sort(key=lambda r: (r["leads"], r["clicks"]), reverse=True)
 
-    # By landing page (source_page). Clicks + leads are stored per page; calls are
-    # attributed to the page the caller actually VISITED before calling (from the
-    # matched click). Callers who dialed straight from the ad without loading a
-    # page are counted separately as "direct calls" (they have no landing page).
+    # By landing page (source_page). Clicks + leads are stored per page. Calls are
+    # attributed to a landing page by (1) the page the caller VISITED before calling
+    # when known, else (2) the tracked phone NUMBER they dialed -> the primary
+    # landing page that displays that number. Repeat callers count once (unique).
+    # Only calls with no page and no matching tracked number are "direct calls".
+    GROUP_PRIMARY_PAGE = {"home_pa": "lapa", "spanish": "laspa", "dg": "ladg", "dgs": "ladgs"}
+
     async def landing_breakdown():
         clicks = await _agg_clicks(["source_page"], s_iso, e_iso)
         leads = await _agg_count(db.leads, ["source_page"], "created_at", s_iso, e_iso)
         call_docs = await db.calls.find(
             {"created_at": {"$gte": s_iso, "$lte": e_iso}},
-            {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1, "created_at": 1},
+            {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1, "created_at": 1, "caller_number": 1},
         ).to_list(length=5000)
         call_docs = await _enrich_calls_with_hooks(call_docs)
-        call_counts, direct_calls = {}, 0
+        # Dedupe repeat callers by phone number (most recent call represents them).
+        latest, individuals = {}, []
         for c in call_docs:
+            num = c.get("caller_number")
+            if not num:
+                individuals.append(c)
+                continue
+            t = c.get("created_at") or c.get("called_at") or ""
+            prev = latest.get(num)
+            if prev is None or t > (prev.get("created_at") or prev.get("called_at") or ""):
+                latest[num] = c
+
+        def _call_page(c):
             sp = (c.get("source_page") or "").lower()
             if sp:
-                call_counts[sp] = call_counts.get(sp, 0) + 1
+                return sp
+            grp = _call_number_group(c.get("tracking_number"))["number_group"]
+            return GROUP_PRIMARY_PAGE.get(grp)  # None if the number isn't tracked
+
+        call_counts, direct_calls = {}, 0
+        for c in list(latest.values()) + individuals:
+            p = _call_page(c)
+            if p:
+                call_counts[p] = call_counts.get(p, 0) + 1
             else:
                 direct_calls += 1
         keys = {k[0] for k in clicks} | {k[0] for k in leads} | set(call_counts)
