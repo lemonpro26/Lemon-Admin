@@ -39,6 +39,18 @@ const convCell = (r) => (
     {r.conversion_rate}%
   </span>
 );
+const money = (v) => (v == null ? <span className="text-slate-400">—</span>
+  : <span className="font-medium text-slate-900">${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>);
+const roasCell = (r) => (r.roas == null ? <span className="text-slate-400">—</span>
+  : <span className={`font-semibold ${r.roas >= 1 ? 'text-emerald-600' : 'text-rose-600'}`}>{r.roas}x</span>);
+const FIN_COLS = [
+  { key: 'spend', label: 'Spend', num: true, render: (r) => money(r.spend) },
+  { key: 'revenue', label: 'Revenue', num: true, render: (r) => money(r.revenue) },
+  { key: 'roas', label: 'ROAS', num: true, render: roasCell },
+  { key: 'cpl', label: 'CPL', num: true, render: (r) => money(r.cpl) },
+  { key: 'cpa', label: 'CPA', num: true, render: (r) => money(r.cpa) },
+];
+
 const bounceCell = (r) => {
   const clicks = r.clicks || 0;
   const converted = r.leads || 0;
@@ -139,6 +151,7 @@ const LandingPageTable = ({ rows, directCalls }) => {
     { key: 'leads', label: 'Leads', num: true },
     { key: 'calls', label: 'Calls', num: true, render: (r) => (r.calls || 0) },
     { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },
+    ...FIN_COLS,
     { key: 'bounce_rate', label: 'Bounce Rate', num: true, render: bounceCell },
   ];
   return (
@@ -409,6 +422,7 @@ export const AdminAnalytics = () => {
     { key: 'leads', label: 'Leads', num: true },
     { key: 'calls', label: 'Calls', num: true, render: (r) => (r.calls || 0) },
     { key: 'conversion_rate', label: 'Conv. Rate', num: true, render: convCell },
+    ...FIN_COLS,
     { key: 'bounce_rate', label: 'Bounce Rate', num: true, render: bounceCell },
   ];
 

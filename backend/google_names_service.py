@@ -162,6 +162,30 @@ def fetch_spend_by_day(start: str, end: str) -> dict:
         logger.info("Google spend fetch failed: %s", e)
         return empty
 
+def fetch_spend_by_campaign(start: str, end: str) -> dict:
+    """Return {campaign_id(str): cost_float} aggregated over the date range.
+    Returns {} if not configured / on error."""
+    if not is_configured():
+        return {}
+    c = _cfg()
+    try:
+        token = _access_token(c)
+        q = (f"SELECT campaign.id, metrics.cost_micros FROM campaign "
+             f"WHERE segments.date BETWEEN '{start}' AND '{end}'")
+        rows = _search(c, token, q)
+        out = {}
+        for r in rows:
+            cid = str(r.get("campaign", {}).get("id", "") or "")
+            micros = int(r.get("metrics", {}).get("costMicros", 0) or 0)
+            if cid:
+                out[cid] = out.get(cid, 0) + micros
+        return {k: round(v / 1_000_000, 2) for k, v in out.items()}
+    except Exception as e:
+        logger.info("Google per-campaign spend fetch failed: %s", e)
+        return {}
+
+
+
 
 
 def fetch_names() -> dict:

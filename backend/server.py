@@ -3720,7 +3720,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         {"created_at": {"$gte": s_iso, "$lte": e_iso}},
         {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1,
          "created_at": 1, "caller_number": 1, "campaign_id": 1, "adgroup_id": 1,
-         "ad_id": 1, "keyword": 1, "sale_status": 1, "sale_value": 1},
+         "ad_id": 1, "keyword": 1, "sale_status": 1, "sale_value": 1, "retained": 1},
     ).to_list(length=20000)
     _enriched_calls = await _enrich_calls_with_hooks(_calls_in_range)
 
@@ -3864,6 +3864,71 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         return rows, direct_calls
 
     by_landing_page, direct_calls = await landing_breakdown()
+
+    # ---- Revenue / ROAS / CPL / CPA for campaigns + landing pages ----
+    # Spend comes from Google (per campaign); landing-page spend is estimated by
+    # allocating each campaign's spend across the pages its clicks landed on.
+    spend_by_campaign = await asyncio.to_thread(gnames.fetch_spend_by_campaign, start, end)
+    lead_docs = await db.leads.find(
+        {"created_at": {"$gte": s_iso, "$lte": e_iso}},
+        {"_id": 0, "campaign_id": 1, "source_page": 1, "sale_status": 1, "sale_value": 1, "retained": 1},
+    ).to_list(length=20000)
+
+    def _page_of_call(c):
+        sp = (c.get("source_page") or "").lower()
+        if sp:
+            return sp
+        grp = _call_number_group(c.get("tracking_number"))["number_group"]
+        return GROUP_PRIMARY_PAGE.get(grp) or ""
+
+    rev_camp, ret_camp, rev_page, ret_page = {}, {}, {}, {}
+
+    def _acc(d, k, v=1.0):
+        if k:
+            d[k] = d.get(k, 0) + v
+
+    for l in lead_docs:
+        cid, pg = l.get("campaign_id") or "", (l.get("source_page") or "").lower()
+        if l.get("sale_status") == "sold":
+            v = float(l.get("sale_value") or 0)
+            _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
+        if l.get("retained"):
+            _acc(ret_camp, cid); _acc(ret_page, pg)
+    for c in _enriched_calls:
+        cid, pg = c.get("campaign_id") or "", _page_of_call(c)
+        if c.get("sale_status") == "sold":
+            v = float(c.get("sale_value") or 0)
+            _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
+        if c.get("retained"):
+            _acc(ret_camp, cid); _acc(ret_page, pg)
+
+    # Allocate campaign spend across landing pages by click share.
+    cp_clicks = await _agg_clicks(["campaign_id", "source_page"], s_iso, e_iso)
+    camp_click_totals = {}
+    for (cid, _sp), info in cp_clicks.items():
+        camp_click_totals[cid] = camp_click_totals.get(cid, 0) + info.get("clicks", 0)
+    spend_page = {}
+    for (cid, sp), info in cp_clicks.items():
+        tot, sp_spend = camp_click_totals.get(cid, 0), spend_by_campaign.get(cid, 0.0)
+        if tot and sp_spend:
+            spend_page[sp] = spend_page.get(sp, 0.0) + sp_spend * (info.get("clicks", 0) / tot)
+
+    def _fin(spend, revenue, leads, retained):
+        return {
+            "spend": round(spend, 2),
+            "revenue": round(revenue, 2),
+            "roas": round(revenue / spend, 2) if spend > 0 else None,
+            "cpl": round(spend / leads, 2) if (spend > 0 and leads > 0) else None,
+            "cpa": round(spend / retained, 2) if (spend > 0 and retained > 0) else None,
+            "retained": int(retained),
+        }
+
+    for r in by_campaign:
+        cid = r.get("campaign_id") or ""
+        r.update(_fin(spend_by_campaign.get(cid, 0.0), rev_camp.get(cid, 0.0), r.get("leads", 0), ret_camp.get(cid, 0)))
+    for r in by_landing_page:
+        sp = r.get("source_page") or ""
+        r.update(_fin(spend_page.get(sp, 0.0), rev_page.get(sp, 0.0), r.get("leads", 0), ret_page.get(sp, 0)))
 
     return {
         "by_campaign": by_campaign,
