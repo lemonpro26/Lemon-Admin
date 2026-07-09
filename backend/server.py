@@ -3288,6 +3288,10 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
             "conversion_detail": c.get("conversion_detail"),
         })
     items.sort(key=lambda x: x.get("retained_at") or "", reverse=True)
+    # Resolve numeric Google Ads IDs → campaign / ad group / ad names (same as the
+    # Calls & Leads tabs) so the detail popup shows names, not raw numbers.
+    cfg = await get_or_create_config()
+    items = _resolve_ad_names(items, cfg.get("ad_labels") or {})
     total_revenue = round(sum(float(i.get("sale_value") or 0) for i in items if i.get("sale_status") == "sold"), 2)
     return {"items": items, "total": len(items), "lead_count": len(leads), "call_count": len(calls), "total_revenue": total_revenue}
 
