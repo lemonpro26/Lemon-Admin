@@ -3934,10 +3934,12 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
 
     for r in by_campaign:
         cid = r.get("campaign_id") or ""
-        r.update(_fin(spend_by_campaign.get(cid, 0.0), rev_camp.get(cid, 0.0), r.get("leads", 0), ret_camp.get(cid, 0)))
+        contacts = r.get("leads", 0) + r.get("calls", 0)
+        r.update(_fin(spend_by_campaign.get(cid, 0.0), rev_camp.get(cid, 0.0), contacts, ret_camp.get(cid, 0)))
     for r in by_landing_page:
         sp = r.get("source_page") or ""
-        r.update(_fin(spend_page.get(sp, 0.0), rev_page.get(sp, 0.0), r.get("leads", 0), ret_page.get(sp, 0)))
+        contacts = r.get("leads", 0) + r.get("calls", 0)
+        r.update(_fin(spend_page.get(sp, 0.0), rev_page.get(sp, 0.0), contacts, ret_page.get(sp, 0)))
 
     return {
         "by_campaign": by_campaign,
