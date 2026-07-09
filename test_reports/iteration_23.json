@@ -1,0 +1,32 @@
+{
+  "summary": "Regression testing of analytics/webhook/tracking endpoints after monolithic server.py edits. 11/11 backend tests pass. Verified admin login, /admin/analytics financial math (CPL=spend/(leads+calls), CPA=spend/retained, retained int field present on every by_campaign & by_landing_page row, null cpl/cpa/roas when spend=0), /admin/analytics/hourly, /admin/retained, /admin/metrics, /admin/stats (total_retained lives here), /admin/channels/summary, /admin/spanish, /admin/calls filter, and POST /track/call-click.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/metrics", "issue": "Review request expected `total_retained` on /admin/metrics, but that field actually lives on /admin/stats. /admin/metrics returns a mock media-buying dashboard with totals/breakdowns. Not a bug — likely a spec-vs-code discrepancy in the request. Confirm intended endpoint with product owner."},
+      {"endpoint": "/api/admin/calls", "issue": "Historical/legacy calls in DB (from before the webhook filter was added) can still show up in the Calls tab because /admin/calls does NOT filter by tracked number at read time — only the ingestion webhook filters. Once existing untracked docs are pruned this is a no-op, but a defensive `number_group != 'other'` filter in the read path would harden the guarantee."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration23_analytics.py",
+    "/app/test_reports/pytest/iteration23.xml"
+  ],
+  "action_items": [
+    "Clarify whether `total_retained` should be exposed on /admin/metrics as well as /admin/stats (review request implied /admin/metrics).",
+    "Consider defensive read-time filter on /admin/calls to hide legacy untracked-number docs.",
+    "Actual tracked numbers in code are 844-335-8911, 866-524-3722, 833-240-9312, 833-868-1802 — the request listed different digits (800-444-2867, 888-782-7321, 800-711-5408, 866-524-3722). Confirm which set is correct."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 4151 lines — should be split into routers (admin_analytics, calls, tracking, auth) for maintainability.",
+    "Financial math in _fin() is clean and correctly returns None for cpl/cpa/roas when spend=0.",
+    "/admin/calls read path lacks the tracked-number filter that ingestion enforces — inconsistent guarantee across write vs read."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration23_analytics.py"],
+  "success_rate": {"backend": "100%", "frontend": "not tested (skipped per request)"},
+  "test_credentials": "owner / LemonPros2026! (verified working on POST /api/admin/login)",
+  "seed_data_creation": "One /track/call-click doc created with session_id prefix TEST_ (harmless, non-blocking).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 23 exercised the review-request checklist end-to-end via test_iteration23_analytics.py. All aggregation & webhook endpoints stable. Note: tracked phone numbers are defined in CALL_NUMBER_GROUPS at server.py ~L2445 — use those (not the ones in the review request) for any future call-related tests. `total_retained` is on /admin/stats, NOT /admin/metrics."
+}

@@ -49,6 +49,7 @@ const FIN_COLS = [
   { key: 'roas', label: 'ROAS', num: true, render: roasCell },
   { key: 'cpl', label: 'CPL', num: true, render: (r) => money(r.cpl) },
   { key: 'cpa', label: 'CPA', num: true, render: (r) => money(r.cpa) },
+  { key: 'retained', label: 'Retained', num: true, render: (r) => <span className="font-semibold text-slate-900 tabular-nums">{r.retained || 0}</span> },
 ];
 
 const bounceCell = (r) => {
