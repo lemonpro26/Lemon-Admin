@@ -37,6 +37,46 @@ export const withAdTracking = (base) => `${String(base).replace(/\/+$/, '')}/?${
 
 const EMPTY = { campaign_id: '', adgroup_id: '', ad_id: '', keyword: '', gclid: '', gbraid: '', wbraid: '', referrer: '', feeditemid: '', extensionid: '', split_experiment_id: '', split_variant: '', params: {} };
 
+// Map the current landing-page path -> its internal source_page code, so a phone
+// tap is attributed to the exact page even when the number is shared across pages.
+const PATH_TO_SOURCE = {
+  '/': 'home', '/sp': 'sp', '/pa': 'lapa', '/spa': 'laspa',
+  '/tm': 'latm', '/tm2': 'latm2', '/dg': 'ladg', '/dgs': 'ladgs',
+};
+function currentSourcePage() {
+  try {
+    const path = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+    return PATH_TO_SOURCE[path] || '';
+  } catch (e) { return ''; }
+}
+
+// Log a phone-number TAP (source_page + dialed number) so the resulting inbound
+// call can be tied back to the exact landing page. Uses sendBeacon so it fires
+// even as the tel: navigation begins. telHref example: "tel:+18443358911".
+export function recordCallClick(telHref) {
+  try {
+    const number = String(telHref || '').replace(/\D/g, '').slice(-10);
+    if (!number) return;
+    const t = getTracking();
+    const body = JSON.stringify({
+      session_id: getSessionId(),
+      source_page: currentSourcePage(),
+      number,
+      gclid: t.gclid || '',
+      campaign_id: t.campaign_id || '',
+      adgroup_id: t.adgroup_id || '',
+      ad_id: t.ad_id || '',
+      keyword: t.keyword || '',
+    });
+    const url = `${process.env.REACT_APP_BACKEND_URL}/api/track/call-click`;
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+    } else {
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
+    }
+  } catch (e) { /* never block the call */ }
+}
+
 export function getTracking() {
   try {
     const raw = localStorage.getItem(TRACK_KEY);

@@ -55,6 +55,12 @@ const CALL_SEGMENTS = [
 // A call is "attributed" when we can tie it to an ad/campaign.
 const callHasAttribution = (c) => !!(c.campaign_name || c.google_campaign);
 
+const SOURCE_LABELS = {
+  home: 'Home', lapa: 'PA (/pa)', laspa: 'Spanish PA (/spa)', sp: 'Spanish (/sp)',
+  ladg: 'Demand Gen (/dg)', ladgs: 'Spanish Demand Gen (/dgs)',
+  latm: 'Team Overlay (/tm)', latm2: 'Team Split (/tm2)',
+};
+
 const _callTime = (c) => new Date(c.called_at || c.created_at || 0).getTime();
 
 // Collapse repeat callers: one row per phone number, represented by their MOST
@@ -716,6 +722,11 @@ export const AdminCalls = () => {
                       )}
                     </div>
                   </div>
+                ) : selected.tapped_from_page ? (
+                  <p className="text-sm text-slate-700" data-testid="call-detail-tapped">
+                    Caller <strong>tapped the call button</strong> on the{' '}
+                    <strong>{SOURCE_LABELS[selected.source_page] || selected.source_page}</strong> page.
+                  </p>
                 ) : (
                   <p className="text-sm text-slate-500" data-testid="call-detail-nopage">
                     This caller clicked to call from the ad <strong>without visiting the landing page</strong> (no matching page visit found).

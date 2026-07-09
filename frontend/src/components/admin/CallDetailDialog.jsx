@@ -119,6 +119,10 @@ export const CallDetailDialog = ({ call, open, onOpenChange, onChanged }) => {
                   )}
                 </div>
               </div>
+            ) : c.tapped_from_page ? (
+              <p className="text-sm text-slate-700" data-testid="cd-tapped">
+                Caller <strong>tapped the call button</strong> on the <strong>{c.source_page || 'landing'}</strong> page.
+              </p>
             ) : (
               <p className="text-sm text-slate-500" data-testid="cd-nopage">
                 This caller clicked to call from the ad <strong>without visiting the landing page</strong>.

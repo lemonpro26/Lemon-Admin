@@ -2,6 +2,7 @@
 // The base Google tag is loaded once in public/index.html with:
 //   - GA4 G-PBB3G61CXB   (send_page_view:false — page views are sent manually here)
 //   - Google Ads AW-318021992 (auto-tagging / GCLID + the form-submit conversion below)
+import { recordCallClick } from '@/lib/tracking';
 const GA4_ID = 'G-PBB3G61CXB';
 // Google Ads "Lead Form Submit" conversion label (Event snippet send_to value).
 const ADS_LEAD_CONVERSION = 'AW-318021992/QndSCIqez8EcEOjC0pcB';
@@ -56,6 +57,12 @@ export function trackAdsConversion({ value, currency = 'USD', transactionId } = 
 // call conversion silently under-reports / "doesn't fire".
 let _lastCallConvAt = 0;
 export function trackPhoneCallConversion(e) {
+  const anchorEl = e && e.currentTarget && e.currentTarget.getAttribute ? e.currentTarget : null;
+  const telHref = anchorEl ? anchorEl.getAttribute('href') : null;
+  // Log the tap to our backend (source_page + dialed number) for exact per-page
+  // call attribution. Fires regardless of whether gtag is available.
+  recordCallClick(telHref);
+
   const now = Date.now();
   if (now - _lastCallConvAt < 1500) return; // let default tel: navigation proceed
   _lastCallConvAt = now;
@@ -63,8 +70,7 @@ export function trackPhoneCallConversion(e) {
   // gtag unavailable → don't block the call, just let the link work.
   if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
 
-  const anchor = e && e.currentTarget && e.currentTarget.getAttribute ? e.currentTarget : null;
-  const url = anchor ? anchor.getAttribute('href') : null;
+  const url = telHref;
 
   if (url) {
     e.preventDefault(); // must be synchronous

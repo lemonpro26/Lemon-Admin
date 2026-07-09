@@ -1011,6 +1011,41 @@ async def track_engage(body: ClickTrack, request: Request):
     return {"success": True}
 
 
+class CallClickIn(BaseModel):
+    session_id: Optional[str] = ""
+    source_page: Optional[str] = ""
+    number: Optional[str] = ""
+    gclid: Optional[str] = ""
+    campaign_id: Optional[str] = ""
+    adgroup_id: Optional[str] = ""
+    ad_id: Optional[str] = ""
+    keyword: Optional[str] = ""
+
+
+@api_router.post("/track/call-click")
+async def track_call_click(payload: CallClickIn, request: Request):
+    """Record a phone-number TAP on a landing page (source_page + dialed number).
+    Lets us attribute the resulting inbound call to the exact page even when the
+    same number appears on multiple pages. Fired via sendBeacon on tel: taps."""
+    if is_bot_ua(request.headers.get("user-agent", "")):
+        return {"ok": True, "bot": True}
+    doc = {
+        "id": str(uuid.uuid4()),
+        "session_id": payload.session_id or "",
+        "source_page": (payload.source_page or "").lower(),
+        "number": _digits10(payload.number or ""),
+        "gclid": payload.gclid or "",
+        "campaign_id": payload.campaign_id or "",
+        "adgroup_id": payload.adgroup_id or "",
+        "ad_id": payload.ad_id or "",
+        "keyword": payload.keyword or "",
+        "created_at": _now_iso(),
+    }
+    await db.call_clicks.insert_one(doc)
+    return {"ok": True}
+
+
+
 # Ordered funnel steps (must match frontend STEP_IDS).
 FUNNEL_STEPS = ["year", "make", "model", "name", "phone", "email"]
 
@@ -2445,6 +2480,30 @@ def _resolve_ad_names(items: list, ad_labels: dict) -> list:
     return items
 
 
+def _match_call_tap(taps_by_digits: dict, call: dict):
+    """Match an inbound call to the most recent phone-number TAP on the same dialed
+    number, within a time window before the call (tap → call latency). Returns the
+    tap doc (with source_page) or None."""
+    d = _digits10(call.get("tracking_number"))
+    lst = taps_by_digits.get(d)
+    if not lst:
+        return None
+    ct = _parse_dt_epoch(call.get("created_at") or call.get("called_at"))
+    if ct is None:
+        return None
+    best = None
+    for tp in lst:  # sorted ascending by time; keep the latest that qualifies
+        tt = _parse_dt_epoch(tp.get("created_at"))
+        if tt is None:
+            continue
+        # Tap should occur shortly BEFORE the call connects (allow 2 min of clock
+        # skew after, up to 30 min before).
+        if tt <= ct + 120 and (ct - tt) <= 1800:
+            best = tp
+    return best
+
+
+
 async def _enrich_calls_with_hooks(items: list) -> list:
     """For each call, determine whether the caller saw the landing page and which
     hook variant they saw, by joining the call's gclid (or session_id) to a
@@ -2475,6 +2534,20 @@ async def _enrich_calls_with_hooks(items: list) -> list:
     cfg = await get_or_create_config()
     default_hook = {"label": "Default hook", "hook1": cfg.get("hook1", ""), "hook2": cfg.get("hook2", "")}
 
+    # Fallback attribution: recorded phone-number TAPS (call_clicks) let us tie a
+    # call to the exact landing page it was dialed from, even on shared numbers.
+    call_digits = {_digits10(c.get("tracking_number")) for c in items if c.get("tracking_number")}
+    call_digits.discard("")
+    taps_by_digits = {}
+    if call_digits:
+        async for tp in db.call_clicks.find(
+            {"number": {"$in": list(call_digits)}},
+            {"number": 1, "source_page": 1, "created_at": 1, "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "keyword": 1},
+        ):
+            taps_by_digits.setdefault(tp["number"], []).append(tp)
+        for lst in taps_by_digits.values():
+            lst.sort(key=lambda x: x.get("created_at") or "")
+
     for c in items:
         c.update(_call_number_group(c.get("tracking_number")))
         ck = None
@@ -2483,13 +2556,36 @@ async def _enrich_calls_with_hooks(items: list) -> list:
         elif c.get("session_id") and c["session_id"] in clicks_by_session:
             ck = clicks_by_session[c["session_id"]]
         if ck is None:
-            c["saw_landing_page"] = False
-            c["hook_label"] = None
-            c["hook1"] = None
-            c["hook2"] = None
-            c["matched_rule_id"] = None
-            c["source_page"] = None
-            c["is_spanish"] = False
+            # No page-visit click record. Try a recorded phone TAP on a page
+            # (exact source_page, even for shared numbers). Else it's a true
+            # direct click-to-call from the ad.
+            tap = _match_call_tap(taps_by_digits, c)
+            if tap is not None:
+                sp = (tap.get("source_page") or "").lower()
+                c["saw_landing_page"] = False
+                c["hook_label"] = None
+                c["hook1"] = None
+                c["hook2"] = None
+                c["matched_rule_id"] = None
+                c["source_page"] = sp
+                c["is_spanish"] = sp in ("sp", "laspa")
+                c["tapped_from_page"] = True
+                if tap.get("campaign_id") and not c.get("campaign_id"):
+                    c["campaign_id"] = tap["campaign_id"]
+                if tap.get("adgroup_id") and not c.get("adgroup_id"):
+                    c["adgroup_id"] = tap["adgroup_id"]
+                if tap.get("ad_id") and not c.get("ad_id"):
+                    c["ad_id"] = tap["ad_id"]
+                if tap.get("keyword") and not c.get("keyword"):
+                    c["keyword"] = tap["keyword"]
+            else:
+                c["saw_landing_page"] = False
+                c["hook_label"] = None
+                c["hook1"] = None
+                c["hook2"] = None
+                c["matched_rule_id"] = None
+                c["source_page"] = None
+                c["is_spanish"] = False
         else:
             rid = ck.get("matched_rule_id")
             hook = rule_map.get(rid) if rid else default_hook
@@ -3283,6 +3379,7 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
             "hook1": c.get("hook1"), "hook2": c.get("hook2"),
             "landing_path": c.get("landing_path"), "last_click_at": c.get("last_click_at"),
             "click_visits": c.get("click_visits"),
+            "source_page": c.get("source_page"), "tapped_from_page": c.get("tapped_from_page"),
             "google_matched": c.get("google_matched"), "google_call_type": c.get("google_call_type"),
             "google_call_status": c.get("google_call_status"),
             "conversion_detail": c.get("conversion_detail"),
@@ -3616,10 +3713,28 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     live_campaigns = set(cfg.get("live_campaigns") or [])
     live_adgroups = set(cfg.get("live_adgroups") or [])
 
+    # Enrich all calls in range ONCE so attribution from click-matches AND phone
+    # taps (campaign / ad group / ad / keyword / source_page) flows into every
+    # breakdown below — not just the raw stored fields.
+    _calls_in_range = await db.calls.find(
+        {"created_at": {"$gte": s_iso, "$lte": e_iso}},
+        {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1,
+         "created_at": 1, "caller_number": 1, "campaign_id": 1, "adgroup_id": 1,
+         "ad_id": 1, "keyword": 1, "sale_status": 1, "sale_value": 1},
+    ).to_list(length=20000)
+    _enriched_calls = await _enrich_calls_with_hooks(_calls_in_range)
+
+    def _agg_enriched_calls(fields):
+        out = {}
+        for c in _enriched_calls:
+            key = tuple((c.get(f) or "") for f in fields)
+            out[key] = out.get(key, 0) + 1
+        return out
+
     async def breakdown(fields: list):
         clicks = await _agg_clicks(fields, s_iso, e_iso)
         leads = await _agg_count(db.leads, fields, "created_at", s_iso, e_iso)
-        calls = await _agg_count(db.calls, fields, "created_at", s_iso, e_iso)
+        calls = _agg_enriched_calls(fields)
         keys = set(clicks) | set(leads) | set(calls)
         rows = []
         for k in keys:
@@ -3704,11 +3819,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     async def landing_breakdown():
         clicks = await _agg_clicks(["source_page"], s_iso, e_iso)
         leads = await _agg_count(db.leads, ["source_page"], "created_at", s_iso, e_iso)
-        call_docs = await db.calls.find(
-            {"created_at": {"$gte": s_iso, "$lte": e_iso}},
-            {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1, "created_at": 1, "caller_number": 1},
-        ).to_list(length=5000)
-        call_docs = await _enrich_calls_with_hooks(call_docs)
+        call_docs = _enriched_calls  # already enriched (click + tap attribution)
         # Dedupe repeat callers by phone number (most recent call represents them).
         latest, individuals = {}, []
         for c in call_docs:
