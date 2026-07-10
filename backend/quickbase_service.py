@@ -101,31 +101,60 @@ def lookup_by_phone(phone: str) -> dict | None:
     if len(d) == 10:
         last7 = f"{d[3:6]}-{d[6:]}"
         where_clauses.append("OR".join(f"{{{pf}.CT.'{last7}'}}" for pf in phone_fields))
-    select = list(dict.fromkeys([fn, fe, *phone_fields]))
+    select = list(dict.fromkeys([3, fn, fe, *phone_fields]))
+    candidates: dict = {}  # record id -> {name, phone, email}
     for where in where_clauses:
         try:
             r = requests.post(
                 f"{_API}/records/query",
                 headers=_headers(c),
-                json={"from": c["table"], "select": select, "where": where, "options": {"top": 1}},
+                json={"from": c["table"], "select": select, "where": where, "options": {"top": 25}},
                 timeout=12,
             )
             if r.status_code != 200:
                 logger.warning("Quickbase query %s -> %s %s", where, r.status_code, r.text[:200])
                 continue
-            data = (r.json() or {}).get("data", [])
-            if data:
-                rec = data[0]
+            for rec in (r.json() or {}).get("data", []):
+                rid = (rec.get("3", {}) or {}).get("value")
+                if rid in candidates:
+                    continue
                 phone_val = ""
                 for pf in phone_fields:
                     phone_val = (rec.get(str(pf), {}) or {}).get("value") or phone_val
                     if phone_val:
                         break
-                return {
-                    "name": (rec.get(str(fn), {}) or {}).get("value") or "",
+                candidates[rid] = {
+                    "name": ((rec.get(str(fn), {}) or {}).get("value") or "").strip(),
                     "phone": phone_val,
                     "email": (rec.get(str(fe), {}) or {}).get("value") or "",
                 }
+            # Once the exact-match clause returns candidates, no need for the
+            # looser contains fallback.
+            if candidates:
+                break
         except Exception as e:
             logger.warning("Quickbase lookup error: %s", e)
-    return None
+    return _best_match(list(candidates.values()))
+
+
+def _best_match(cands: list) -> dict | None:
+    """Pick the best record when a phone number matches several Quickbase records.
+    A real person's record beats a junk / "(Duplicate)" record (which often just
+    holds a city like "SANTA ROSA CA"). Prefers: not-a-duplicate > has email >
+    a proper mixed-case name."""
+    def score(rec):
+        name = rec.get("name") or ""
+        if not name:
+            return -1
+        s = 0
+        if "duplicate" not in name.lower():
+            s += 1000
+        if rec.get("email"):
+            s += 100
+        if name != name.upper():  # has lowercase -> looks like a real name, not a CITY
+            s += 10
+        return s
+    named = [c for c in cands if c.get("name")]
+    if not named:
+        return None
+    return max(named, key=score)
