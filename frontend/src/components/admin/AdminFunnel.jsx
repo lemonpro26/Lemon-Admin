@@ -10,6 +10,10 @@ const PAGES = [
   { key: 'lapa', label: 'PA Page' },
   { key: 'laspa', label: 'PA (Spanish)' },
   { key: 'sp', label: 'Spanish' },
+  { key: 'dg', label: 'Demand Gen' },
+  { key: 'dgs', label: 'Demand Gen (Spanish)' },
+  { key: 'tm', label: 'Team Overlay' },
+  { key: 'tm2', label: 'Team Split' },
 ];
 
 function StageBar({ stage, topCount, isLast }) {

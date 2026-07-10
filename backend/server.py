@@ -1790,11 +1790,11 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
     # Histogram of furthest step reached, grouped by source page.
     pages = {}  # page -> {"views": n, "hist": {idx: n}, "converted": n}
 
+    FUNNEL_PAGES = ["home", "lapa", "laspa", "sp", "dg", "dgs", "tm", "tm2"]
+
     def _page(sp):
-        key = (sp or "home").lower()
-        if key not in ("home", "lapa", "sp", "laspa"):
-            key = "home"
-        return key
+        key = _canon_page(sp) or "home"
+        return key if key in FUNNEL_PAGES else "home"
 
     async for row in db.clicks.aggregate([
         {"$match": match},
@@ -1814,7 +1814,9 @@ async def admin_funnel(_: dict = Depends(require_admin), start: str = Query(""),
         p = _page(row["_id"])
         pages.setdefault(p, {"views": 0, "hist": {}, "converted": 0})["converted"] += row["n"]
 
-    labels = {"home": "Home", "lapa": "PA Page", "sp": "Spanish", "laspa": "PA (Spanish)"}
+    labels = {"home": "Home", "lapa": "PA Page", "laspa": "PA (Spanish)", "sp": "Spanish",
+              "dg": "Demand Gen", "dgs": "Demand Gen (Spanish)",
+              "tm": "Team Overlay", "tm2": "Team Split"}
     stage_names = ["Landing View"] + [s.capitalize() for s in FUNNEL_STEPS] + ["Submitted"]
 
     def build(d, calls=0):
@@ -1873,13 +1875,12 @@ async def admin_funnel_campaigns(page: str = Query("overall"), _: dict = Depends
     s_iso, e_iso, _d = _date_range(start, end)
     cfg = await get_or_create_config()
     ad_labels = cfg.get("ad_labels") or {}
-    page_map = {"home": "home", "lapa": "lapa", "sp": "sp", "laspa": "laspa"}
-
     click_match = {"first_seen": {"$gte": s_iso, "$lte": e_iso}}
     lead_match = {"created_at": {"$gte": s_iso, "$lte": e_iso}}
-    if page in page_map:
-        click_match["source_page"] = page_map[page]
-        lead_match["source_page"] = page_map[page]
+    if page != "overall":
+        aliases = _CANON_TO_ALIASES.get(_canon_page(page), [page])
+        click_match["source_page"] = {"$in": aliases}
+        lead_match["source_page"] = {"$in": aliases}
 
     clicks = {}
     async for row in db.clicks.aggregate([
@@ -2481,6 +2482,15 @@ _PAGE_ALIASES = {
 def _canon_page(sp) -> str:
     sp = (sp or "").lower().strip()
     return _PAGE_ALIASES.get(sp, sp)
+
+
+# Reverse map: canonical code -> every raw source_page alias that collapses to it
+# (used to query clicks/leads which store the raw codes). Empty source_page is
+# treated as Home.
+_CANON_TO_ALIASES: dict[str, list[str]] = {}
+for _raw, _canon in _PAGE_ALIASES.items():
+    _CANON_TO_ALIASES.setdefault(_canon, []).append(_raw)
+_CANON_TO_ALIASES.setdefault("home", []).append("")
 
 
 # Landing pages that share the same tracked phone number are grouped into one row
