@@ -3905,15 +3905,39 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         if l.get("sale_status") == "sold":
             v = float(l.get("sale_value") or 0)
             _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
-        if l.get("retained"):
-            _acc(ret_camp, cid); _acc(ret_page, pg)
     for c in _enriched_calls:
         cid, pg = c.get("campaign_id") or "", _page_of_call(c)
         if c.get("sale_status") == "sold":
             v = float(c.get("sale_value") or 0)
             _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
-        if c.get("retained"):
-            _acc(ret_camp, cid); _acc(ret_page, pg)
+
+    # Retained clients are counted by retained_at (exactly like the Retained tab) so
+    # the "Retained" column reconciles with it. Attribute each to its campaign /
+    # landing page (calls are enriched for click + tap attribution). Retained items
+    # with no campaign roll into an "Unattributed / Direct" bucket.
+    retained_q = {"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}
+    ret_lead_docs = await db.leads.find(
+        retained_q, {"_id": 0, "campaign_id": 1, "source_page": 1}).to_list(length=20000)
+    ret_call_docs = await _enrich_calls_with_hooks(await db.calls.find(
+        retained_q,
+        {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1,
+         "created_at": 1, "caller_number": 1, "campaign_id": 1, "adgroup_id": 1,
+         "ad_id": 1, "keyword": 1, "source_page": 1}).to_list(length=20000))
+    ret_unattr = 0
+    for r in ret_lead_docs:
+        cid, pg = r.get("campaign_id") or "", (r.get("source_page") or "").lower()
+        if cid:
+            ret_camp[cid] = ret_camp.get(cid, 0) + 1
+        else:
+            ret_unattr += 1
+        _acc(ret_page, pg)
+    for r in ret_call_docs:
+        cid, pg = r.get("campaign_id") or "", _page_of_call(r)
+        if cid:
+            ret_camp[cid] = ret_camp.get(cid, 0) + 1
+        else:
+            ret_unattr += 1
+        _acc(ret_page, pg)
 
     # Allocate campaign spend across landing pages by click share.
     cp_clicks = await _agg_clicks(["campaign_id", "source_page"], s_iso, e_iso)
@@ -3944,6 +3968,25 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         sp = r.get("source_page") or ""
         contacts = r.get("leads", 0) + r.get("calls", 0)
         r.update(_fin(spend_page.get(sp, 0.0), rev_page.get(sp, 0.0), contacts, ret_page.get(sp, 0)))
+
+    # Any retained whose campaign has no row in this range (e.g. paused campaign
+    # with no clicks) also can't be shown — fold it into the unattributed bucket.
+    shown_camp_ids = {r.get("campaign_id") or "" for r in by_campaign}
+    for cid, n in ret_camp.items():
+        if cid not in shown_camp_ids:
+            ret_unattr += n
+
+    # Reconciliation row: retained clients with no campaign attribution (direct
+    # calls / leads with no gclid) or whose campaign isn't shown. Ensures the
+    # Retained column sums to the same total shown in the Retained tab.
+    if ret_unattr:
+        by_campaign.append({
+            "campaign_id": "__unattributed__", "kind": "unattributed",
+            "display": "Unattributed / Direct",
+            "clicks": 0, "leads": 0, "calls": 0, "bounced": 0,
+            "conversion_rate": 0.0, "bounce_rate": 0.0,
+            **_fin(0.0, 0.0, 0, ret_unattr),
+        })
 
     return {
         "by_campaign": by_campaign,
