@@ -2463,6 +2463,26 @@ def _call_number_group(tracking_number: str) -> dict:
     return {"number_group": "other", "number_group_label": "Other", "tracked_number_display": (tracking_number or "")}
 
 
+# Canonical landing-page codes. Over time the same page has been tagged with
+# alias codes (e.g. /dg stored as both "dg" and "ladg", /pa as "pa" and "lapa"),
+# which produced DUPLICATE rows in landing-page analytics. This collapses every
+# alias to one canonical code so each page shows exactly one row.
+_PAGE_ALIASES = {
+    "pa": "lapa", "lapa": "lapa",
+    "spa": "laspa", "laspa": "laspa",
+    "dg": "dg", "ladg": "dg",
+    "dgs": "dgs", "ladgs": "dgs",
+    "tm": "tm", "latm": "tm",
+    "tm2": "tm2", "latm2": "tm2",
+    "sp": "sp", "home": "home",
+}
+
+
+def _canon_page(sp) -> str:
+    sp = (sp or "").lower().strip()
+    return _PAGE_ALIASES.get(sp, sp)
+
+
 def _resolve_ad_names(items: list, ad_labels: dict) -> list:
     """Attach human-readable campaign / ad-group / ad names to each lead/call by
     looking up their numeric Google Ads IDs in the synced ad_labels map. Leaves
@@ -3827,11 +3847,20 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     # when known, else (2) the tracked phone NUMBER they dialed -> the primary
     # landing page that displays that number. Repeat callers count once (unique).
     # Only calls with no page and no matching tracked number are "direct calls".
-    GROUP_PRIMARY_PAGE = {"home_pa": "lapa", "spanish": "laspa", "dg": "ladg", "dgs": "ladgs"}
+    GROUP_PRIMARY_PAGE = {"home_pa": "lapa", "spanish": "laspa", "dg": "dg", "dgs": "dgs"}
 
     async def landing_breakdown():
-        clicks = await _agg_clicks(["source_page"], s_iso, e_iso)
-        leads = await _agg_count(db.leads, ["source_page"], "created_at", s_iso, e_iso)
+        raw_clicks = await _agg_clicks(["source_page"], s_iso, e_iso)
+        raw_leads = await _agg_count(db.leads, ["source_page"], "created_at", s_iso, e_iso)
+        # Merge alias codes (dg/ladg, pa/lapa, ...) into one canonical row.
+        clicks, leads = {}, {}
+        for (sp,), info in raw_clicks.items():
+            cp = _canon_page(sp)
+            agg = clicks.setdefault(cp, {"clicks": 0, "bounced": 0})
+            agg["clicks"] += info.get("clicks", 0)
+            agg["bounced"] += info.get("bounced", 0)
+        for (sp,), n in raw_leads.items():
+            leads[_canon_page(sp)] = leads.get(_canon_page(sp), 0) + n
         call_docs = _enriched_calls  # already enriched (click + tap attribution)
         # Dedupe repeat callers by phone number (most recent call represents them).
         latest, individuals = {}, []
@@ -3846,7 +3875,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
                 latest[num] = c
 
         def _call_page(c):
-            sp = (c.get("source_page") or "").lower()
+            sp = _canon_page(c.get("source_page"))
             if sp:
                 return sp
             grp = _call_number_group(c.get("tracking_number"))["number_group"]
@@ -3859,12 +3888,12 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
                 call_counts[p] = call_counts.get(p, 0) + 1
             else:
                 direct_calls += 1
-        keys = {k[0] for k in clicks} | {k[0] for k in leads} | set(call_counts)
+        keys = set(clicks) | set(leads) | set(call_counts)
         rows = []
         for sp in keys:
-            cinfo = clicks.get((sp,), {})
+            cinfo = clicks.get(sp, {})
             c = cinfo.get("clicks", 0)
-            lc = leads.get((sp,), 0)
+            lc = leads.get(sp, 0)
             cl = call_counts.get(sp, 0)
             bounced = max(0, min(cinfo.get("bounced", 0), c - lc))
             rows.append({
@@ -3888,7 +3917,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     ).to_list(length=20000)
 
     def _page_of_call(c):
-        sp = (c.get("source_page") or "").lower()
+        sp = _canon_page(c.get("source_page"))
         if sp:
             return sp
         grp = _call_number_group(c.get("tracking_number"))["number_group"]
@@ -3901,7 +3930,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             d[k] = d.get(k, 0) + v
 
     for l in lead_docs:
-        cid, pg = l.get("campaign_id") or "", (l.get("source_page") or "").lower()
+        cid, pg = l.get("campaign_id") or "", _canon_page(l.get("source_page"))
         if l.get("sale_status") == "sold":
             v = float(l.get("sale_value") or 0)
             _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
@@ -3925,7 +3954,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
          "ad_id": 1, "keyword": 1, "source_page": 1}).to_list(length=20000))
     ret_unattr = 0
     for r in ret_lead_docs:
-        cid, pg = r.get("campaign_id") or "", (r.get("source_page") or "").lower()
+        cid, pg = r.get("campaign_id") or "", _canon_page(r.get("source_page"))
         if cid:
             ret_camp[cid] = ret_camp.get(cid, 0) + 1
         else:
@@ -3948,7 +3977,8 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     for (cid, sp), info in cp_clicks.items():
         tot, sp_spend = camp_click_totals.get(cid, 0), spend_by_campaign.get(cid, 0.0)
         if tot and sp_spend:
-            spend_page[sp] = spend_page.get(sp, 0.0) + sp_spend * (info.get("clicks", 0) / tot)
+            cp = _canon_page(sp)
+            spend_page[cp] = spend_page.get(cp, 0.0) + sp_spend * (info.get("clicks", 0) / tot)
 
     def _fin(spend, revenue, leads, retained):
         return {

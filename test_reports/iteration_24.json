@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 24: Focused regression on canonicalized source_page (no duplicate/alias rows in by_landing_page) and retained reconciliation across By-Campaign vs /admin/retained. Created /app/backend/tests/test_iteration24_analytics.py with 13 tests — ALL PASSED.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration24_analytics.py",
+    "/app/test_reports/pytest/iteration_24.xml"
+  ],
+  "tests_executed": [
+    "test_login_returns_token — POST /api/admin/login owner/LemonPros2026! returns token",
+    "test_by_landing_page_no_duplicate_source_pages — each source_page code appears at most once",
+    "test_by_landing_page_no_alias_codes — none of {ladg,ladgs,latm,latm2,pa,spa} present",
+    "test_by_landing_page_financial_fields — spend/revenue/roas/cpl/cpa/retained present; cpl/cpa/roas null when spend==0",
+    "test_by_campaign_retained_reconciles_with_retained_endpoint — sum(by_campaign.retained) == len(/admin/retained) via __unattributed__ row",
+    "test_drilldowns_present — by_adgroup/by_ad/by_keyword/by_sitelink all lists",
+    "test_calls_by_number — key present",
+    "test_hourly_endpoint — GET /admin/analytics/hourly 200",
+    "test_retained_has_attribution_fields — retained items include campaign_id/source_page/gclid",
+    "test_stats_total_retained — /admin/stats returns total_retained int",
+    "test_channels_endpoint — /admin/analytics/channels 200",
+    "test_spanish_endpoint — /admin/spanish 200",
+    "test_admin_calls_tracked_numbers_only — no number_group=='other' rows"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is very large (>4000 lines) — consider splitting analytics computation into a submodule for maintainability, but not urgent."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "not tested (scope: backend only)"},
+  "test_credentials": "owner / LemonPros2026! (from problem statement, matches /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — used existing preview DB data (Google Ads spend is 0 in this DB, so null financial metrics are expected and correct per problem statement)",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 24 verified the source_page canonicalization fix and retained reconciliation. All alias codes (ladg/ladgs/latm/latm2/pa/spa) are properly normalized to canonical codes (dg/dgs/tm/tm2/lapa/laspa). By-Campaign retained sum now equals /admin/retained count due to the __unattributed__ reconciliation row. Regression tests live at /app/backend/tests/test_iteration24_analytics.py — reuse for future iterations.",
+  "rca of the issue": "N/A — no bugs found; all fixes verified working."
+}
