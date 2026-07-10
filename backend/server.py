@@ -2483,6 +2483,28 @@ def _canon_page(sp) -> str:
     return _PAGE_ALIASES.get(sp, sp)
 
 
+# Landing pages that share the same tracked phone number are grouped into one row
+# (calls to a shared number can't be tied to a single page). Each canonical page
+# maps to its phone-number group; the group row aggregates stats and expands to
+# show the per-page breakdown.
+_PAGE_GROUP = {
+    "home": "home_pa", "lapa": "home_pa", "tm": "home_pa", "tm2": "home_pa",
+    "sp": "spanish", "laspa": "spanish",
+    "dg": "dg", "dgs": "dgs",
+}
+_GROUP_META = {
+    "home_pa": {"label": "Home, PA & Team", "number": "844-335-8911"},
+    "spanish": {"label": "Spanish (/sp + /spa)", "number": "866-524-3722"},
+    "dg": {"label": "Demand Gen (/dg)", "number": "833-240-9312"},
+    "dgs": {"label": "Demand Gen Spanish (/dgs)", "number": "833-868-1802"},
+    "direct": {"label": "Direct / Untracked", "number": ""},
+}
+
+
+def _page_group(cp) -> str:
+    return _PAGE_GROUP.get(_canon_page(cp), "direct")
+
+
 def _resolve_ad_names(items: list, ad_labels: dict) -> list:
     """Attach human-readable campaign / ad-group / ad names to each lead/call by
     looking up their numeric Google Ads IDs in the synced ad_labels map. Leaves
@@ -3998,6 +4020,35 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         sp = r.get("source_page") or ""
         contacts = r.get("leads", 0) + r.get("calls", 0)
         r.update(_fin(spend_page.get(sp, 0.0), rev_page.get(sp, 0.0), contacts, ret_page.get(sp, 0)))
+
+    # Group per-page rows by shared tracked phone number into one row each, with a
+    # `pages` child list for the expandable per-page breakdown.
+    def _group_landing(page_rows):
+        groups = {}
+        for r in page_rows:
+            groups.setdefault(_page_group(r.get("source_page")), []).append(r)
+        out = []
+        for gkey, children in groups.items():
+            meta = _GROUP_META.get(gkey, {"label": gkey, "number": ""})
+            clicks = sum(c.get("clicks", 0) for c in children)
+            leads = sum(c.get("leads", 0) for c in children)
+            calls = sum(c.get("calls", 0) for c in children)
+            bounced = sum(c.get("bounced", 0) for c in children)
+            spend = sum(c.get("spend", 0) or 0 for c in children)
+            revenue = sum(c.get("revenue", 0) or 0 for c in children)
+            retained = sum(c.get("retained", 0) for c in children)
+            out.append({
+                "source_page": gkey, "label": meta["label"], "number": meta["number"],
+                "clicks": clicks, "leads": leads, "calls": calls, "bounced": bounced,
+                "conversion_rate": round((leads / clicks * 100), 1) if clicks else (100.0 if leads else 0.0),
+                "bounce_rate": round((bounced / clicks * 100), 1) if clicks else 0.0,
+                **_fin(spend, revenue, leads + calls, retained),
+                "pages": sorted(children, key=lambda c: (c.get("leads", 0), c.get("clicks", 0), c.get("calls", 0)), reverse=True),
+            })
+        out.sort(key=lambda r: (r["leads"], r["clicks"], r["calls"]), reverse=True)
+        return out
+
+    by_landing_page = _group_landing(by_landing_page)
 
     # Any retained whose campaign has no row in this range (e.g. paused campaign
     # with no clicks) also can't be shown — fold it into the unattributed bucket.

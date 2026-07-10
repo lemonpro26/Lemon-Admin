@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { BarChart3, RefreshCw, Pencil, ChevronRight, Home, Phone, Clock, FileText } from 'lucide-react';
+import { BarChart3, RefreshCw, Pencil, ChevronRight, ChevronDown, Home, Phone, Clock, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -113,10 +113,36 @@ function computeTotals(rows) {
   };
 }
 
-function DrillTable({ title, columns, rows, onRowClick, testid, showTotals }) {
+function DrillTable({ title, columns, rows, onRowClick, testid, showTotals, expandable }) {
   // Default-sorted by most clicks from the top.
   const { sorted, sortKey, sortDir, toggle } = useSortable(rows, 'clicks', 'desc');
+  const [expanded, setExpanded] = useState({});
   const totals = showTotals && rows.length ? computeTotals(rows) : null;
+  const toggleExpand = (key) => setExpanded((p) => ({ ...p, [key]: !p[key] }));
+  const renderCells = (r, { isChild = false } = {}) =>
+    columns.map((c, ci) => {
+      const hasChildren = expandable && Array.isArray(r.pages) && r.pages.length > 1;
+      const content = c.render ? c.render(r) : (r[c.key] === '' || r[c.key] == null ? NONE : r[c.key]);
+      return (
+        <TableCell key={c.key} className={`${c.num ? 'text-right tabular-nums' : 'text-slate-700'} ${isChild ? 'text-slate-500' : ''}`}>
+          {ci === 0 && !isChild && hasChildren ? (
+            <span className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); toggleExpand(r.source_page ?? r.campaign_id); }}
+                className="text-slate-400 hover:text-slate-700 transition-colors"
+                data-testid={`${testid}-expand-${r.source_page ?? r.campaign_id}`}
+              >
+                {expanded[r.source_page ?? r.campaign_id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+              {content}
+            </span>
+          ) : ci === 0 && isChild ? (
+            <span className="pl-6 block">{content}</span>
+          ) : content}
+        </TableCell>
+      );
+    });
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid={testid}>
       {title && <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900">{title}</div>}
@@ -136,23 +162,30 @@ function DrillTable({ title, columns, rows, onRowClick, testid, showTotals }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sorted.map((r, i) => (
-                <TableRow
-                  key={i}
-                  onClick={onRowClick ? () => onRowClick(r) : undefined}
-                  className={onRowClick ? 'cursor-pointer hover:bg-slate-50' : ''}
-                  data-testid={onRowClick ? `${testid}-row-${i}` : undefined}
-                >
-                  {columns.map((c) => (
-                    <TableCell key={c.key} className={c.num ? 'text-right tabular-nums' : 'text-slate-700'}>
-                      {c.render ? c.render(r) : (r[c.key] === '' || r[c.key] == null ? NONE : r[c.key])}
-                    </TableCell>
-                  ))}
-                  {onRowClick && (
-                    <TableCell className="text-slate-300"><ChevronRight className="h-4 w-4" /></TableCell>
-                  )}
-                </TableRow>
-              ))}
+              {sorted.map((r, i) => {
+                const rowKey = r.source_page ?? r.campaign_id;
+                const isOpen = expandable && expanded[rowKey];
+                return (
+                  <React.Fragment key={i}>
+                    <TableRow
+                      onClick={onRowClick ? () => onRowClick(r) : undefined}
+                      className={onRowClick ? 'cursor-pointer hover:bg-slate-50' : ''}
+                      data-testid={onRowClick ? `${testid}-row-${i}` : undefined}
+                    >
+                      {renderCells(r)}
+                      {onRowClick && (
+                        <TableCell className="text-slate-300"><ChevronRight className="h-4 w-4" /></TableCell>
+                      )}
+                    </TableRow>
+                    {isOpen && (r.pages || []).map((child, ci) => (
+                      <TableRow key={`${i}-${ci}`} className="bg-slate-50/60" data-testid={`${testid}-child-${rowKey}-${ci}`}>
+                        {renderCells(child, { isChild: true })}
+                        {onRowClick && <TableCell />}
+                      </TableRow>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
             </TableBody>
             {totals && (
               <TableFooter data-testid={`${testid}-totals`}>
@@ -176,7 +209,12 @@ function DrillTable({ title, columns, rows, onRowClick, testid, showTotals }) {
 // Per-landing-page performance (visits, leads, calls, conv, bounce).
 const LandingPageTable = ({ rows, directCalls }) => {
   const cols = [
-    { key: 'source_page', label: 'Landing Page', render: (r) => <span className="font-medium text-slate-900">{pageLabel(r.source_page)}</span> },
+    { key: 'source_page', label: 'Landing Page', render: (r) => (
+      <span className="font-medium text-slate-900">
+        {r.label || pageLabel(r.source_page)}
+        {r.number ? <span className="ml-2 text-[11px] font-normal text-slate-400">{r.number}</span> : null}
+      </span>
+    ) },
     { key: 'clicks', label: 'Visits', num: true },
     { key: 'leads', label: 'Leads', num: true },
     { key: 'calls', label: 'Calls', num: true, render: (r) => (r.calls || 0) },
@@ -189,7 +227,7 @@ const LandingPageTable = ({ rows, directCalls }) => {
       <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-slate-500">
         <BarChart3 className="h-4 w-4" /> Performance by landing page
       </div>
-      <DrillTable title="By Landing Page" columns={cols} rows={rows || []} testid="analytics-landing-table" showTotals />
+      <DrillTable title="By Landing Page" columns={cols} rows={rows || []} testid="analytics-landing-table" showTotals expandable />
       {directCalls > 0 && (
         <p className="mt-2 text-[11px] text-slate-400" data-testid="analytics-direct-calls-note">
           + {directCalls} call{directCalls === 1 ? '' : 's'} from untracked numbers (couldn&apos;t be tied to a specific landing page above).
