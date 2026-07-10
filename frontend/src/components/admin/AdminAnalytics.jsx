@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter,
 } from '@/components/ui/table';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -97,9 +97,26 @@ const bounceCell = (r) => {
   );
 };
 
-function DrillTable({ title, columns, rows, onRowClick, testid }) {
+function computeTotals(rows) {
+  const sum = (k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+  const clicks = sum('clicks'), leads = sum('leads'), calls = sum('calls');
+  const spend = sum('spend'), revenue = sum('revenue'), retained = sum('retained');
+  const bounced = rows.reduce((a, r) => a + (r.bounced != null
+    ? Number(r.bounced) : Math.round((r.bounce_rate || 0) / 100 * (r.clicks || 0))), 0);
+  return {
+    __total: true, clicks, leads, calls, spend, revenue, retained, bounced,
+    conversion_rate: clicks ? Math.round((leads / clicks) * 1000) / 10 : 0,
+    roas: spend > 0 ? Math.round((revenue / spend) * 100) / 100 : null,
+    cpl: (spend > 0 && (leads + calls) > 0) ? Math.round((spend / (leads + calls)) * 100) / 100 : null,
+    cpa: (spend > 0 && retained > 0) ? Math.round((spend / retained) * 100) / 100 : null,
+    bounce_rate: clicks ? Math.round((bounced / clicks) * 1000) / 10 : 0,
+  };
+}
+
+function DrillTable({ title, columns, rows, onRowClick, testid, showTotals }) {
   // Default-sorted by most clicks from the top.
   const { sorted, sortKey, sortDir, toggle } = useSortable(rows, 'clicks', 'desc');
+  const totals = showTotals && rows.length ? computeTotals(rows) : null;
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid={testid}>
       {title && <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900">{title}</div>}
@@ -137,6 +154,18 @@ function DrillTable({ title, columns, rows, onRowClick, testid }) {
                 </TableRow>
               ))}
             </TableBody>
+            {totals && (
+              <TableFooter data-testid={`${testid}-totals`}>
+                <TableRow className="bg-slate-100 hover:bg-slate-100 border-t-2 border-slate-300">
+                  {columns.map((c, ci) => (
+                    <TableCell key={c.key} className={`font-bold text-slate-900 ${c.num ? 'text-right tabular-nums' : ''}`}>
+                      {ci === 0 ? 'Total' : (c.render ? c.render(totals) : (totals[c.key] == null ? NONE : totals[c.key]))}
+                    </TableCell>
+                  ))}
+                  {onRowClick && <TableCell />}
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </div>
       )}
@@ -160,7 +189,7 @@ const LandingPageTable = ({ rows, directCalls }) => {
       <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-slate-500">
         <BarChart3 className="h-4 w-4" /> Performance by landing page
       </div>
-      <DrillTable title="By Landing Page" columns={cols} rows={rows || []} testid="analytics-landing-table" />
+      <DrillTable title="By Landing Page" columns={cols} rows={rows || []} testid="analytics-landing-table" showTotals />
       {directCalls > 0 && (
         <p className="mt-2 text-[11px] text-slate-400" data-testid="analytics-direct-calls-note">
           + {directCalls} call{directCalls === 1 ? '' : 's'} from untracked numbers (couldn&apos;t be tied to a specific landing page above).
@@ -549,7 +578,7 @@ export const AdminAnalytics = () => {
         )}
       </div>
 
-      <DrillTable title={levelTitle} columns={columns} rows={rows} onRowClick={onRowClick} testid={levelTestid} />
+      <DrillTable title={levelTitle} columns={columns} rows={rows} onRowClick={onRowClick} testid={levelTestid} showTotals />
 
       {/* Sitelinks — pulled LIVE from Google Ads (independent of first-party capture). */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid="analytics-by-sitelink">
