@@ -50,9 +50,42 @@ def _headers(c):
     }
 
 
+_PHONE_FIELDS_CACHE: dict[str, list[int]] = {}
+
+
+def _phone_field_ids(c) -> list[int]:
+    """All phone-type field IDs in the table (e.g. primary + "Alt Phone Number"),
+    so a client is matched even when the number is stored on a secondary field.
+    Discovered once via the Quickbase fields API and cached; always includes the
+    configured primary phone field as a fallback."""
+    primary = int(c["f_phone"])
+    table = c["table"]
+    if table in _PHONE_FIELDS_CACHE:
+        return _PHONE_FIELDS_CACHE[table]
+    ids = [primary]
+    try:
+        r = requests.get(
+            f"{_API}/fields",
+            params={"tableId": table},
+            headers={k: v for k, v in _headers(c).items() if k != "Content-Type"},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            ids = [f["id"] for f in (r.json() or []) if f.get("fieldType") == "phone"]
+            if primary not in ids:
+                ids.insert(0, primary)
+        else:
+            logger.warning("Quickbase fields query -> %s %s", r.status_code, r.text[:200])
+    except Exception as e:
+        logger.warning("Quickbase fields lookup error: %s", e)
+    _PHONE_FIELDS_CACHE[table] = ids
+    return ids
+
+
 def lookup_by_phone(phone: str) -> dict | None:
     """Return {"name","email","phone"} for the first matching Quickbase record,
-    or None if not configured / not found / on error. Read-only."""
+    or None if not configured / not found / on error. Read-only. Searches ALL
+    phone fields (primary + alternate numbers)."""
     if not is_configured():
         return None
     c = _cfg()
@@ -60,18 +93,21 @@ def lookup_by_phone(phone: str) -> dict | None:
     if not formatted:
         return None
     fp, fn, fe = int(c["f_phone"]), int(c["f_name"]), int(c["f_email"])
-    # Exact match on the phone field, then fall back to a "contains last-7-digits"
-    # search in case of odd formatting.
+    phone_fields = _phone_field_ids(c)
+    # Exact match on any phone field, then fall back to a "contains last-7-digits"
+    # search across all phone fields in case of odd formatting.
     d = _digits(phone)[-10:]
-    where_clauses = [f"{{{fp}.EX.'{formatted}'}}"]
+    where_clauses = ["OR".join(f"{{{pf}.EX.'{formatted}'}}" for pf in phone_fields)]
     if len(d) == 10:
-        where_clauses.append(f"{{{fp}.CT.'{d[3:6]}-{d[6:]}'}}")
+        last7 = f"{d[3:6]}-{d[6:]}"
+        where_clauses.append("OR".join(f"{{{pf}.CT.'{last7}'}}" for pf in phone_fields))
+    select = list(dict.fromkeys([fn, fe, *phone_fields]))
     for where in where_clauses:
         try:
             r = requests.post(
                 f"{_API}/records/query",
                 headers=_headers(c),
-                json={"from": c["table"], "select": [fn, fp, fe], "where": where, "options": {"top": 1}},
+                json={"from": c["table"], "select": select, "where": where, "options": {"top": 1}},
                 timeout=12,
             )
             if r.status_code != 200:
@@ -80,9 +116,14 @@ def lookup_by_phone(phone: str) -> dict | None:
             data = (r.json() or {}).get("data", [])
             if data:
                 rec = data[0]
+                phone_val = ""
+                for pf in phone_fields:
+                    phone_val = (rec.get(str(pf), {}) or {}).get("value") or phone_val
+                    if phone_val:
+                        break
                 return {
                     "name": (rec.get(str(fn), {}) or {}).get("value") or "",
-                    "phone": (rec.get(str(fp), {}) or {}).get("value") or "",
+                    "phone": phone_val,
                     "email": (rec.get(str(fe), {}) or {}).get("value") or "",
                 }
         except Exception as e:
