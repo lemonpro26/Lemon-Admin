@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign, Database, Eye } from 'lucide-react';
+import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign, Database, Eye, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
@@ -20,6 +20,11 @@ const fmtDate = (s) => {
 };
 
 const SOURCE_LABELS = { lapa: 'PA', laspa: 'Spanish PA', sp: 'Spanish', dg: 'Demand Gen', dgs: 'Spanish DG', home: 'Home' };
+
+const UNATTRIBUTED = 'Unattributed / Direct';
+// Best human-readable campaign for a retained lead/call (falls back to the raw id,
+// then to an "unattributed" bucket for calls/leads with no Google campaign).
+const campaignLabel = (it) => (it.campaign_name || it.campaign_id || UNATTRIBUTED);
 
 // yyyy-mm-dd for a date <input>, from a stored ISO string.
 const toDateInput = (s) => {
@@ -138,6 +143,7 @@ export const AdminRetained = () => {
   const [syncingQb, setSyncingQb] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [network, setNetwork] = useState('all');
+  const [campaign, setCampaign] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -215,9 +221,25 @@ export const AdminRetained = () => {
 
   // Network filter: clicking a network chip narrows the list AND the stat cards
   // to just that traffic source (same behaviour as the Calls & Leads tabs).
-  const shownItems = useMemo(
+  const netItems = useMemo(
     () => items.filter((it) => network === 'all' || getNetwork(it) === network),
     [items, network],
+  );
+  // Campaign breakdown — how many retained clients (and revenue) each campaign drove.
+  const campaignBreakdown = useMemo(() => {
+    const m = new Map();
+    for (const it of netItems) {
+      const key = campaignLabel(it);
+      const e = m.get(key) || { key, count: 0, revenue: 0 };
+      e.count += 1;
+      e.revenue += it.sale_status === 'sold' ? Number(it.sale_value || 0) : 0;
+      m.set(key, e);
+    }
+    return Array.from(m.values()).sort((a, b) => b.count - a.count);
+  }, [netItems]);
+  const shownItems = useMemo(
+    () => netItems.filter((it) => campaign === 'all' || campaignLabel(it) === campaign),
+    [netItems, campaign],
   );
   const stats = useMemo(() => {
     const leadCount = shownItems.filter((i) => i.type === 'lead').length;
@@ -276,6 +298,39 @@ export const AdminRetained = () => {
       {/* Network filter — clicking a network narrows the table AND the stats above. */}
       <NetworkChips items={items} value={network} onChange={setNetwork} testidPrefix="retained-network" />
 
+      {/* Campaign breakdown — which campaigns your retained clients came from. */}
+      {campaignBreakdown.length > 0 && (
+        <div data-testid="retained-campaign-breakdown">
+          <div className="flex items-center gap-2 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <Megaphone className="h-3.5 w-3.5" /> Retained by campaign
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setCampaign('all')}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${campaign === 'all' ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+              data-testid="retained-campaign-all"
+            >
+              All campaigns <span className="text-xs opacity-80">{netItems.length}</span>
+            </button>
+            {campaignBreakdown.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setCampaign(campaign === c.key ? 'all' : c.key)}
+                title={c.revenue ? `$${Number(c.revenue).toLocaleString()} revenue` : undefined}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${campaign === c.key ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'}`}
+                data-testid={`retained-campaign-chip-${c.key}`}
+              >
+                <span className="max-w-[220px] truncate">{c.key}</span>
+                <span className={`text-xs rounded-full px-1.5 ${campaign === c.key ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{c.count}</span>
+                {c.revenue > 0 && (
+                  <span className={`text-xs ${campaign === c.key ? 'text-white/90' : 'text-emerald-600'}`}>${Number(c.revenue).toLocaleString()}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-slate-500" data-testid="retained-loading">Loading…</div>
@@ -296,6 +351,7 @@ export const AdminRetained = () => {
                   <TableHead>Type</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead className="hidden sm:table-cell">Source</TableHead>
+                  <TableHead className="hidden lg:table-cell">Campaign</TableHead>
                   <TableHead className="hidden sm:table-cell">Revenue</TableHead>
                   <TableHead className="hidden md:table-cell">Came in on</TableHead>
                   <TableHead>Retained on</TableHead>
@@ -326,6 +382,13 @@ export const AdminRetained = () => {
                       {it.type === 'call'
                         ? `Call from ${it.number_group_label || 'Unknown'}`
                         : (SOURCE_LABELS[it.source_page] || it.source_page || '\u2014')}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell" data-testid={`retained-campaign-${it.id}`}>
+                      {(it.campaign_name || it.campaign_id) ? (
+                        <span className="inline-flex max-w-[200px] truncate text-sm text-slate-700" title={campaignLabel(it)}>{campaignLabel(it)}</span>
+                      ) : (
+                        <span className="text-xs text-slate-400">{UNATTRIBUTED}</span>
+                      )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <RevenueCell item={it} onSave={saveRevenue} />
