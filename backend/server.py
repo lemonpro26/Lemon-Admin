@@ -2782,7 +2782,7 @@ async def _enrich_calls_with_hooks(items: list) -> list:
 # (never the full number), so we enrich our CTM calls by matching on
 # area code + call start time (within a window) + duration. Matched calls get
 # Google's real call type + campaign attached and a "Verified via Google Ads" flag.
-_GCALL_TIME_WINDOW_S = 5400  # +/- 90 min — Google truncates call_view times (often to the hour)
+_GCALL_TIME_WINDOW_S = 21600  # +/- 6h — Google truncates call_view start time (to the hour) and long calls drift; duration is the primary discriminator
 
 
 def _parse_dt_epoch(value):
