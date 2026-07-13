@@ -1,5 +1,9 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13b (fork continuation)
+- **Retained — real city/state from Quickbase:** The Quickbase lookup now also pulls the client's City (field 12) + State/Region (field 13) and `_enrich_from_quickbase` persists them onto the lead/call (`city`/`state` + `qb_city`/`qb_state`), overriding CTM geo/IP-derived location. The Retained tab self-heals any item missing a `qb_city` on load, and the "Sync from Quickbase" button backfills all. Added `QUICKBASE_FIELD_CITY="12"` + `QUICKBASE_FIELD_STATE="13"` env (multi-choice state values flattened via `_flatten`). Verified end-to-end: a lead seeded with WRONGCITY/ZZ resolved to the real "Montebello, California" from Quickbase. NOTE: these two env vars must also be set in the production deploy env.
+- **Campaign picker excludes [E]/[M] variants:** `/admin/campaigns` now filters out campaigns whose name ends in `[E]` or `[M]` (Enhanced/Manual variants the owner doesn't use) — 46 → 11 usable campaigns in the manual picker.
+
 ## 2026-07-13 (fork continuation)
 - **Manual Campaign editor in Lead/Call detail dialogs:** Wired the `CampaignEditor` component into `LeadDetailDialog.jsx` and `CallDetailDialog.jsx` (replaces the read-only Campaign row). Admins can pick from the Google campaign list (native datalist) or type a custom campaign, then save. Backend `POST /admin/{kind}/{item_id}/campaign` resolves name→id via `_campaign_name_to_id` and persists `campaign_id`/`campaign_name`/`campaign_manual`. Verified end-to-end: edit → "Campaign updated" toast → value + Retained campaign chip update.
 - **Retained tab — Columns show/hide toggle:** Added a "Columns" DropdownMenu (checkbox items) to the Retained toolbar to toggle Type / Phone / Source / Campaign / Revenue / Came-in columns (Client / Retained on / Detail always shown). Verified via screenshot.

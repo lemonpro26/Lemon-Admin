@@ -3453,6 +3453,16 @@ async def _enrich_from_quickbase(doc: dict, collection) -> dict:
     if name:
         fields["qb_name"] = name
         fields["qb_email"] = (res or {}).get("email", "")
+        # Pull the client's real city/state from Quickbase when present so the
+        # Retained "by city" view reflects the CRM address, not CTM geo/IP.
+        qb_city = (res or {}).get("city", "").strip()
+        qb_state = (res or {}).get("state", "").strip()
+        if qb_city:
+            fields["qb_city"] = qb_city
+            fields["city"] = qb_city
+        if qb_state:
+            fields["qb_state"] = qb_state
+            fields["state"] = qb_state
     # else: leave any existing qb_name/qb_email untouched (never clobber a good name)
     await collection.update_one({"id": doc["id"]}, {"$set": fields})
     doc.update(fields)
@@ -3604,9 +3614,12 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
     if qb.is_configured():
         # Re-look-up any item with no name OR a junk/duplicate name (e.g.
         # "SANTA ROSA CA (Duplicate)") so stale bad names self-heal on load.
+        # Also re-look-up items that have never had a Quickbase city pulled yet,
+        # so the real CRM city/state backfills automatically on the Retained tab.
         def _needs_qb(x):
             n = (x.get("qb_name") or "").strip()
-            return (not n) or ("duplicate" in n.lower())
+            no_qb_city = not (x.get("qb_city") or "").strip()
+            return (not n) or ("duplicate" in n.lower()) or no_qb_city
         pending = ([(l, db.leads) for l in leads if _needs_qb(l)]
                    + [(c, db.calls) for c in calls if _needs_qb(c)])
         if pending:

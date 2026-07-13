@@ -20,6 +20,8 @@ def _cfg():
         "f_phone_alt": os.environ.get("QUICKBASE_FIELD_PHONE_ALT", ""),
         "f_name": os.environ.get("QUICKBASE_FIELD_NAME", ""),
         "f_email": os.environ.get("QUICKBASE_FIELD_EMAIL", ""),
+        "f_city": os.environ.get("QUICKBASE_FIELD_CITY", ""),
+        "f_state": os.environ.get("QUICKBASE_FIELD_STATE", ""),
     }
 
 
@@ -30,6 +32,16 @@ def is_configured() -> bool:
 
 def _digits(value: str) -> str:
     return re.sub(r"\D", "", str(value or ""))
+
+
+def _flatten(value) -> str:
+    """Coerce a Quickbase field value (string / list for multi-choice) to a
+    clean single string (e.g. State/Region text-multiple-choice)."""
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(v).strip() for v in value if str(v).strip())
+    return str(value).strip()
 
 
 def _fmt_phone(value: str) -> str:
@@ -109,6 +121,8 @@ def lookup_by_phone(phone: str) -> dict | None:
     if not formatted:
         return None
     fp, fn, fe = int(c["f_phone"]), int(c["f_name"]), int(c["f_email"])
+    fcity = int(c["f_city"]) if str(c.get("f_city") or "").isdigit() else 0
+    fstate = int(c["f_state"]) if str(c.get("f_state") or "").isdigit() else 0
     phone_fields = _phone_field_ids(c)
     # Exact match on any phone field, then fall back to a "contains last-7-digits"
     # search across all phone fields in case of odd formatting.
@@ -117,8 +131,8 @@ def lookup_by_phone(phone: str) -> dict | None:
     if len(d) == 10:
         last7 = f"{d[3:6]}-{d[6:]}"
         where_clauses.append("OR".join(f"{{{pf}.CT.'{last7}'}}" for pf in phone_fields))
-    select = list(dict.fromkeys([3, fn, fe, *phone_fields]))
-    candidates: dict = {}  # record id -> {name, phone, email}
+    select = list(dict.fromkeys([3, fn, fe, *([fcity] if fcity else []), *([fstate] if fstate else []), *phone_fields]))
+    candidates: dict = {}  # record id -> {name, phone, email, city, state}
     for where in where_clauses:
         try:
             r = requests.post(
@@ -143,6 +157,8 @@ def lookup_by_phone(phone: str) -> dict | None:
                     "name": ((rec.get(str(fn), {}) or {}).get("value") or "").strip(),
                     "phone": phone_val,
                     "email": (rec.get(str(fe), {}) or {}).get("value") or "",
+                    "city": _flatten(rec.get(str(fcity), {}).get("value")) if fcity else "",
+                    "state": _flatten(rec.get(str(fstate), {}).get("value")) if fstate else "",
                 }
             # Once the exact-match clause returns candidates, no need for the
             # looser contains fallback.
