@@ -56,13 +56,15 @@ _PHONE_FIELDS_CACHE: dict[str, list[int]] = {}
 def _phone_field_ids(c) -> list[int]:
     """All phone-type field IDs in the table (e.g. primary + "Alt Phone Number"),
     so a client is matched even when the number is stored on a secondary field.
-    Discovered once via the Quickbase fields API and cached; always includes the
-    configured primary phone field as a fallback."""
+    Discovered via the Quickbase fields API and cached ONLY on success (a failed
+    discovery must not permanently strand us on the primary field). Always
+    includes the configured primary phone field as a fallback."""
     primary = int(c["f_phone"])
     table = c["table"]
-    if table in _PHONE_FIELDS_CACHE:
+    if _PHONE_FIELDS_CACHE.get(table):
         return _PHONE_FIELDS_CACHE[table]
     ids = [primary]
+    discovered = False
     try:
         r = requests.get(
             f"{_API}/fields",
@@ -71,14 +73,19 @@ def _phone_field_ids(c) -> list[int]:
             timeout=12,
         )
         if r.status_code == 200:
-            ids = [f["id"] for f in (r.json() or []) if f.get("fieldType") == "phone"]
-            if primary not in ids:
-                ids.insert(0, primary)
+            found = [f["id"] for f in (r.json() or []) if f.get("fieldType") == "phone"]
+            if found:
+                ids = found if primary in found else [primary, *found]
+                discovered = True
+                logger.info("Quickbase phone fields discovered: %s", ids)
         else:
             logger.warning("Quickbase fields query -> %s %s", r.status_code, r.text[:200])
     except Exception as e:
         logger.warning("Quickbase fields lookup error: %s", e)
-    _PHONE_FIELDS_CACHE[table] = ids
+    if discovered:
+        _PHONE_FIELDS_CACHE[table] = ids  # cache only a successful discovery
+    else:
+        logger.warning("Quickbase phone-field discovery failed; using primary %s only", primary)
     return ids
 
 
