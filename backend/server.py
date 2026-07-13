@@ -2176,6 +2176,45 @@ async def admin_get_leads(
     return {"total": total, "leads": leads, "range": {"start": start, "end": end}}
 
 
+@api_router.get("/admin/leads/origin-audit")
+async def admin_leads_origin_audit(_: dict = Depends(require_admin)):
+    """Read-only audit: classify every lead by whether it actually came through a
+    landing page / ad click. The app never imports leads from Quickbase — leads
+    are only created by the landing-page form (`POST /leads`) or the manual
+    'Submit Test Lead' button — so this surfaces any legacy/anomalous records that
+    have NO landing-page origin signal at all. Deletes nothing."""
+    leads = await db.leads.find({}, {"_id": 0}).to_list(length=100000)
+    # Sessions that have a recorded click (i.e. the visitor hit a landing page).
+    sessions = [l.get("session_id") for l in leads if l.get("session_id")]
+    clicked = set()
+    if sessions:
+        async for c in db.clicks.find({"session_id": {"$in": sessions}}, {"session_id": 1, "_id": 0}):
+            if c.get("session_id"):
+                clicked.add(c["session_id"])
+
+    def classify(l):
+        if l.get("is_test"):
+            return "test"
+        if (l.get("session_id") in clicked) or l.get("gclid") or l.get("session_id") \
+                or l.get("user_agent") or l.get("ip"):
+            return "landing_page"
+        return "no_origin"
+
+    summary = {"landing_page": 0, "test": 0, "no_origin": 0}
+    no_origin = []
+    for l in leads:
+        cls = classify(l)
+        summary[cls] += 1
+        if cls == "no_origin":
+            no_origin.append({
+                "id": l.get("id"),
+                "name": l.get("qb_name") or l.get("full_name") or l.get("first_name") or "—",
+                "phone": l.get("phone"), "email": l.get("email"),
+                "source_page": l.get("source_page"), "created_at": l.get("created_at"),
+            })
+    return {"total": len(leads), "summary": summary, "no_origin": no_origin}
+
+
 @api_router.post("/admin/leads/test")
 async def create_test_lead(_: dict = Depends(require_editor)):
     """Create a realistic sample lead so the team can practice entering revenue."""
@@ -2656,7 +2695,10 @@ async def _backfill_attribution() -> dict:
     if not name_to_id:
         return {"updated": 0, "reason": "no campaign labels synced yet"}
     updated = 0
-    miss = {"$or": [{"campaign_id": {"$in": ["", None]}}, {"campaign_id": {"$exists": False}}]}
+    miss = {"$and": [
+        {"$or": [{"campaign_id": {"$in": ["", None]}}, {"campaign_id": {"$exists": False}}]},
+        {"campaign_cleared": {"$ne": True}},
+    ]}
     for coll in (db.calls, db.leads):
         async for doc in coll.find(miss, {"id": 1, "campaign_id": 1, "campaign": 1,
                                           "campaign_name": 1, "google_campaign": 1,
@@ -2977,6 +3019,16 @@ async def admin_set_campaign(kind: str, item_id: str, body: dict, _: dict = Depe
     name_to_id = _campaign_name_to_id(cfg.get("ad_labels") or {})
     cid = str(body.get("campaign_id") or "").strip()
     cname = str(body.get("campaign_name") or "").strip()
+    # Clear/delete the campaign attribution entirely. `campaign_cleared` stops the
+    # attribution backfill from silently re-filling it (incl. the Demand Gen rule).
+    if body.get("clear"):
+        clear_fields = {"campaign_id": "", "campaign_name": "", "campaign": "",
+                        "google_campaign_id": "", "campaign_manual": False,
+                        "campaign_cleared": True}
+        res = await coll.update_one({"id": item_id}, {"$set": clear_fields})
+        if not res.matched_count:
+            raise HTTPException(status_code=404, detail="Record not found")
+        return {"success": True, "campaign_id": "", "campaign_name": ""}
     if not cid and cname:
         cid = name_to_id.get(cname.lower(), "")
     if cid and not cname:
@@ -2984,7 +3036,8 @@ async def admin_set_campaign(kind: str, item_id: str, body: dict, _: dict = Depe
     if not cid and not cname:
         raise HTTPException(status_code=400, detail="Provide a campaign name or id")
     res = await coll.update_one({"id": item_id}, {"$set": {
-        "campaign_id": cid, "campaign_name": cname, "campaign_manual": True}})
+        "campaign_id": cid, "campaign_name": cname, "campaign_manual": True,
+        "campaign_cleared": False}})
     if not res.matched_count:
         raise HTTPException(status_code=404, detail="Record not found")
     return {"success": True, "campaign_id": cid, "campaign_name": cname}

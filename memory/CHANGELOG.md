@@ -1,5 +1,9 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13f (fork continuation)
+- **Delete/clear campaign:** Campaign editor (inline `CampaignCell` + detail-dialog `CampaignEditor`) now shows a trash icon when a campaign is set. Clearing sets a `campaign_cleared` flag so the attribution backfill (incl. the Demand Gen rule) won't silently re-fill it. Backend `POST /admin/{kind}/{id}/campaign` accepts `{clear:true}`. Verified: cleared a call → stayed empty through a backfill run.
+- **Lead origin audit (read-only) — answers "did you import from Quickbase?":** Confirmed the app NEVER imports leads from Quickbase. Leads are created ONLY by the landing-page form (`POST /leads`) or the manual "Submit Test Lead" button; calls only by the CTM webhook. Quickbase is read-only (name/email/city lookup by phone). New `GET /admin/leads/origin-audit` classifies every lead as landing_page / test / no_origin and lists any no-origin records. Verified on preview: 6 leads → 5 landing_page, 1 test, 0 no_origin. The "Cassandra Jones (LL)…" name is a Quickbase-enriched display name on a real phone-matched record, not a phantom import.
+
 ## 2026-07-13e (fork continuation)
 - **Inline campaign edit UX fixes:** (1) Saving no longer reloads the whole table — `CampaignCell` keeps a local `current` value and parents patch their list state in place (`setCalls`/`setData`), so it "just updates". (2) Clicking edit no longer scrolls/jumps the page — replaced `autoFocus` with `inputRef.focus({ preventScroll: true })`. Verified: edited a call's campaign inline; cell + badge updated instantly, no reload, no jump.
 

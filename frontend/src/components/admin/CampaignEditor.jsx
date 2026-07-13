@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Megaphone, Pencil, Check, X } from 'lucide-react';
+import { Megaphone, Pencil, Check, X, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 
@@ -44,6 +44,21 @@ export const CampaignEditor = ({ kind, item, onChanged }) => {
     } finally { setBusy(false); }
   };
 
+  const clear = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/admin/${kind}/${item.id}/campaign`, { clear: true });
+      item.campaign_id = '';
+      item.campaign_name = '';
+      item.campaign = '';
+      toast.success('Campaign removed.');
+      setEditing(false);
+      onChanged && onChanged();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Could not remove campaign.');
+    } finally { setBusy(false); }
+  };
+
   return (
     <div className="flex justify-between gap-4 text-sm py-1 border-b border-slate-100 items-center" data-testid="campaign-editor">
       <span className="text-slate-500 flex items-center gap-1.5"><Megaphone className="h-3.5 w-3.5" /> Campaign</span>
@@ -69,6 +84,9 @@ export const CampaignEditor = ({ kind, item, onChanged }) => {
           <span className="font-medium text-slate-900 text-right break-all" data-testid="campaign-editor-value">{current || 'Unattributed / Direct'}</span>
           {editable && (
             <button onClick={() => { setDraft(item.campaign_name || ''); setEditing(true); }} className="text-slate-400 hover:text-slate-700 p-1" data-testid="campaign-editor-edit"><Pencil className="h-3.5 w-3.5" /></button>
+          )}
+          {editable && current && (
+            <button onClick={clear} disabled={busy} className="text-slate-400 hover:text-red-600 p-1" title="Remove campaign" data-testid="campaign-editor-clear"><Trash2 className="h-3.5 w-3.5" /></button>
           )}
         </span>
       )}
@@ -140,6 +158,24 @@ export const CampaignCell = ({ kind, item, onChanged, children }) => {
     } finally { setBusy(false); }
   };
 
+  const clear = async (e) => {
+    stop(e);
+    setBusy(true);
+    try {
+      await api.post(`/admin/${kind}/${item.id}/campaign`, { clear: true });
+      item.campaign_id = '';
+      item.campaign_name = '';
+      item.campaign = '';
+      item.google_campaign = '';
+      setCurrent('');
+      toast.success('Campaign removed.');
+      setEditing(false);
+      onChanged && onChanged({ campaign_id: '', campaign_name: '', campaign: '', google_campaign: '' });
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not remove campaign.');
+    } finally { setBusy(false); }
+  };
+
   if (editing) {
     return (
       <div className="flex items-center gap-1" onClick={stop} data-testid={`campaign-cell-edit-${item.id}`}>
@@ -176,6 +212,17 @@ export const CampaignCell = ({ kind, item, onChanged, children }) => {
           data-testid={`campaign-cell-editbtn-${item.id}`}
         >
           <Pencil className="h-3 w-3" />
+        </button>
+      )}
+      {editable && current && (
+        <button
+          onClick={clear}
+          disabled={busy}
+          className="text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5"
+          title="Remove campaign"
+          data-testid={`campaign-cell-clearbtn-${item.id}`}
+        >
+          <Trash2 className="h-3 w-3" />
         </button>
       )}
     </div>
