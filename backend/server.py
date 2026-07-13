@@ -2922,12 +2922,15 @@ async def admin_backfill_attribution(_: dict = Depends(require_editor)):
 @api_router.get("/admin/campaigns")
 async def admin_list_campaigns(_: dict = Depends(require_admin)):
     """List Google campaigns (id + name) for the manual campaign picker.
-    Excludes campaigns ending in [E] or [M] (Enhanced/Manual variants the
-    owner doesn't use)."""
+    Only currently ENABLED (live) campaigns are offered — paused/removed ones
+    linger in the cumulative ad_labels map (kept for historical attribution) but
+    should not be pickable. Also excludes [E]/[M] variants the owner doesn't use."""
     cfg = await get_or_create_config()
     camp = (cfg.get("ad_labels") or {}).get("campaign") or {}
+    live = set(str(x) for x in (cfg.get("live_campaigns") or []))
     items = [{"id": str(k), "name": v} for k, v in camp.items()
-             if v and not _re.search(r"\[(?:E|M)\]\s*$", v, _re.I)]
+             if v and not _re.search(r"\[(?:E|M)\]\s*$", v, _re.I)
+             and (not live or str(k) in live)]
     items.sort(key=lambda x: (x["name"] or "").lower())
     return {"campaigns": items}
 
