@@ -21,8 +21,7 @@ import { useSortable, SortLabel } from '@/lib/useSortable';
 import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
 import { Badge } from '@/components/ui/badge';
 import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
-import { CampaignEditor } from '@/components/admin/CampaignEditor';
-
+import { CampaignEditor, CampaignCell } from '@/components/admin/CampaignEditor';
 // Toggleable columns (Caller & Actions always shown). Persisted per-browser.
 const COLS = [
   { key: 'number', label: 'Number' },
@@ -498,14 +497,17 @@ export const AdminCalls = () => {
                 )}
                 {cols.duration && <TableCell className="text-slate-700">{fmtDuration(c.duration)}</TableCell>}
                 {cols.campaign && (
-                  <TableCell className="hidden md:table-cell text-slate-600">
-                    {c.campaign_name || c.google_campaign || c.campaign || '—'}
-                    {c.adgroup_name && (
-                      <span className="block text-[10px] text-slate-400" data-testid={`call-adgroup-${c.id}`}>{c.adgroup_name}</span>
-                    )}
-                    {c.google_matched && c.google_call_type && (
-                      <span className="block text-[10px] text-green-600" data-testid={`call-google-type-${c.id}`}>{gcallType(c.google_call_type)} · via Google</span>
-                    )}
+                  <TableCell className="hidden md:table-cell text-slate-600" onClick={(e) => e.stopPropagation()}>
+                    <CampaignCell kind="calls" item={c} onChanged={load} children={
+                      <>
+                        {c.adgroup_name && (
+                          <span className="block text-[10px] text-slate-400" data-testid={`call-adgroup-${c.id}`}>{c.adgroup_name}</span>
+                        )}
+                        {c.google_matched && c.google_call_type && (
+                          <span className="block text-[10px] text-green-600" data-testid={`call-google-type-${c.id}`}>{gcallType(c.google_call_type)} · via Google</span>
+                        )}
+                      </>
+                    } />
                   </TableCell>
                 )}
                 {cols.hook && (

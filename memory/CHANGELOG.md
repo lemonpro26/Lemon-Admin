@@ -1,5 +1,10 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13c (fork continuation)
+- **Inline campaign editing in tables (no dialog needed):** New compact `CampaignCell` component added to the **Calls** and **Retained** table Campaign columns. Hover reveals a pencil → inline datalist (pick from enabled Google campaigns or type custom) → save, all without opening the detail dialog. Click propagation is stopped so editing never triggers the row's open-dialog onClick. Verified: edited a call's campaign inline → "Campaign updated" toast, cell + badge + Attributed filter all refreshed. (Leads table has no Campaign column, so nothing there.)
+- **Picker restricted to ENABLED campaigns:** `/admin/campaigns` now intersects the cumulative `ad_labels.campaign` map with `live_campaigns`, so only currently-enabled campaigns are offered (10, matching the owner's Google Ads screenshot) — paused/removed ones (Demand Gen 2026/Spanish, Lemon Pmax for Seniors, The Lemon Law Lawyers) no longer appear.
+- **Campaign filters sort blank → A→Z:** Retained "by campaign" chips and Leads "All campaigns" dropdown now list the blank/Unattributed bucket first, then alphabetically.
+
 ## 2026-07-13b (fork continuation)
 - **Retained — real city/state from Quickbase:** The Quickbase lookup now also pulls the client's City (field 12) + State/Region (field 13) and `_enrich_from_quickbase` persists them onto the lead/call (`city`/`state` + `qb_city`/`qb_state`), overriding CTM geo/IP-derived location. The Retained tab self-heals any item missing a `qb_city` on load, and the "Sync from Quickbase" button backfills all. Added `QUICKBASE_FIELD_CITY="12"` + `QUICKBASE_FIELD_STATE="13"` env (multi-choice state values flattened via `_flatten`). Verified end-to-end: a lead seeded with WRONGCITY/ZZ resolved to the real "Montebello, California" from Quickbase. NOTE: these two env vars must also be set in the production deploy env.
 - **Campaign picker excludes [E]/[M] variants:** `/admin/campaigns` now filters out campaigns whose name ends in `[E]` or `[M]` (Enhanced/Manual variants the owner doesn't use) — 46 → 11 usable campaigns in the manual picker.

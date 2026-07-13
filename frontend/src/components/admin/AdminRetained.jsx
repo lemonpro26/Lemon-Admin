@@ -16,6 +16,7 @@ import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter'
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
 import { NetworkChips, getNetwork } from '@/lib/networks';
+import { CampaignCell } from '@/components/admin/CampaignEditor';
 
 const fmtDate = (s) => {
   if (!s) return '\u2014';
@@ -487,11 +488,7 @@ export const AdminRetained = () => {
                     )}
                     {colOn('campaign') && (
                     <TableCell className="hidden lg:table-cell" data-testid={`retained-campaign-${it.id}`}>
-                      {(it.campaign_name || it.campaign_id) ? (
-                        <span className="inline-flex max-w-[200px] truncate text-sm text-slate-700" title={campaignLabel(it)}>{campaignLabel(it)}</span>
-                      ) : (
-                        <span className="text-xs text-slate-400">{UNATTRIBUTED}</span>
-                      )}
+                      <CampaignCell kind={it.type === 'call' ? 'calls' : 'leads'} item={it} onChanged={load} />
                     </TableCell>
                     )}
                     {colOn('revenue') && (
