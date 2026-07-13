@@ -21,6 +21,7 @@ import { useSortable, SortLabel } from '@/lib/useSortable';
 import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
 import { Badge } from '@/components/ui/badge';
 import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
+import { CampaignEditor } from '@/components/admin/CampaignEditor';
 
 // Toggleable columns (Caller & Actions always shown). Persisted per-browser.
 const COLS = [
@@ -631,7 +632,6 @@ export const AdminCalls = () => {
                   ['Called #', selected.tracked_number_display || selected.tracking_number, 'call-detail-tracking'],
                   ['Landing group', selected.number_group_label, 'call-detail-group'],
                   ['Duration', fmtDuration(selected.duration), 'call-detail-duration'],
-                  ['Campaign', selected.campaign_name || selected.google_campaign || selected.campaign, 'call-detail-campaign'],
                   ['Ad Group', selected.adgroup_name || selected.adgroup_id, 'call-detail-adgroup'],
                   ['Ad', selected.ad_name || selected.ad_id, 'call-detail-ad'],
                   ['Keyword', selected.keyword, 'call-detail-keyword'],
@@ -644,6 +644,7 @@ export const AdminCalls = () => {
                     <span className="text-slate-900 font-medium text-right break-all" data-testid={tid}>{value || '—'}</span>
                   </div>
                 ))}
+                <CampaignEditor kind="calls" item={selected} onChanged={() => { setSelected({ ...selected }); load(); }} />
               </div>
 
               {/* Call history — every time this number called (repeat callers) */}

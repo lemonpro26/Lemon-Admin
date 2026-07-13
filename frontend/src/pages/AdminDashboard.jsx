@@ -38,6 +38,7 @@ import { AdminRetained } from '@/components/admin/AdminRetained';
 import { AdminChannels } from '@/components/admin/AdminChannels';
 import { NetworkChips, getNetwork, NetworkBadge } from '@/lib/networks';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
+import { CampaignEditor } from '@/components/admin/CampaignEditor';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 // Toggleable Leads-table columns (Name & Actions always shown). Persisted per-browser.
@@ -807,7 +808,6 @@ export default function AdminDashboard() {
                   ['Phone', formatPhone(selected.phone), 'lead-detail-phone'],
                   ['Email', selected.email, 'lead-detail-email'],
                   ['Source', ({ lapa: 'PA page (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish Landing (sp)', ladg: 'Demand Gen (ladg)', ladgs: 'Spanish Demand Gen (ladgs)', latm: 'Team Attorneys — Overlay (latm)', latm2: 'Team Attorneys — Split (latm2)', dg: 'Demand Gen (dg)', dgs: 'Spanish Demand Gen (dgs)', tm: 'Team Attorneys — Overlay (tm)', tm2: 'Team Attorneys — Split (tm2)' }[selected.source_page]) || (selected.source_page || 'home'), 'lead-detail-source'],
-                  ['Campaign', selected.campaign_name || selected.campaign_id, 'lead-detail-campaign'],
                   ['Ad Group', selected.adgroup_name || selected.adgroup_id, 'lead-detail-adgroup'],
                   ['Ad', selected.ad_name || selected.ad_id, 'lead-detail-ad'],
                   ['Keyword', selected.keyword, 'lead-detail-keyword'],
@@ -820,6 +820,7 @@ export default function AdminDashboard() {
                     <span className="text-slate-900 font-medium text-right break-all" data-testid={tid}>{value || '\u2014'}</span>
                   </div>
                 ))}
+                <CampaignEditor kind="leads" item={selected} onChanged={() => { setSelected({ ...selected }); loadLeads(); }} />
               </div>
 
               {/* Revenue + Google Ads conversion */}
