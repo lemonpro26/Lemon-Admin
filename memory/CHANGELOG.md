@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13g (fork continuation)
+- **Auto-populating campaign filters on top bars:** Calls tab gained a new "CAMPAIGN" chip row (all enabled Google campaigns ∪ any present in data — incl. Lemon Display 2026 — with unique-caller counts, click to filter). Leads tab campaign dropdown now unions in all enabled campaigns too (Lemon Display shows even at 0). Both fetch from `/admin/campaigns` (enabled-only), so newly enabled/added Google campaigns appear automatically with no hardcoding. Verified via screenshots on both tabs.
+
 ## 2026-07-13f (fork continuation)
 - **Delete/clear campaign:** Campaign editor (inline `CampaignCell` + detail-dialog `CampaignEditor`) now shows a trash icon when a campaign is set. Clearing sets a `campaign_cleared` flag so the attribution backfill (incl. the Demand Gen rule) won't silently re-fill it. Backend `POST /admin/{kind}/{id}/campaign` accepts `{clear:true}`. Verified: cleared a call → stayed empty through a backfill run.
 - **Lead origin audit (read-only) — answers "did you import from Quickbase?":** Confirmed the app NEVER imports leads from Quickbase. Leads are created ONLY by the landing-page form (`POST /leads`) or the manual "Submit Test Lead" button; calls only by the CTM webhook. Quickbase is read-only (name/email/city lookup by phone). New `GET /admin/leads/origin-audit` classifies every lead as landing_page / test / no_origin and lists any no-origin records. Verified on preview: 6 leads → 5 landing_page, 1 test, 0 no_origin. The "Cassandra Jones (LL)…" name is a Quickbase-enriched display name on a real phone-matched record, not a phantom import.

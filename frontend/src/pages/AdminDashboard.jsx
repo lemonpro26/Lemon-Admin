@@ -126,6 +126,7 @@ export default function AdminDashboard() {
   const [openedCall, setOpenedCall] = useState(null);
   const [leadSeg, setLeadSeg] = useState('all');
   const [leadCampaign, setLeadCampaign] = useState('all');
+  const [enabledCampaigns, setEnabledCampaigns] = useState([]);
   const [leadNetwork, setLeadNetwork] = useState('all');
   const [leadCols, setLeadCols] = useState(loadLeadCols);
   useEffect(() => { try { localStorage.setItem(LEAD_COLS_KEY, JSON.stringify(leadCols)); } catch { /* ignore */ } }, [leadCols]);
@@ -184,6 +185,11 @@ export default function AdminDashboard() {
       const cur = map.get(key) || { key, label: leadCampaignLabel(l), count: 0 };
       cur.count += 1;
       map.set(key, cur);
+    });
+    // Also surface every enabled Google campaign (Lemon Display + any new one),
+    // so they show on the bar automatically even with 0 leads in this segment.
+    enabledCampaigns.forEach((c) => {
+      if (c.id && !map.has(c.id)) map.set(c.id, { key: c.id, label: c.name, count: 0 });
     });
     // Blank / "Direct / Untracked" bucket first, then the rest alphabetically.
     return Array.from(map.values()).sort((a, b) => {
@@ -276,6 +282,9 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadGaStatus(); }, [loadGaStatus]);
   useEffect(() => { loadGaHealth(); }, [loadGaHealth]);
+  useEffect(() => {
+    api.get('/admin/campaigns').then((res) => setEnabledCampaigns(res.data.campaigns || [])).catch(() => {});
+  }, []);
   useEffect(() => { loadLeads(); }, [loadLeads]);
   useEffect(() => { loadStats(); }, [loadStats]);
 

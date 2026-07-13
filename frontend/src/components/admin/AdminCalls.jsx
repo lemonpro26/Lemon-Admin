@@ -55,6 +55,9 @@ const CALL_SEGMENTS = [
 // A call is "attributed" when we can tie it to an ad/campaign.
 const callHasAttribution = (c) => !!(c.campaign_name || c.google_campaign);
 
+// Human campaign name for a call (used by the auto-populating campaign chips).
+const callCampaignName = (c) => (c.campaign_name || c.google_campaign || c.campaign || '').trim();
+
 const SOURCE_LABELS = {
   home: 'Home', lapa: 'PA (/pa)', laspa: 'Spanish PA (/spa)', sp: 'Spanish (/sp)',
   ladg: 'Demand Gen (/dg)', ladgs: 'Spanish Demand Gen (/dgs)',
@@ -134,6 +137,8 @@ export const AdminCalls = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [seg, setSeg] = useState('all');
   const [network, setNetwork] = useState('all');
+  const [campaignFilter, setCampaignFilter] = useState('all');
+  const [enabledCampaigns, setEnabledCampaigns] = useState([]);
   const [cols, setCols] = useState(loadCols);
   const [matchedLeads, setMatchedLeads] = useState([]);
   const [openedLead, setOpenedLead] = useState(null);
@@ -151,6 +156,26 @@ export const AdminCalls = () => {
   }, [cols]);
   const toggleCol = (k) => setCols((prev) => ({ ...prev, [k]: !prev[k] }));
 
+  // Enabled Google campaigns → always-visible campaign chips (so Lemon Display &
+  // any newly-enabled campaign auto-appear on the top bar, even with 0 calls yet).
+  useEffect(() => {
+    api.get('/admin/campaigns').then((res) => setEnabledCampaigns((res.data.campaigns || []).map((c) => c.name))).catch(() => {});
+  }, []);
+
+  // Campaign chips = enabled campaigns ∪ any campaign already present in the data
+  // (so paused campaigns like Demand Gen still filter). Counts are unique callers.
+  const campaignChips = useMemo(() => {
+    const counts = new Map();
+    for (const c of calls) {
+      const n = callCampaignName(c);
+      if (n) counts.set(n, (counts.get(n) || []).concat(c));
+    }
+    const names = new Set([...enabledCampaigns, ...counts.keys()]);
+    return Array.from(names)
+      .map((name) => ({ name, count: groupByCaller(counts.get(name) || []).length }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [calls, enabledCampaigns]);
+
   // Segment calls by the DIALED tracking number (number_group), plus an
   // "attributed" segment that shows only calls tied to an ad/campaign.
   // Counts are UNIQUE CALLERS (repeat calls from one number count once).
@@ -160,7 +185,9 @@ export const AdminCalls = () => {
     acc[s.key] = groupByCaller(list).length;
     return acc;
   }, {});
-  const shownCalls = sortedCalls.filter((c) => inSeg(seg, c) && (network === 'all' || getNetwork(c) === network));
+  const shownCalls = sortedCalls.filter((c) => inSeg(seg, c)
+    && (network === 'all' || getNetwork(c) === network)
+    && (campaignFilter === 'all' || callCampaignName(c) === campaignFilter));
   // Grouped rows for the table (one per caller) + grouped set for the network chip counts.
   const groupedCalls = useMemo(() => groupByCaller(shownCalls), [shownCalls]);
   const groupedForNetwork = useMemo(() => groupByCaller(sortedCalls), [sortedCalls]);
@@ -385,7 +412,33 @@ export const AdminCalls = () => {
         ))}
       </div>
 
-      {/* Network filter (mockup) — separate calls by traffic source */}
+      {/* Campaign filter — auto-populates from enabled Google campaigns (∪ any in
+          the data), so Lemon Display & new campaigns show up here automatically. */}
+      {campaignChips.length > 0 && (
+        <div className="mt-3">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Campaign</div>
+          <div className="flex items-center gap-2 flex-wrap" data-testid="call-campaign-filters">
+            <button
+              onClick={() => setCampaignFilter('all')}
+              className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${campaignFilter === 'all' ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
+              data-testid="call-campaign-all"
+            >
+              All <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${campaignFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{groupByCaller(calls.filter((c) => callCampaignName(c))).length}</span>
+            </button>
+            {campaignChips.map((c) => (
+              <button
+                key={c.name}
+                onClick={() => setCampaignFilter(campaignFilter === c.name ? 'all' : c.name)}
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${campaignFilter === c.name ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
+                data-testid={`call-campaign-${c.name}`}
+              >
+                {c.name}
+                <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${campaignFilter === c.name ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{c.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mt-3">
         <NetworkChips items={groupedForNetwork} value={network} onChange={setNetwork} testidPrefix="call-network" />
       </div>
