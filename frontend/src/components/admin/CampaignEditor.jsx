@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Megaphone, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
@@ -78,16 +78,23 @@ export const CampaignEditor = ({ kind, item, onChanged }) => {
 
 
 // Compact inline campaign editor for table cells — lets you edit the campaign
-// straight from the Campaign column without opening the detail dialog. Stops
-// click propagation so it never triggers a row's onClick (which opens a dialog).
+// straight from the Campaign column without opening the detail dialog. Updates
+// in place (no list refetch) and stops click propagation so it never triggers a
+// row's onClick (which opens a dialog).
 export const CampaignCell = ({ kind, item, onChanged, children }) => {
   const editable = canEditFn();
   const [campaigns, setCampaigns] = useState(_campaignCache || []);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const inputRef = useRef(null);
+  // Local copy so the cell updates instantly on save without reloading the table.
+  const [current, setCurrent] = useState(
+    item.campaign_name || item.google_campaign || item.campaign || item.campaign_id || '');
 
-  const current = item.campaign_name || item.google_campaign || item.campaign || item.campaign_id || '';
+  useEffect(() => {
+    setCurrent(item.campaign_name || item.google_campaign || item.campaign || item.campaign_id || '');
+  }, [item.campaign_name, item.google_campaign, item.campaign, item.campaign_id]);
 
   useEffect(() => {
     if (_campaignCache) { setCampaigns(_campaignCache); return; }
@@ -96,6 +103,11 @@ export const CampaignCell = ({ kind, item, onChanged, children }) => {
       setCampaigns(_campaignCache);
     }).catch(() => {});
   }, []);
+
+  // Focus the input WITHOUT scrolling the page to it (prevents the jump/shift).
+  useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus({ preventScroll: true });
+  }, [editing]);
 
   const stop = (e) => { e.stopPropagation(); };
 
@@ -116,11 +128,13 @@ export const CampaignCell = ({ kind, item, onChanged, children }) => {
         campaign_id: match ? match.id : '',
         campaign_name: name,
       });
+      // Mutate the row object + update the cell locally — no full table reload.
       item.campaign_id = res.data.campaign_id;
       item.campaign_name = res.data.campaign_name;
+      setCurrent(res.data.campaign_name || name);
       toast.success('Campaign updated.');
       setEditing(false);
-      onChanged && onChanged();
+      onChanged && onChanged({ campaign_id: res.data.campaign_id, campaign_name: res.data.campaign_name });
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Could not update campaign.');
     } finally { setBusy(false); }
@@ -130,6 +144,7 @@ export const CampaignCell = ({ kind, item, onChanged, children }) => {
     return (
       <div className="flex items-center gap-1" onClick={stop} data-testid={`campaign-cell-edit-${item.id}`}>
         <input
+          ref={inputRef}
           list="campaign-cell-options"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -137,7 +152,6 @@ export const CampaignCell = ({ kind, item, onChanged, children }) => {
           placeholder="Pick or type"
           className="w-44 rounded-lg border border-slate-200 px-2 py-1 text-xs"
           data-testid={`campaign-cell-input-${item.id}`}
-          autoFocus
         />
         <datalist id="campaign-cell-options">
           {campaigns.map((c) => <option key={c.id} value={c.name} />)}

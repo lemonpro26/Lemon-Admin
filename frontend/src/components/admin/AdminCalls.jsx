@@ -498,7 +498,7 @@ export const AdminCalls = () => {
                 {cols.duration && <TableCell className="text-slate-700">{fmtDuration(c.duration)}</TableCell>}
                 {cols.campaign && (
                   <TableCell className="hidden md:table-cell text-slate-600" onClick={(e) => e.stopPropagation()}>
-                    <CampaignCell kind="calls" item={c} onChanged={load} children={
+                    <CampaignCell kind="calls" item={c} onChanged={(u) => setCalls((prev) => prev.map((x) => x.id === c.id ? { ...x, ...u } : x))} children={
                       <>
                         {c.adgroup_name && (
                           <span className="block text-[10px] text-slate-400" data-testid={`call-adgroup-${c.id}`}>{c.adgroup_name}</span>

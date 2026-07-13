@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13e (fork continuation)
+- **Inline campaign edit UX fixes:** (1) Saving no longer reloads the whole table — `CampaignCell` keeps a local `current` value and parents patch their list state in place (`setCalls`/`setData`), so it "just updates". (2) Clicking edit no longer scrolls/jumps the page — replaced `autoFocus` with `inputRef.focus({ preventScroll: true })`. Verified: edited a call's campaign inline; cell + badge updated instantly, no reload, no jump.
+
 ## 2026-07-13d (fork continuation)
 - **Demand Gen source → Demand Gen campaign mapping:** Calls/leads that came in through a Demand Gen landing page or tracked number now attribute to their real Google campaign — `/dg` + number 833-240-9312 → "Demand Gen 2026", `/dgs` + 833-868-1802 → "Demand Gen 2026 Spanish". Added `_demandgen_campaign_name` + a final fallback in `_derive_campaign_id` (fires only when no other campaign resolved, so it fills blanks without clobbering real Google matches). Backfill projection widened to include `number_group`/`source_page`; new webhook calls get it automatically. These campaigns are paused (hidden from the manual picker) but still resolve for display. Verified: a dgs-sourced call backfilled to "Demand Gen 2026 Spanish".
 

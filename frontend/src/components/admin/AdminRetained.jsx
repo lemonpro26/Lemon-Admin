@@ -488,7 +488,7 @@ export const AdminRetained = () => {
                     )}
                     {colOn('campaign') && (
                     <TableCell className="hidden lg:table-cell" data-testid={`retained-campaign-${it.id}`}>
-                      <CampaignCell kind={it.type === 'call' ? 'calls' : 'leads'} item={it} onChanged={load} />
+                      <CampaignCell kind={it.type === 'call' ? 'calls' : 'leads'} item={it} onChanged={(u) => setData((prev) => ({ ...prev, items: (prev.items || []).map((x) => (x.id === it.id && x.type === it.type) ? { ...x, ...u } : x) }))} />
                     </TableCell>
                     )}
                     {colOn('revenue') && (
