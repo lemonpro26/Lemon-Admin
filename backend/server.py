@@ -2744,7 +2744,6 @@ async def _enrich_calls_with_hooks(items: list) -> list:
 # area code + call start time (within a window) + duration. Matched calls get
 # Google's real call type + campaign attached and a "Verified via Google Ads" flag.
 _GCALL_TIME_WINDOW_S = 900   # +/- 15 minutes (absorbs minor clock/tz drift)
-_GCALL_DURATION_TOL_S = 25   # +/- 25 seconds
 
 
 def _parse_dt_epoch(value):
@@ -2799,7 +2798,7 @@ async def _enrich_calls_with_google(full: bool = False) -> dict:
         c_epoch = _parse_dt_epoch(c.get("called_at") or c.get("created_at"))
         if not area or c_epoch is None:
             continue
-        best, best_gap = None, None
+        best, best_score = None, None
         for i, r in enumerate(g_rows):
             if i in used or r.get("_epoch") is None:
                 continue
@@ -2808,10 +2807,13 @@ async def _enrich_calls_with_google(full: bool = False) -> dict:
             gap = abs(r["_epoch"] - c_epoch)
             if gap > _GCALL_TIME_WINDOW_S:
                 continue
-            if abs(int(r.get("duration") or 0) - int(c.get("duration") or 0)) > _GCALL_DURATION_TOL_S:
-                continue
-            if best_gap is None or gap < best_gap:
-                best, best_gap, best_i = r, gap, i
+            # Duration is a SOFT signal only — CTM and Google frequently report
+            # different durations (ring vs talk time), so we no longer reject on
+            # it; it just breaks ties in favour of the closest match.
+            dur_diff = abs(int(r.get("duration") or 0) - int(c.get("duration") or 0))
+            score = gap + min(dur_diff, 600) * 0.5
+            if best_score is None or score < best_score:
+                best, best_score, best_i = r, score, i
         if best is None:
             continue
         used.add(best_i)
@@ -3204,14 +3206,22 @@ async def _google_call_sync_loop():
     behind the live call by up to a few hours, so we re-scan recent calls every
     20 minutes and attach call type + campaign as Google makes it available."""
     await asyncio.sleep(45)  # let the app finish booting first
+    last_full = 0.0
     while True:
         try:
             if gnames.is_configured():
-                res = await _enrich_calls_with_google(full=False)
+                # A full historical re-scan once a day (and on first boot) so every
+                # past call gets attributed as Google's call_view data catches up;
+                # a light 3-day pass every 20 min in between.
+                import time as _t
+                do_full = (_t.time() - last_full) > 24 * 3600
+                res = await _enrich_calls_with_google(full=do_full)
+                if do_full:
+                    last_full = _t.time()
                 if res.get("matched"):
-                    logger.info("Google call sync loop matched %s calls", res.get("matched"))
+                    logger.info("Google call sync loop matched %s calls (full=%s)", res.get("matched"), do_full)
                 # Turn CTM/Google campaign names into attribution ids on any
-                # call/lead still missing one (report-editor data → admin).
+                # call/lead still missing one (report-editor data -> admin).
                 await _backfill_attribution()
         except Exception as e:
             logger.warning("Google call sync loop error: %s", e)
