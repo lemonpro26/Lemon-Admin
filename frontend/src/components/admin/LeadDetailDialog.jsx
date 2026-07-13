@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CampaignEditor } from '@/components/admin/CampaignEditor';
 
 const fmtDate = (s) => { try { return new Date(s).toLocaleString(); } catch { return s || '\u2014'; } };
 const SRC = {
@@ -71,7 +72,6 @@ export const LeadDetailDialog = ({ lead, open, onOpenChange, onChanged }) => {
     ['Email', l.email, 'ld-email'],
     ['Vehicle', vehicle, 'ld-vehicle'],
     ['Source', SRC[l.source_page] || l.source_page || 'home', 'ld-source'],
-    ['Campaign', l.campaign_name || l.campaign_id, 'ld-campaign'],
     ['Ad Group', l.adgroup_name || l.adgroup_id, 'ld-adgroup'],
     ['Ad', l.ad_name || l.ad_id, 'ld-ad'],
     ['Keyword', l.keyword, 'ld-keyword'],
@@ -96,6 +96,8 @@ export const LeadDetailDialog = ({ lead, open, onOpenChange, onChanged }) => {
               <span className="font-medium text-slate-900 text-right break-all" data-testid={tid}>{val || '\u2014'}</span>
             </div>
           ))}
+
+          <CampaignEditor kind="leads" item={l} onChanged={() => { setL({ ...l }); onChanged && onChanged(); }} />
 
           {l.saw_landing_page && (
             <div className="mt-2 rounded-xl border border-slate-200 p-4 bg-white" data-testid="ld-hook-section">

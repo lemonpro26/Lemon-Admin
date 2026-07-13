@@ -3631,6 +3631,7 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
             "ad_id": l.get("ad_id"), "ad_name": l.get("ad_name"),
             "keyword": l.get("keyword"), "gclid": l.get("gclid"),
             "network": l.get("network"), "ip": l.get("ip"),
+            "city": l.get("city"), "state": l.get("state"),
             "conversion_detail": l.get("conversion_detail"),
         })
     for c in calls:

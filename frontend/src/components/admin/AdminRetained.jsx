@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign, Database, Eye, Megaphone } from 'lucide-react';
+import { Award, RefreshCw, Phone, FileText, Pencil, Check, X, Search, DollarSign, Database, Eye, Megaphone, MapPin, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
@@ -8,6 +8,10 @@ import { Input } from '@/components/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
@@ -25,6 +29,23 @@ const UNATTRIBUTED = 'Unattributed / Direct';
 // Best human-readable campaign for a retained lead/call (falls back to the raw id,
 // then to an "unattributed" bucket for calls/leads with no Google campaign).
 const campaignLabel = (it) => (it.campaign_name || it.campaign_id || UNATTRIBUTED);
+
+const UNKNOWN_CITY = 'Unknown location';
+// City label for a retained lead/call (city + state), for the "Retained by city" view.
+const cityLabel = (it) => {
+  const parts = [it.city, it.state].map((s) => (s || '').trim()).filter(Boolean);
+  return parts.length ? parts.join(', ') : UNKNOWN_CITY;
+};
+
+// Toggleable table columns (Client / Retained on / Detail are always shown).
+const TOGGLE_COLS = [
+  { key: 'type', label: 'Type' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'source', label: 'Source' },
+  { key: 'campaign', label: 'Campaign' },
+  { key: 'revenue', label: 'Revenue' },
+  { key: 'camein', label: 'Came in on' },
+];
 
 // yyyy-mm-dd for a date <input>, from a stored ISO string.
 const toDateInput = (s) => {
@@ -144,6 +165,9 @@ export const AdminRetained = () => {
   const [viewing, setViewing] = useState(null);
   const [network, setNetwork] = useState('all');
   const [campaign, setCampaign] = useState('all');
+  const [city, setCity] = useState('all');
+  const [cols, setCols] = useState(() => Object.fromEntries(TOGGLE_COLS.map((c) => [c.key, true])));
+  const colOn = (k) => cols[k] !== false;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -237,9 +261,23 @@ export const AdminRetained = () => {
     }
     return Array.from(m.values()).sort((a, b) => b.count - a.count);
   }, [netItems]);
+  // City breakdown — geographic distribution of retained clients.
+  const cityBreakdown = useMemo(() => {
+    const m = new Map();
+    for (const it of netItems) {
+      const key = cityLabel(it);
+      const e = m.get(key) || { key, count: 0, revenue: 0 };
+      e.count += 1;
+      e.revenue += it.sale_status === 'sold' ? Number(it.sale_value || 0) : 0;
+      m.set(key, e);
+    }
+    return Array.from(m.values()).sort((a, b) => b.count - a.count);
+  }, [netItems]);
   const shownItems = useMemo(
-    () => netItems.filter((it) => campaign === 'all' || campaignLabel(it) === campaign),
-    [netItems, campaign],
+    () => netItems.filter((it) =>
+      (campaign === 'all' || campaignLabel(it) === campaign) &&
+      (city === 'all' || cityLabel(it) === city)),
+    [netItems, campaign, city],
   );
   const stats = useMemo(() => {
     const leadCount = shownItems.filter((i) => i.type === 'lead').length;
@@ -274,6 +312,28 @@ export const AdminRetained = () => {
           <button onClick={load} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-[#0F1B3D] transition-colors" data-testid="retained-refresh">
             <RefreshCw className="h-4 w-4" /> Refresh
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-[#0F1B3D] transition-colors" data-testid="retained-columns-trigger">
+                <SlidersHorizontal className="h-4 w-4" /> Columns
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44" data-testid="retained-columns-menu">
+              <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {TOGGLE_COLS.map((c) => (
+                <DropdownMenuCheckboxItem
+                  key={c.key}
+                  checked={colOn(c.key)}
+                  onCheckedChange={(v) => setCols((prev) => ({ ...prev, [c.key]: !!v }))}
+                  onSelect={(e) => e.preventDefault()}
+                  data-testid={`retained-col-toggle-${c.key}`}
+                >
+                  {c.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button onClick={syncQuickbase} disabled={syncingQb} className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-60 transition-colors" data-testid="retained-sync-quickbase">
             <Database className={`h-4 w-4 ${syncingQb ? 'animate-pulse' : ''}`} /> {syncingQb ? 'Syncing…' : 'Sync from Quickbase'}
           </button>
@@ -331,6 +391,39 @@ export const AdminRetained = () => {
         </div>
       )}
 
+      {/* City breakdown — geographic distribution of your retained clients. */}
+      {cityBreakdown.length > 0 && (
+        <div data-testid="retained-city-breakdown">
+          <div className="flex items-center gap-2 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <MapPin className="h-3.5 w-3.5" /> Retained by city
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setCity('all')}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${city === 'all' ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+              data-testid="retained-city-all"
+            >
+              All cities <span className="text-xs opacity-80">{netItems.length}</span>
+            </button>
+            {cityBreakdown.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setCity(city === c.key ? 'all' : c.key)}
+                title={c.revenue ? `$${Number(c.revenue).toLocaleString()} revenue` : undefined}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${city === c.key ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
+                data-testid={`retained-city-chip-${c.key}`}
+              >
+                <span className="max-w-[220px] truncate">{c.key}</span>
+                <span className={`text-xs rounded-full px-1.5 ${city === c.key ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{c.count}</span>
+                {c.revenue > 0 && (
+                  <span className={`text-xs ${city === c.key ? 'text-white/90' : 'text-emerald-600'}`}>${Number(c.revenue).toLocaleString()}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-slate-500" data-testid="retained-loading">Loading…</div>
@@ -348,12 +441,12 @@ export const AdminRetained = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Client</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead className="hidden sm:table-cell">Source</TableHead>
-                  <TableHead className="hidden lg:table-cell">Campaign</TableHead>
-                  <TableHead className="hidden sm:table-cell">Revenue</TableHead>
-                  <TableHead className="hidden md:table-cell">Came in on</TableHead>
+                  {colOn('type') && <TableHead>Type</TableHead>}
+                  {colOn('phone') && <TableHead>Phone</TableHead>}
+                  {colOn('source') && <TableHead className="hidden sm:table-cell">Source</TableHead>}
+                  {colOn('campaign') && <TableHead className="hidden lg:table-cell">Campaign</TableHead>}
+                  {colOn('revenue') && <TableHead className="hidden sm:table-cell">Revenue</TableHead>}
+                  {colOn('camein') && <TableHead className="hidden md:table-cell">Came in on</TableHead>}
                   <TableHead>Retained on</TableHead>
                   <TableHead className="text-right">Detail</TableHead>
                 </TableRow>
@@ -370,6 +463,7 @@ export const AdminRetained = () => {
                       </div>
                       {it.email && <div className="text-xs font-normal text-slate-500 truncate max-w-[220px]" data-testid={`retained-email-${it.id}`}>{it.email}</div>}
                     </TableCell>
+                    {colOn('type') && (
                     <TableCell>
                       {it.type === 'call' ? (
                         <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] gap-1"><Phone className="h-3 w-3" /> Call</Badge>
@@ -377,12 +471,16 @@ export const AdminRetained = () => {
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] gap-1"><FileText className="h-3 w-3" /> Lead</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-slate-600">{formatPhone(it.phone) || '\u2014'}</TableCell>
+                    )}
+                    {colOn('phone') && <TableCell className="text-slate-600">{formatPhone(it.phone) || '\u2014'}</TableCell>}
+                    {colOn('source') && (
                     <TableCell className="hidden sm:table-cell text-slate-600" data-testid={`retained-source-${it.id}`}>
                       {it.type === 'call'
                         ? `Call from ${it.number_group_label || 'Unknown'}`
                         : (SOURCE_LABELS[it.source_page] || it.source_page || '\u2014')}
                     </TableCell>
+                    )}
+                    {colOn('campaign') && (
                     <TableCell className="hidden lg:table-cell" data-testid={`retained-campaign-${it.id}`}>
                       {(it.campaign_name || it.campaign_id) ? (
                         <span className="inline-flex max-w-[200px] truncate text-sm text-slate-700" title={campaignLabel(it)}>{campaignLabel(it)}</span>
@@ -390,10 +488,13 @@ export const AdminRetained = () => {
                         <span className="text-xs text-slate-400">{UNATTRIBUTED}</span>
                       )}
                     </TableCell>
+                    )}
+                    {colOn('revenue') && (
                     <TableCell className="hidden sm:table-cell">
                       <RevenueCell item={it} onSave={saveRevenue} />
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-slate-500 text-sm whitespace-nowrap" data-testid={`retained-camein-${it.id}`}>{fmtDate(it.created_at)}</TableCell>
+                    )}
+                    {colOn('camein') && <TableCell className="hidden md:table-cell text-slate-500 text-sm whitespace-nowrap" data-testid={`retained-camein-${it.id}`}>{fmtDate(it.created_at)}</TableCell>}
                     <TableCell className="text-slate-500 text-sm whitespace-nowrap"><RetainedDateCell item={it} onSave={saveRetainedDate} /></TableCell>
                     <TableCell className="text-right">
                       <button

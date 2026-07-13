@@ -14,7 +14,7 @@ export const CampaignEditor = ({ kind, item, onChanged }) => {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const current = item.campaign_name || item.campaign_id || '';
+  const current = item.campaign_name || item.google_campaign || item.campaign || item.campaign_id || '';
 
   useEffect(() => {
     if (_campaignCache) { setCampaigns(_campaignCache); return; }

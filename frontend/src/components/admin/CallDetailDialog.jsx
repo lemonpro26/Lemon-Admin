@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CampaignEditor } from '@/components/admin/CampaignEditor';
 
 const fmtDate = (s) => { try { return new Date(s).toLocaleString(); } catch { return s || '\u2014'; } };
 const fmtDur = (d) => (d ? `${Math.floor(d / 60)}m ${d % 60}s` : '\u2014');
@@ -63,7 +64,6 @@ export const CallDetailDialog = ({ call, open, onOpenChange, onChanged }) => {
     ['Called #', c.tracked_number_display || c.tracking_number, 'cd-tracking'],
     ['Landing group', c.number_group_label, 'cd-group'],
     ['Duration', fmtDur(c.duration), 'cd-duration'],
-    ['Campaign', c.campaign_name || c.google_campaign || c.campaign, 'cd-campaign'],
     ['Ad Group', c.adgroup_name || c.adgroup_id, 'cd-adgroup'],
     ['Ad', c.ad_name || c.ad_id, 'cd-ad'],
     ['Keyword', c.keyword, 'cd-keyword'],
@@ -88,6 +88,8 @@ export const CallDetailDialog = ({ call, open, onOpenChange, onChanged }) => {
               <span className="font-medium text-slate-900 text-right break-all" data-testid={tid}>{val || '\u2014'}</span>
             </div>
           ))}
+
+          <CampaignEditor kind="calls" item={c} onChanged={() => { setC({ ...c }); onChanged && onChanged(); }} />
 
           {/* Landing page & hook attribution */}
           <div className="mt-2 rounded-xl border border-slate-200 p-4 bg-white" data-testid="cd-hook-section">
