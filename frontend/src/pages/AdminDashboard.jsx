@@ -185,7 +185,12 @@ export default function AdminDashboard() {
       cur.count += 1;
       map.set(key, cur);
     });
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    // Blank / "Direct / Untracked" bucket first, then the rest alphabetically.
+    return Array.from(map.values()).sort((a, b) => {
+      const au = a.key === '__none__', bu = b.key === '__none__';
+      if (au !== bu) return au ? -1 : 1;
+      return a.label.localeCompare(b.label);
+    });
   })();
   const shownLeads = segLeads.filter(
     (l) => (leadCampaign === 'all' || leadCampaignKey(l) === leadCampaign)

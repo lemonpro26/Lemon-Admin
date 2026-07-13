@@ -259,7 +259,12 @@ export const AdminRetained = () => {
       e.revenue += it.sale_status === 'sold' ? Number(it.sale_value || 0) : 0;
       m.set(key, e);
     }
-    return Array.from(m.values()).sort((a, b) => b.count - a.count);
+    // Blank / "Unattributed" bucket first, then the rest alphabetically.
+    return Array.from(m.values()).sort((a, b) => {
+      const au = a.key === UNATTRIBUTED, bu = b.key === UNATTRIBUTED;
+      if (au !== bu) return au ? -1 : 1;
+      return a.key.localeCompare(b.key);
+    });
   }, [netItems]);
   // City breakdown — geographic distribution of retained clients.
   const cityBreakdown = useMemo(() => {
