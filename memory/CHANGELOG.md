@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13d (fork continuation)
+- **Demand Gen source → Demand Gen campaign mapping:** Calls/leads that came in through a Demand Gen landing page or tracked number now attribute to their real Google campaign — `/dg` + number 833-240-9312 → "Demand Gen 2026", `/dgs` + 833-868-1802 → "Demand Gen 2026 Spanish". Added `_demandgen_campaign_name` + a final fallback in `_derive_campaign_id` (fires only when no other campaign resolved, so it fills blanks without clobbering real Google matches). Backfill projection widened to include `number_group`/`source_page`; new webhook calls get it automatically. These campaigns are paused (hidden from the manual picker) but still resolve for display. Verified: a dgs-sourced call backfilled to "Demand Gen 2026 Spanish".
+
 ## 2026-07-13c (fork continuation)
 - **Inline campaign editing in tables (no dialog needed):** New compact `CampaignCell` component added to the **Calls** and **Retained** table Campaign columns. Hover reveals a pencil → inline datalist (pick from enabled Google campaigns or type custom) → save, all without opening the detail dialog. Click propagation is stopped so editing never triggers the row's open-dialog onClick. Verified: edited a call's campaign inline → "Campaign updated" toast, cell + badge + Attributed filter all refreshed. (Leads table has no Campaign column, so nothing there.)
 - **Picker restricted to ENABLED campaigns:** `/admin/campaigns` now intersects the cumulative `ad_labels.campaign` map with `live_campaigns`, so only currently-enabled campaigns are offered (10, matching the owner's Google Ads screenshot) — paused/removed ones (Demand Gen 2026/Spanish, Lemon Pmax for Seniors, The Lemon Law Lawyers) no longer appear.

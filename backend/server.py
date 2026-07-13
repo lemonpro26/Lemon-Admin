@@ -2570,7 +2570,10 @@ def _campaign_name_to_id(ad_labels: dict) -> dict:
 
 def _derive_campaign_id(doc: dict, name_to_id: dict) -> str:
     """Best campaign id for a call/lead: an explicit id first, then Google's
-    matched id, then a reverse-lookup of the CTM/Google campaign NAME."""
+    matched id, then a reverse-lookup of the CTM/Google campaign NAME. As a final
+    fallback, records that came in through a Demand Gen landing page/number are
+    mapped to their Demand Gen campaign (those campaigns are paused but old
+    records should still show the campaign they came from)."""
     cid = str(doc.get("campaign_id") or "").strip()
     if cid:
         return cid
@@ -2590,6 +2593,32 @@ def _derive_campaign_id(doc: dict, name_to_id: dict) -> str:
             return raw_name
         if raw_name in name_to_id:
             return name_to_id[raw_name]
+    # Demand Gen source → Demand Gen campaign (paused, but authoritative for the
+    # dedicated /dg and /dgs landing pages + their tracked numbers).
+    dg_name = _demandgen_campaign_name(doc)
+    if dg_name:
+        return name_to_id.get(dg_name.lower(), "")
+    return ""
+
+
+# The dedicated Demand Gen landing pages / tracked numbers map 1:1 to their
+# Google campaign (answer 1B: use the real campaign names).
+_DEMANDGEN_CAMPAIGN_BY_SOURCE = {
+    "dg": "Demand Gen 2026",
+    "dgs": "Demand Gen 2026 Spanish",
+}
+
+
+def _demandgen_campaign_name(doc: dict) -> str:
+    """Demand Gen campaign name for a call/lead sourced from a Demand Gen page,
+    or "" if it didn't come from one. Calls carry `number_group` (dg/dgs); leads
+    carry `source_page` (dg/ladg/dgs/ladgs, normalized via _canon_page)."""
+    grp = str(doc.get("number_group") or "").lower()
+    if grp in _DEMANDGEN_CAMPAIGN_BY_SOURCE:
+        return _DEMANDGEN_CAMPAIGN_BY_SOURCE[grp]
+    sp = _canon_page(doc.get("source_page"))
+    if sp in _DEMANDGEN_CAMPAIGN_BY_SOURCE:
+        return _DEMANDGEN_CAMPAIGN_BY_SOURCE[sp]
     return ""
 
 
@@ -2631,7 +2660,8 @@ async def _backfill_attribution() -> dict:
     for coll in (db.calls, db.leads):
         async for doc in coll.find(miss, {"id": 1, "campaign_id": 1, "campaign": 1,
                                           "campaign_name": 1, "google_campaign": 1,
-                                          "google_campaign_id": 1, "raw": 1, "_id": 0}):
+                                          "google_campaign_id": 1, "raw": 1,
+                                          "number_group": 1, "source_page": 1, "_id": 0}):
             cid = _derive_campaign_id(doc, name_to_id)
             if cid:
                 await coll.update_one({"id": doc.get("id")}, {"$set": {"campaign_id": cid}})
