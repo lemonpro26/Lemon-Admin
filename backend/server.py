@@ -2919,6 +2919,41 @@ async def admin_backfill_attribution(_: dict = Depends(require_editor)):
     return await _backfill_attribution()
 
 
+@api_router.get("/admin/campaigns")
+async def admin_list_campaigns(_: dict = Depends(require_admin)):
+    """List Google campaigns (id + name) for the manual campaign picker."""
+    cfg = await get_or_create_config()
+    camp = (cfg.get("ad_labels") or {}).get("campaign") or {}
+    items = [{"id": str(k), "name": v} for k, v in camp.items() if v]
+    items.sort(key=lambda x: (x["name"] or "").lower())
+    return {"campaigns": items}
+
+
+@api_router.post("/admin/{kind}/{item_id}/campaign")
+async def admin_set_campaign(kind: str, item_id: str, body: dict, _: dict = Depends(require_editor)):
+    """Manually assign / correct the campaign on a lead or call from its detail
+    dialog. Accepts a campaign_id and/or a campaign_name (typed or picked)."""
+    if kind not in ("leads", "calls"):
+        raise HTTPException(status_code=404, detail="Unknown kind")
+    coll = db.leads if kind == "leads" else db.calls
+    cfg = await get_or_create_config()
+    camp_map = {str(k): v for k, v in ((cfg.get("ad_labels") or {}).get("campaign") or {}).items()}
+    name_to_id = _campaign_name_to_id(cfg.get("ad_labels") or {})
+    cid = str(body.get("campaign_id") or "").strip()
+    cname = str(body.get("campaign_name") or "").strip()
+    if not cid and cname:
+        cid = name_to_id.get(cname.lower(), "")
+    if cid and not cname:
+        cname = camp_map.get(cid, "")
+    if not cid and not cname:
+        raise HTTPException(status_code=400, detail="Provide a campaign name or id")
+    res = await coll.update_one({"id": item_id}, {"$set": {
+        "campaign_id": cid, "campaign_name": cname, "campaign_manual": True}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return {"success": True, "campaign_id": cid, "campaign_name": cname}
+
+
 @api_router.get("/admin/calls")
 async def admin_get_calls(start: str = "", end: str = "", search: str = Query(""), _: dict = Depends(require_admin)):
     search = (search or "").strip()
