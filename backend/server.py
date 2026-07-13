@@ -3386,8 +3386,13 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
     # still has no name — so nameless clients (e.g. calls showing only a city)
     # get re-attempted every time the tab loads, and self-heal.
     if qb.is_configured():
-        pending = ([(l, db.leads) for l in leads if not l.get("qb_name")]
-                   + [(c, db.calls) for c in calls if not c.get("qb_name")])
+        # Re-look-up any item with no name OR a junk/duplicate name (e.g.
+        # "SANTA ROSA CA (Duplicate)") so stale bad names self-heal on load.
+        def _needs_qb(x):
+            n = (x.get("qb_name") or "").strip()
+            return (not n) or ("duplicate" in n.lower())
+        pending = ([(l, db.leads) for l in leads if _needs_qb(l)]
+                   + [(c, db.calls) for c in calls if _needs_qb(c)])
         if pending:
             await asyncio.gather(*[_enrich_from_quickbase(doc, coll) for doc, coll in pending], return_exceptions=True)
     items = []
