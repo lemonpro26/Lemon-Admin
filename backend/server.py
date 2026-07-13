@@ -3371,6 +3371,33 @@ async def admin_channels_summary(start: str = "", end: str = "", _: dict = Depen
             "networks": {"google": google, "facebook": dict(zero), "instagram": dict(zero), "native": dict(zero)}}
 
 
+@api_router.get("/admin/channels/campaigns")
+async def admin_channels_campaigns(network: str = "google", start: str = "", end: str = "",
+                                   _: dict = Depends(require_admin)):
+    """Spend broken down by campaign for a given network (click-through from a
+    Channels network card). Only Google has live spend today; other networks
+    return an empty list until their attribution is switched on."""
+    from datetime import date, timedelta
+    if not end:
+        end = date.today().isoformat()
+    if not start:
+        start = (date.today() - timedelta(days=29)).isoformat()
+    if network != "google":
+        return {"network": network, "campaigns": [], "total_spend": 0.0, "live": False}
+
+    spend_by_campaign = await asyncio.to_thread(gnames.fetch_spend_by_campaign, start, end)
+    cfg = await get_or_create_config()
+    camp_names = {str(k): v for k, v in ((cfg.get("ad_labels") or {}).get("campaign") or {}).items() if v}
+    campaigns = [
+        {"campaign_id": str(cid), "campaign_name": camp_names.get(str(cid)) or str(cid),
+         "spend": round(float(sp), 2)}
+        for cid, sp in spend_by_campaign.items() if sp
+    ]
+    campaigns.sort(key=lambda r: r["spend"], reverse=True)
+    return {"network": network, "campaigns": campaigns,
+            "total_spend": round(sum(c["spend"] for c in campaigns), 2), "live": True}
+
+
 
 @api_router.get("/admin/retained")
 async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(require_admin)):

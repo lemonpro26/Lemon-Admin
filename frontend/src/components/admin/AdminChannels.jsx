@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Info, Phone, Users, Award, TrendingUp } from 'lucide-react';
+import { Info, Phone, Users, Award, TrendingUp, ChevronDown } from 'lucide-react';
 import { api } from '@/lib/api';
 import { NETWORKS } from '@/lib/networks';
 import { DateRangeFilter } from '@/components/admin/DateRangeFilter';
@@ -22,6 +22,9 @@ export function AdminChannels() {
   const [loading, setLoading] = useState(true);
   const [spend30, setSpend30] = useState(null);
   const [spendLoading, setSpendLoading] = useState(true);
+  const [selected, setSelected] = useState(null);       // network key clicked
+  const [campaigns, setCampaigns] = useState(null);     // spend-by-campaign result
+  const [campLoading, setCampLoading] = useState(false);
 
   // Summary cards + table follow the selected range (defaults to Today).
   useEffect(() => {
@@ -45,6 +48,20 @@ export function AdminChannels() {
       .finally(() => { if (alive) setSpendLoading(false); });
     return () => { alive = false; };
   }, []);
+
+  // Clicking a network card loads its spend-by-campaign breakdown.
+  const selectNetwork = (key) => {
+    if (selected === key) { setSelected(null); return; }
+    setSelected(key);
+    setCampLoading(true);
+    setCampaigns(null);
+    api.get(`/admin/channels/campaigns?network=${key}&start=${range.start}&end=${range.end}`)
+      .then((res) => setCampaigns(res.data))
+      .catch(() => setCampaigns({ campaigns: [], live: false }))
+      .finally(() => setCampLoading(false));
+  };
+  // Reset the drill-down whenever the date range changes.
+  useEffect(() => { setSelected(null); setCampaigns(null); }, [range.start, range.end]);
 
   const net = data?.networks || {};
   const rows = NETWORKS.map((n) => ({ ...n, ...(net[n.key] || { calls: 0, leads: 0, retained: 0, revenue: 0, spend: 0, spend_by_day: [] }) }));
@@ -83,7 +100,14 @@ export function AdminChannels() {
           const cpa = r.retained ? r.spend / r.retained : 0;
           const roas = r.spend ? r.revenue / r.spend : 0;
           return (
-            <div key={r.key} className={`rounded-2xl border ${r.border} bg-white p-5`} data-testid={`channel-card-${r.key}`}>
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => selectNetwork(r.key)}
+              className={`text-left rounded-2xl border ${selected === r.key ? 'ring-2 ring-offset-1' : ''} ${r.border} bg-white p-5 transition-all hover:shadow-md hover:-translate-y-0.5`}
+              style={selected === r.key ? { '--tw-ring-color': r.color } : undefined}
+              data-testid={`channel-card-${r.key}`}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${r.bg}`} style={{ color: r.color }}>
@@ -109,10 +133,52 @@ export function AdminChannels() {
                 <span className="text-slate-500" title="Spend ÷ (Calls + Leads)">CPL <span className="font-semibold text-slate-800">{contacts ? money(cpl) : '—'}</span></span>
                 <span className="text-slate-500" title="Spend ÷ Retained">CPA <span className="font-semibold text-slate-800">{r.retained ? money(cpa) : '—'}</span></span>
               </div>
-            </div>
+              <div className={`mt-3 flex items-center gap-1 text-[11px] font-semibold ${selected === r.key ? 'text-slate-700' : 'text-slate-400'}`}>
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${selected === r.key ? 'rotate-180' : ''}`} />
+                {selected === r.key ? 'Hide campaign spend' : 'View spend by campaign'}
+              </div>
+            </button>
           );
         })}
       </div>
+
+      {/* Spend-by-campaign drill-down for the selected network */}
+      {selected && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="channels-campaign-spend">
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-slab font-bold text-slate-900">
+              Spend by campaign — {(rows.find((r) => r.key === selected) || {}).label}
+            </div>
+            {campaigns?.total_spend != null && (
+              <div className="text-sm text-slate-500">Total <span className="font-bold text-slate-900">{usd(campaigns.total_spend)}</span></div>
+            )}
+          </div>
+          {campLoading ? (
+            <div className="text-sm text-slate-400 py-6 text-center">Loading campaign spend…</div>
+          ) : !campaigns?.campaigns?.length ? (
+            <div className="text-sm text-slate-400 py-6 text-center" data-testid="channels-campaign-spend-empty">
+              {campaigns?.live === false
+                ? `${(rows.find((r) => r.key === selected) || {}).label} spend isn't tracked yet — switch on its attribution to see campaigns here.`
+                : 'No campaign spend in this date range.'}
+            </div>
+          ) : (
+            <div className="space-y-2.5" data-testid="channels-campaign-spend-list">
+              {(() => {
+                const maxCamp = Math.max(...campaigns.campaigns.map((c) => c.spend || 0), 1);
+                return campaigns.campaigns.map((c) => (
+                  <div key={c.campaign_id} className="flex items-center gap-3" data-testid={`channels-campaign-row-${c.campaign_id}`}>
+                    <div className="w-56 shrink-0 truncate text-sm text-slate-700" title={c.campaign_name}>{c.campaign_name}</div>
+                    <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.round((c.spend / maxCamp) * 100)}%` }} />
+                    </div>
+                    <div className="w-24 shrink-0 text-right font-semibold text-slate-900 tabular-nums">{money(c.spend)}</div>
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Google spend by day */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="channels-google-spend-by-day">
