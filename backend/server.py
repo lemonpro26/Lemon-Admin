@@ -2431,6 +2431,10 @@ async def calls_webhook(request: Request, token: str = ""):
     }
     # Resolve the campaign NAME that CTM sends (report-editor data) into the numeric
     # campaign_id that attribution keys off of, so the call isn't left "unattributed".
+    if not rec.get("campaign"):
+        rec["campaign"] = _deep_find_value(data, ["campaign"])
+    if not rec.get("gclid"):
+        rec["gclid"] = _deep_find_value(data, ["gclid"])
     try:
         _labels = (await get_or_create_config()).get("ad_labels") or {}
         _cid = _derive_campaign_id(rec, _campaign_name_to_id(_labels))
@@ -2577,12 +2581,47 @@ def _derive_campaign_id(doc: dict, name_to_id: dict) -> str:
         name = str(doc.get(key) or "").strip().lower()
         if name and not name.isdigit() and name in name_to_id:
             return name_to_id[name]
+    # Last resort: dig the campaign out of the raw CTM payload (field names vary,
+    # and PMax calls never show up in Google's gclid/call_view data — the CTM
+    # record is the only place the campaign lives).
+    raw_name = _deep_find_value(doc.get("raw"), ["campaign"]).strip().lower()
+    if raw_name:
+        if raw_name.isdigit():
+            return raw_name
+        if raw_name in name_to_id:
+            return name_to_id[raw_name]
+    return ""
+
+
+def _deep_find_value(obj, key_substrings, _depth=0):
+    """Recursively search a nested dict/list for the first scalar value whose KEY
+    contains any of the given substrings (case-insensitive). Used to pull the
+    campaign / gclid out of CTM's raw webhook payload regardless of exact naming.
+    Skips id-like keys so we get the campaign NAME, not a numeric id."""
+    if _depth > 6 or obj is None:
+        return ""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            kl = str(k).lower()
+            if any(s in kl for s in key_substrings) and "id" not in kl.replace("gclid", "") \
+                    and isinstance(v, (str, int, float)) and str(v).strip():
+                return str(v).strip()
+        for v in obj.values():
+            found = _deep_find_value(v, key_substrings, _depth + 1)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _deep_find_value(v, key_substrings, _depth + 1)
+            if found:
+                return found
     return ""
 
 
 async def _backfill_attribution() -> dict:
     """Fill in missing campaign_id on past calls & leads using the campaign name
-    CTM/Google already recorded (report-editor data). Idempotent."""
+    CTM/Google already recorded (report-editor data, incl. the raw payload).
+    Idempotent."""
     cfg = await get_or_create_config()
     name_to_id = _campaign_name_to_id(cfg.get("ad_labels") or {})
     if not name_to_id:
@@ -2592,7 +2631,7 @@ async def _backfill_attribution() -> dict:
     for coll in (db.calls, db.leads):
         async for doc in coll.find(miss, {"id": 1, "campaign_id": 1, "campaign": 1,
                                           "campaign_name": 1, "google_campaign": 1,
-                                          "google_campaign_id": 1, "_id": 0}):
+                                          "google_campaign_id": 1, "raw": 1, "_id": 0}):
             cid = _derive_campaign_id(doc, name_to_id)
             if cid:
                 await coll.update_one({"id": doc.get("id")}, {"$set": {"campaign_id": cid}})
