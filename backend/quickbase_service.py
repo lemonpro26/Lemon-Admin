@@ -17,6 +17,7 @@ def _cfg():
         "token": os.environ.get("QUICKBASE_USER_TOKEN", ""),
         "table": os.environ.get("QUICKBASE_TABLE_ID", ""),
         "f_phone": os.environ.get("QUICKBASE_FIELD_PHONE", ""),
+        "f_phone_alt": os.environ.get("QUICKBASE_FIELD_PHONE_ALT", ""),
         "f_name": os.environ.get("QUICKBASE_FIELD_NAME", ""),
         "f_email": os.environ.get("QUICKBASE_FIELD_EMAIL", ""),
     }
@@ -61,9 +62,13 @@ def _phone_field_ids(c) -> list[int]:
     includes the configured primary phone field as a fallback."""
     primary = int(c["f_phone"])
     table = c["table"]
+    # Explicit alternate phone fields from config (e.g. "Alt Phone Number") — a
+    # reliable fallback that does not depend on the fields-API discovery call.
+    configured_alts = [int(x) for x in re.split(r"[,\s]+", c.get("f_phone_alt") or "") if x.strip().isdigit()]
+    base = list(dict.fromkeys([primary, *configured_alts]))
     if _PHONE_FIELDS_CACHE.get(table):
         return _PHONE_FIELDS_CACHE[table]
-    ids = [primary]
+    ids = list(base)
     discovered = False
     try:
         r = requests.get(
@@ -75,7 +80,7 @@ def _phone_field_ids(c) -> list[int]:
         if r.status_code == 200:
             found = [f["id"] for f in (r.json() or []) if f.get("fieldType") == "phone"]
             if found:
-                ids = found if primary in found else [primary, *found]
+                ids = list(dict.fromkeys([*base, *found]))
                 discovered = True
                 logger.info("Quickbase phone fields discovered: %s", ids)
         else:
@@ -84,6 +89,10 @@ def _phone_field_ids(c) -> list[int]:
         logger.warning("Quickbase fields lookup error: %s", e)
     if discovered:
         _PHONE_FIELDS_CACHE[table] = ids  # cache only a successful discovery
+    elif len(base) > 1:
+        # No discovery, but we have configured alt fields — cache & use those.
+        _PHONE_FIELDS_CACHE[table] = ids
+        logger.info("Quickbase using configured phone fields (no discovery): %s", ids)
     else:
         logger.warning("Quickbase phone-field discovery failed; using primary %s only", primary)
     return ids
