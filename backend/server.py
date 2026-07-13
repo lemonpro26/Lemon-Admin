@@ -2743,7 +2743,7 @@ async def _enrich_calls_with_hooks(items: list) -> list:
 # (never the full number), so we enrich our CTM calls by matching on
 # area code + call start time (within a window) + duration. Matched calls get
 # Google's real call type + campaign attached and a "Verified via Google Ads" flag.
-_GCALL_TIME_WINDOW_S = 900   # +/- 15 minutes (absorbs minor clock/tz drift)
+_GCALL_TIME_WINDOW_S = 5400  # +/- 90 min — Google truncates call_view times (often to the hour)
 
 
 def _parse_dt_epoch(value):
@@ -2789,11 +2789,33 @@ async def _enrich_calls_with_google(full: bool = False) -> dict:
     for r in g_rows:
         r["_epoch"] = _parse_dt_epoch(r.get("start_call_date_time"))
 
+    # EXACT attribution first: map gclid -> campaign from Google's click data. Any
+    # call carrying a gclid (Google "Ad / click-to-call") gets its true campaign
+    # with no fuzzy matching.
+    gclid_map = {}
+    try:
+        gclid_map = await asyncio.to_thread(gnames.fetch_gclid_campaigns, start_date, end_date)
+    except Exception as e:
+        logger.info("gclid->campaign fetch skipped: %s", e)
+
     q = {"is_test": {"$ne": True}, "created_at": {"$gte": start_dt.astimezone(timezone.utc).isoformat()}}
     calls = await db.calls.find(q).to_list(5000)
     matched = 0
+    gclid_matched = 0
     used = set()  # google rows already claimed
     for c in calls:
+        # 1) Exact gclid match.
+        gclid = str(c.get("gclid") or "").strip()
+        if gclid and gclid in gclid_map:
+            gm = gclid_map[gclid]
+            set_fields = {"google_campaign": gm["campaign_name"], "google_campaign_id": gm["campaign_id"],
+                          "google_matched": True, "google_matched_at": _now_iso()}
+            if not str(c.get("campaign_id") or "").strip():
+                set_fields["campaign_id"] = gm["campaign_id"]
+            await db.calls.update_one({"id": c["id"]}, {"$set": set_fields})
+            matched += 1
+            gclid_matched += 1
+            continue
         area = _digits10(c.get("caller_number"))[:3]
         c_epoch = _parse_dt_epoch(c.get("called_at") or c.get("created_at"))
         if not area or c_epoch is None:
@@ -2832,8 +2854,9 @@ async def _enrich_calls_with_google(full: bool = False) -> dict:
         await db.calls.update_one({"id": c["id"]}, {"$set": set_fields})
         matched += 1
     if matched:
-        logger.info("Google call match: enriched %s of %s calls (%s google rows)", matched, len(calls), len(g_rows))
-    return {"success": True, "matched": matched, "google_rows": len(g_rows), "scanned_calls": len(calls)}
+        logger.info("Google call match: enriched %s of %s calls (%s via gclid, %s google rows)", matched, len(calls), gclid_matched, len(g_rows))
+    return {"success": True, "matched": matched, "gclid_matched": gclid_matched,
+            "google_rows": len(g_rows), "gclids_seen": len(gclid_map), "scanned_calls": len(calls)}
 
 
 

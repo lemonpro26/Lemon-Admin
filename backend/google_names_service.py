@@ -265,6 +265,45 @@ def _account_timezone(c, token) -> str:
     return ""
 
 
+def fetch_gclid_campaigns(start_date: str, end_date: str) -> dict:
+    """Map each gclid seen in the account to its campaign, using the click_view
+    report (which DOES expose the full gclid). This gives an EXACT call→campaign
+    attribution for ad calls that carry a gclid, with no fuzzy matching.
+    click_view only allows single-day queries, so we iterate day by day (Google
+    keeps click_view data for ~90 days). Returns {gclid: {campaign_id, campaign_name}}."""
+    from datetime import datetime as _dt, timedelta as _td
+    c = _cfg()
+    if not is_configured():
+        raise RuntimeError("Google Ads API is not configured")
+    token = _access_token(c)
+    try:
+        d0 = _dt.strptime(start_date, "%Y-%m-%d").date()
+        d1 = _dt.strptime(end_date, "%Y-%m-%d").date()
+    except Exception:
+        return {}
+    # click_view data is only retained ~90 days; don't ask for older.
+    from datetime import date as _date
+    earliest = _date.today() - _td(days=90)
+    if d0 < earliest:
+        d0 = earliest
+    out = {}
+    day = d0
+    while day <= d1:
+        ds = day.strftime("%Y-%m-%d")
+        try:
+            q = ("SELECT click_view.gclid, campaign.id, campaign.name "
+                 f"FROM click_view WHERE segments.date = '{ds}'")
+            for row in _search(c, token, q):
+                gclid = (row.get("clickView", {}) or {}).get("gclid") or ""
+                camp = row.get("campaign", {}) or {}
+                if gclid and camp.get("id"):
+                    out[gclid] = {"campaign_id": str(camp["id"]), "campaign_name": camp.get("name") or ""}
+        except Exception as e:
+            logger.info("click_view fetch %s skipped: %s", ds, e)
+        day += _td(days=1)
+    return out
+
+
 def fetch_call_views(start_date: str, end_date: str) -> list:
     """Pull Google Ads call details (call_view) since start_date (YYYY-MM-DD).
     Returns a list of dicts with the caller's area/country code, duration, start
