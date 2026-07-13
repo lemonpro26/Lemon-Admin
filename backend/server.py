@@ -2820,7 +2820,7 @@ async def _enrich_calls_with_google(full: bool = False) -> dict:
         c_epoch = _parse_dt_epoch(c.get("called_at") or c.get("created_at"))
         if not area or c_epoch is None:
             continue
-        best, best_score = None, None
+        best, best_key = None, None
         for i, r in enumerate(g_rows):
             if i in used or r.get("_epoch") is None:
                 continue
@@ -2829,13 +2829,14 @@ async def _enrich_calls_with_google(full: bool = False) -> dict:
             gap = abs(r["_epoch"] - c_epoch)
             if gap > _GCALL_TIME_WINDOW_S:
                 continue
-            # Duration is a SOFT signal only — CTM and Google frequently report
-            # different durations (ring vs talk time), so we no longer reject on
-            # it; it just breaks ties in favour of the closest match.
+            # Match key = area code (already filtered) + CLOSEST duration, then
+            # closest time. Duration is the primary discriminator because it's a
+            # near-unique fingerprint; time is only accurate to the hour (Google
+            # truncates it) so it's the tiebreaker.
             dur_diff = abs(int(r.get("duration") or 0) - int(c.get("duration") or 0))
-            score = gap + min(dur_diff, 600) * 0.5
-            if best_score is None or score < best_score:
-                best, best_score, best_i = r, score, i
+            key = (dur_diff, gap)
+            if best_key is None or key < best_key:
+                best, best_key, best_i = r, key, i
         if best is None:
             continue
         used.add(best_i)
