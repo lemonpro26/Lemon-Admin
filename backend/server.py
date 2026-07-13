@@ -2417,8 +2417,8 @@ async def calls_webhook(request: Request, token: str = ""):
         "number_group": _grp,
         "duration": duration,
         "source": g("source"),
-        "keyword": g("keyword"),
-        "campaign": g("campaign", "campaign_name"),
+        "keyword": g("keyword", "utm_term"),
+        "campaign": g("campaign", "campaign_name", "utm_campaign", "adwords_campaign", "google_campaign", "ad_campaign"),
         "gclid": g("gclid"),
         "session_id": g("session_id", "session", "sid"),
         "city": g("city"),
@@ -2429,6 +2429,18 @@ async def calls_webhook(request: Request, token: str = ""):
         "raw": data,
         "created_at": now,
     }
+    # Resolve the campaign NAME that CTM sends (report-editor data) into the numeric
+    # campaign_id that attribution keys off of, so the call isn't left "unattributed".
+    try:
+        _labels = (await get_or_create_config()).get("ad_labels") or {}
+        _cid = _derive_campaign_id(rec, _campaign_name_to_id(_labels))
+        if _cid:
+            rec["campaign_id"] = _cid
+            _cname = (_labels.get("campaign") or {}).get(_cid)
+            if _cname and not rec.get("campaign"):
+                rec["campaign"] = _cname
+    except Exception as e:
+        logger.warning("Call campaign_id resolve failed: %s", e)
     await db.calls.insert_one({**rec})
     logger.info("Call webhook stored: %s (%ss) from %s", rec["caller_number"], duration, rec["source"])
     asyncio.create_task(_auto_upload_call_conversion(rec))
@@ -2539,6 +2551,54 @@ def _resolve_ad_names(items: list, ad_labels: dict) -> list:
         if cval.isdigit() and camp.get(cval) and not it.get("campaign_name"):
             it["campaign_name"] = camp[cval]
     return items
+
+
+def _campaign_name_to_id(ad_labels: dict) -> dict:
+    """Reverse map: lowercased campaign NAME -> campaign id. Lets us turn the
+    free-text campaign name that CallTrackingMetrics / Google send (e.g.
+    "Lemon Law 2026") into the numeric id that attribution keys off of."""
+    out = {}
+    for cid, name in (ad_labels.get("campaign") or {}).items():
+        if name:
+            out[str(name).strip().lower()] = str(cid)
+    return out
+
+
+def _derive_campaign_id(doc: dict, name_to_id: dict) -> str:
+    """Best campaign id for a call/lead: an explicit id first, then Google's
+    matched id, then a reverse-lookup of the CTM/Google campaign NAME."""
+    cid = str(doc.get("campaign_id") or "").strip()
+    if cid:
+        return cid
+    gid = str(doc.get("google_campaign_id") or "").strip()
+    if gid:
+        return gid
+    for key in ("campaign", "google_campaign", "campaign_name"):
+        name = str(doc.get(key) or "").strip().lower()
+        if name and not name.isdigit() and name in name_to_id:
+            return name_to_id[name]
+    return ""
+
+
+async def _backfill_attribution() -> dict:
+    """Fill in missing campaign_id on past calls & leads using the campaign name
+    CTM/Google already recorded (report-editor data). Idempotent."""
+    cfg = await get_or_create_config()
+    name_to_id = _campaign_name_to_id(cfg.get("ad_labels") or {})
+    if not name_to_id:
+        return {"updated": 0, "reason": "no campaign labels synced yet"}
+    updated = 0
+    miss = {"$or": [{"campaign_id": {"$in": ["", None]}}, {"campaign_id": {"$exists": False}}]}
+    for coll in (db.calls, db.leads):
+        async for doc in coll.find(miss, {"id": 1, "campaign_id": 1, "campaign": 1,
+                                          "campaign_name": 1, "google_campaign": 1,
+                                          "google_campaign_id": 1, "_id": 0}):
+            cid = _derive_campaign_id(doc, name_to_id)
+            if cid:
+                await coll.update_one({"id": doc.get("id")}, {"$set": {"campaign_id": cid}})
+                updated += 1
+    logger.info("Attribution backfill: set campaign_id on %s calls/leads", updated)
+    return {"updated": updated}
 
 
 def _match_call_tap(taps_by_digits: dict, call: dict):
@@ -2755,14 +2815,19 @@ async def _enrich_calls_with_google(full: bool = False) -> dict:
         if best is None:
             continue
         used.add(best_i)
-        await db.calls.update_one({"id": c["id"]}, {"$set": {
+        set_fields = {
             "google_matched": True,
             "google_call_type": best.get("type") or "",
             "google_call_status": best.get("status") or "",
             "google_campaign": best.get("campaign_name") or "",
             "google_campaign_id": best.get("campaign_id") or "",
             "google_matched_at": _now_iso(),
-        }})
+        }
+        # Google's matched campaign becomes the attribution id when we don't already
+        # have one, so the call stops showing as "unattributed".
+        if not str(c.get("campaign_id") or "").strip() and best.get("campaign_id"):
+            set_fields["campaign_id"] = str(best.get("campaign_id"))
+        await db.calls.update_one({"id": c["id"]}, {"$set": set_fields})
         matched += 1
     if matched:
         logger.info("Google call match: enriched %s of %s calls (%s google rows)", matched, len(calls), len(g_rows))
@@ -2776,7 +2841,17 @@ async def admin_sync_google_calls(_: dict = Depends(require_editor)):
     res = await _enrich_calls_with_google(full=True)
     if not res.get("configured", True):
         raise HTTPException(status_code=400, detail="Google Ads API is not configured")
+    # Then resolve any campaign NAMES into attribution ids across calls & leads.
+    backfill = await _backfill_attribution()
+    res["attribution_backfilled"] = backfill.get("updated", 0)
     return res
+
+
+@api_router.post("/admin/attribution/backfill")
+async def admin_backfill_attribution(_: dict = Depends(require_editor)):
+    """Fill missing campaign_id on past calls & leads from the campaign name that
+    CTM/Google already recorded, so historical records stop showing 'unattributed'."""
+    return await _backfill_attribution()
 
 
 @api_router.get("/admin/calls")
@@ -3135,6 +3210,9 @@ async def _google_call_sync_loop():
                 res = await _enrich_calls_with_google(full=False)
                 if res.get("matched"):
                     logger.info("Google call sync loop matched %s calls", res.get("matched"))
+                # Turn CTM/Google campaign names into attribution ids on any
+                # call/lead still missing one (report-editor data → admin).
+                await _backfill_attribution()
         except Exception as e:
             logger.warning("Google call sync loop error: %s", e)
         await asyncio.sleep(20 * 60)
