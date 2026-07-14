@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13i (fork continuation)
+- **Analytics tab load delay fixed (caching):** The delay was live Google Ads API calls made on every open. Added (1) an in-process **OAuth access-token cache** (55-min TTL — was minting a fresh token on every Google call, app-wide) and (2) a **5-min report cache** for `fetch_spend_by_campaign`, `fetch_spend_by_day`, and `fetch_sitelink_metrics`. Result: `/admin/analytics` 0.72s→0.16s and `/admin/google-ads/sitelinks` 1.58s→0.18s on warm loads. Cold (first open per 5 min) still refreshes from Google.
+
 ## 2026-07-13h (fork continuation)
 - **Display leads show ad Size instead of Keyword:** `google_names_service.fetch_names` now also pulls image-ad pixel dimensions and builds an `ad_size` map `{ad_id: "336x280"}` (stored in `ad_labels.ad_size`, merged on sync). `_resolve_ad_names` attaches `ad_size` to any lead/call whose `ad_id` (captured via ValueTrack `{creative}`/`sub2`) is a sized image ad. Lead detail dialogs (Leads tab + shared Retained dialog) render a **Size** row instead of **Keyword** whenever `ad_size` is present. Verified: a Lemon Display lead (ad_id 816687329475) resolved to Size 300×250, Keyword row hidden; search leads still show Keyword.
 

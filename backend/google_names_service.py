@@ -7,11 +7,19 @@ reports "not configured" and the caller falls back to showing raw IDs.
 import os
 import logging
 import re
+import time
 import requests
 
 logger = logging.getLogger("server")
 
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+# In-process caches. The OAuth access token is valid ~1h (we refresh at 55m), so
+# minting one per API call is wasteful. Spend/sitelink reports are cached briefly
+# so repeatedly opening the Analytics tab doesn't re-hit Google every time.
+_token_cache = {"token": "", "exp": 0.0}
+_report_cache = {}  # key -> (timestamp, data)
+_REPORT_TTL = 300  # seconds
 
 # Google Ads ad-customizer / location macros embedded in RSA headlines, e.g.
 # {LOCATION(City):California} -> California, {Keyword:Lemon Law Help} -> Lemon Law Help,
@@ -102,6 +110,9 @@ def check_connection() -> dict:
 
 
 def _access_token(c) -> str:
+    now = time.time()
+    if _token_cache["token"] and now < _token_cache["exp"]:
+        return _token_cache["token"]
     resp = requests.post(_TOKEN_URL, data={
         "client_id": c["client_id"],
         "client_secret": c["client_secret"],
@@ -109,7 +120,10 @@ def _access_token(c) -> str:
         "grant_type": "refresh_token",
     }, timeout=20)
     resp.raise_for_status()
-    return resp.json()["access_token"]
+    token = resp.json()["access_token"]
+    _token_cache["token"] = token
+    _token_cache["exp"] = now + 55 * 60  # refresh a little before the 1h expiry
+    return token
 
 
 def _search(c, token, query):
@@ -143,6 +157,10 @@ def fetch_spend_by_day(start: str, end: str) -> dict:
     empty = {"total": 0.0, "by_day": [], "currency": "USD"}
     if not is_configured():
         return empty
+    ck = ("spend_day", start, end)
+    hit = _report_cache.get(ck)
+    if hit and (time.time() - hit[0]) < _REPORT_TTL:
+        return hit[1]
     c = _cfg()
     try:
         token = _access_token(c)
@@ -157,16 +175,23 @@ def fetch_spend_by_day(start: str, end: str) -> dict:
             currency = r.get("customer", {}).get("currencyCode", currency)
             total += micros
             by_day.append({"date": date, "cost": round(micros / 1_000_000, 2)})
-        return {"total": round(total / 1_000_000, 2), "by_day": by_day, "currency": currency}
+        result = {"total": round(total / 1_000_000, 2), "by_day": by_day, "currency": currency}
+        _report_cache[ck] = (time.time(), result)
+        return result
     except Exception as e:
         logger.info("Google spend fetch failed: %s", e)
         return empty
 
 def fetch_spend_by_campaign(start: str, end: str) -> dict:
     """Return {campaign_id(str): cost_float} aggregated over the date range.
+    Cached ~5 min so repeatedly opening Analytics doesn't re-hit Google.
     Returns {} if not configured / on error."""
     if not is_configured():
         return {}
+    ck = ("spend_campaign", start, end)
+    hit = _report_cache.get(ck)
+    if hit and (time.time() - hit[0]) < _REPORT_TTL:
+        return hit[1]
     c = _cfg()
     try:
         token = _access_token(c)
@@ -179,7 +204,9 @@ def fetch_spend_by_campaign(start: str, end: str) -> dict:
             micros = int(r.get("metrics", {}).get("costMicros", 0) or 0)
             if cid:
                 out[cid] = out.get(cid, 0) + micros
-        return {k: round(v / 1_000_000, 2) for k, v in out.items()}
+        result = {k: round(v / 1_000_000, 2) for k, v in out.items()}
+        _report_cache[ck] = (time.time(), result)
+        return result
     except Exception as e:
         logger.info("Google per-campaign spend fetch failed: %s", e)
         return {}
@@ -388,12 +415,16 @@ def fetch_sitelink_metrics(start_date: str, end_date: str, campaign_ids=None) ->
     c = _cfg()
     if not is_configured():
         raise RuntimeError("Google Ads API is not configured")
+    ids = [str(x) for x in (campaign_ids or []) if str(x).strip()]
+    ck = ("sitelinks", start_date, end_date, tuple(sorted(ids)))
+    hit = _report_cache.get(ck)
+    if hit and (time.time() - hit[0]) < _REPORT_TTL:
+        return hit[1]
     token = _access_token(c)
     where = [
         "campaign_asset.field_type = 'SITELINK'",
         f"segments.date BETWEEN '{start_date}' AND '{end_date}'",
     ]
-    ids = [str(x) for x in (campaign_ids or []) if str(x).strip()]
     if ids:
         where.append("campaign.id IN (" + ", ".join(ids) + ")")
     query = (
@@ -416,5 +447,7 @@ def fetch_sitelink_metrics(start_date: str, end_date: str, campaign_ids=None) ->
         rec["clicks"] += int(m.get("clicks", 0) or 0)
         rec["impressions"] += int(m.get("impressions", 0) or 0)
         rec["conversions"] += float(m.get("conversions", 0) or 0)
-    return sorted(out.values(), key=lambda r: r["clicks"], reverse=True)
+    result = sorted(out.values(), key=lambda r: r["clicks"], reverse=True)
+    _report_cache[ck] = (time.time(), result)
+    return result
 
