@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13k (fork continuation)
+- **Leads table Campaign column:** Added a sortable, toggleable **Campaign** column to the Leads table with inline editing (`CampaignCell`, updates in place). Shows the resolved campaign (e.g. Demand Gen 2026) or "—". The campaign filter (the "All campaigns" dropdown, enabled-campaigns-aware) was already present above the table. Verified via screenshot.
+
 ## 2026-07-13j (fork continuation)
 - **Resolve the ad an old/renamed lead came from:** New `fetch_ad_by_id` + `GET /admin/google-ads/ad-lookup?ad_id=` resolves any Google ad by ID regardless of status (ENABLED/PAUSED/REMOVED), returning current name, size, type, status, ad group, campaign (only 74 of 1,495 ads are enabled, so the live name cache misses paused/renamed ones). Lead detail dialog now auto-resolves the ad by ID on open and shows the real name + an "Ad status" row when paused/removed. Verified on a paused ad.
 

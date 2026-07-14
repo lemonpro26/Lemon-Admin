@@ -38,13 +38,14 @@ import { AdminRetained } from '@/components/admin/AdminRetained';
 import { AdminChannels } from '@/components/admin/AdminChannels';
 import { NetworkChips, getNetwork, NetworkBadge } from '@/lib/networks';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
-import { CampaignEditor } from '@/components/admin/CampaignEditor';
+import { CampaignEditor, CampaignCell } from '@/components/admin/CampaignEditor';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 // Toggleable Leads-table columns (Name & Actions always shown). Persisted per-browser.
 const LEAD_COLS = [
   { key: 'phone', label: 'Phone' },
   { key: 'vehicle', label: 'Vehicle' },
+  { key: 'campaign', label: 'Campaign' },
   { key: 'email', label: 'Email' },
   { key: 'revenue', label: 'Revenue' },
   { key: 'location', label: 'Location' },
@@ -52,7 +53,7 @@ const LEAD_COLS = [
 ];
 const LEAD_COLS_KEY = 'lp_leads_cols_v1';
 const loadLeadCols = () => {
-  const def = { phone: true, vehicle: true, email: true, revenue: true, location: true, date: true };
+  const def = { phone: true, vehicle: true, campaign: true, email: true, revenue: true, location: true, date: true };
   try { return { ...def, ...JSON.parse(localStorage.getItem(LEAD_COLS_KEY) || '{}') }; } catch { return def; }
 };
 
@@ -657,6 +658,7 @@ export default function AdminDashboard() {
                         <TableHead><SortLabel label="Name" k="full_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
                         {leadCols.phone && <TableHead><SortLabel label="Phone" k="phone" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
                         {leadCols.vehicle && <TableHead className="hidden md:table-cell"><SortLabel label="Vehicle" k="car_make" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+                        {leadCols.campaign && <TableHead className="hidden lg:table-cell"><SortLabel label="Campaign" k="campaign_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
                         {leadCols.email && <TableHead className="hidden md:table-cell"><SortLabel label="Email" k="email" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
                         {leadCols.revenue && <TableHead className="hidden sm:table-cell"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
                         {leadCols.location && <TableHead className="hidden lg:table-cell"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
@@ -701,6 +703,11 @@ export default function AdminDashboard() {
                           </TableCell>
                           {leadCols.phone && <TableCell className="text-slate-600">{formatPhone(lead.phone)}</TableCell>}
                           {leadCols.vehicle && <TableCell className="hidden md:table-cell text-slate-600">{[lead.car_year, lead.car_make, lead.car_model].filter(Boolean).join(' ') || '\u2014'}</TableCell>}
+                          {leadCols.campaign && (
+                            <TableCell className="hidden lg:table-cell" data-testid={`lead-campaign-${lead.id}`}>
+                              <CampaignCell kind="leads" item={lead} onChanged={(u) => setLeads((prev) => prev.map((x) => x.id === lead.id ? { ...x, ...u } : x))} />
+                            </TableCell>
+                          )}
                           {leadCols.email && <TableCell className="hidden md:table-cell text-slate-600 break-all">{lead.email}</TableCell>}
                           {leadCols.revenue && (
                           <TableCell className="hidden sm:table-cell">
