@@ -74,7 +74,7 @@ export const LeadDetailDialog = ({ lead, open, onOpenChange, onChanged }) => {
     ['Source', SRC[l.source_page] || l.source_page || 'home', 'ld-source'],
     ['Ad Group', l.adgroup_name || l.adgroup_id, 'ld-adgroup'],
     ['Ad', l.ad_name || l.ad_id, 'ld-ad'],
-    ['Keyword', l.keyword, 'ld-keyword'],
+    l.ad_size ? ['Size', l.ad_size, 'ld-size'] : ['Keyword', l.keyword, 'ld-keyword'],
     ['GCLID', l.gclid, 'ld-gclid'],
     ['IP Address', l.ip, 'ld-ip'],
     ['When', fmtDate(l.created_at), 'ld-when'],

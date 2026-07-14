@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13h (fork continuation)
+- **Display leads show ad Size instead of Keyword:** `google_names_service.fetch_names` now also pulls image-ad pixel dimensions and builds an `ad_size` map `{ad_id: "336x280"}` (stored in `ad_labels.ad_size`, merged on sync). `_resolve_ad_names` attaches `ad_size` to any lead/call whose `ad_id` (captured via ValueTrack `{creative}`/`sub2`) is a sized image ad. Lead detail dialogs (Leads tab + shared Retained dialog) render a **Size** row instead of **Keyword** whenever `ad_size` is present. Verified: a Lemon Display lead (ad_id 816687329475) resolved to Size 300×250, Keyword row hidden; search leads still show Keyword.
+
 ## 2026-07-13g (fork continuation)
 - **Auto-populating campaign filters on top bars:** Calls tab gained a new "CAMPAIGN" chip row (all enabled Google campaigns ∪ any present in data — incl. Lemon Display 2026 — with unique-caller counts, click to filter). Leads tab campaign dropdown now unions in all enabled campaigns too (Lemon Display shows even at 0). Both fetch from `/admin/campaigns` (enabled-only), so newly enabled/added Google campaigns appear automatically with no hardcoding. Verified via screenshots on both tabs.
 

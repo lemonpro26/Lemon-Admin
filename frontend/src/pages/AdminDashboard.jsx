@@ -824,7 +824,9 @@ export default function AdminDashboard() {
                   ['Source', ({ lapa: 'PA page (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish Landing (sp)', ladg: 'Demand Gen (ladg)', ladgs: 'Spanish Demand Gen (ladgs)', latm: 'Team Attorneys — Overlay (latm)', latm2: 'Team Attorneys — Split (latm2)', dg: 'Demand Gen (dg)', dgs: 'Spanish Demand Gen (dgs)', tm: 'Team Attorneys — Overlay (tm)', tm2: 'Team Attorneys — Split (tm2)' }[selected.source_page]) || (selected.source_page || 'home'), 'lead-detail-source'],
                   ['Ad Group', selected.adgroup_name || selected.adgroup_id, 'lead-detail-adgroup'],
                   ['Ad', selected.ad_name || selected.ad_id, 'lead-detail-ad'],
-                  ['Keyword', selected.keyword, 'lead-detail-keyword'],
+                  selected.ad_size
+                    ? ['Size', selected.ad_size, 'lead-detail-size']
+                    : ['Keyword', selected.keyword, 'lead-detail-keyword'],
                   ['GCLID', selected.gclid, 'lead-detail-gclid'],
                   ['IP Address', selected.ip, 'lead-detail-ip'],
                   ['Submitted', fmtDate(selected.created_at), 'lead-detail-date'],

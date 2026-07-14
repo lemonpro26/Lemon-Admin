@@ -2579,6 +2579,7 @@ def _resolve_ad_names(items: list, ad_labels: dict) -> list:
     camp = {str(k): v for k, v in (ad_labels.get("campaign") or {}).items() if v}
     ag = {str(k): v for k, v in (ad_labels.get("adgroup") or {}).items() if v}
     ad = {str(k): v for k, v in (ad_labels.get("ad") or {}).items() if v}
+    ad_size = {str(k): v for k, v in (ad_labels.get("ad_size") or {}).items() if v}
     for it in items:
         cid = str(it.get("campaign_id") or "").strip()
         agid = str(it.get("adgroup_id") or "").strip()
@@ -2589,6 +2590,10 @@ def _resolve_ad_names(items: list, ad_labels: dict) -> list:
             it["adgroup_name"] = ag[agid]
         if adid and ad.get(adid):
             it["ad_name"] = ad[adid]
+        # Display/image creatives carry a pixel size (e.g. "336x280"); surface it
+        # so the UI can show Size instead of Keyword for Display leads.
+        if adid and ad_size.get(adid):
+            it["ad_size"] = ad_size[adid]
         # Calls store a free-text `campaign` field; resolve it when it's a numeric id.
         cval = str(it.get("campaign") or "").strip()
         if cval.isdigit() and camp.get(cval) and not it.get("campaign_name"):
@@ -3357,7 +3362,7 @@ async def _sync_ad_labels_core(force: bool = False) -> dict:
         logger.warning("Google Ads name sync failed: %s", e)
         return {"success": False, "configured": True, "error": str(e)[:300]}
     labels = cfg.get("ad_labels") or {}
-    for t in ("campaign", "adgroup", "ad", "sitelink"):
+    for t in ("campaign", "adgroup", "ad", "sitelink", "ad_size"):
         merged = dict(labels.get(t) or {})
         merged.update({k: v for k, v in (fetched.get(t) or {}).items() if v})
         labels[t] = merged

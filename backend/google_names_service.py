@@ -200,6 +200,7 @@ def fetch_names() -> dict:
         raise RuntimeError("Google Ads API is not configured")
     token = _access_token(c)
     campaign, adgroup, ad, sitelink, campaign_type = {}, {}, {}, {}, {}
+    ad_size = {}
     live_campaigns, live_adgroups = [], []
 
     # Only ENABLED campaigns = currently live / serving.
@@ -224,15 +225,24 @@ def fetch_names() -> dict:
             live_adgroups.append(agid)
 
     # Ad creatives — build a readable label from the ad name or its RSA headlines.
+    # Also capture the pixel size of image/display ads (e.g. "336x280") so Display
+    # leads can show the creative's Size instead of a (never-present) Keyword.
     try:
         for row in _search(c, token,
                            "SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.ad.type, "
-                           "ad_group_ad.ad.responsive_search_ad.headlines FROM ad_group_ad "
+                           "ad_group_ad.ad.responsive_search_ad.headlines, "
+                           "ad_group_ad.ad.image_ad.pixel_width, ad_group_ad.ad.image_ad.pixel_height "
+                           "FROM ad_group_ad "
                            "WHERE ad_group_ad.status = 'ENABLED' AND ad_group.status = 'ENABLED' "
                            "AND campaign.status = 'ENABLED'"):
             adobj = row.get("adGroupAd", {}).get("ad", {})
             if adobj.get("id"):
-                ad[str(adobj["id"])] = _build_ad_label(adobj)
+                aid = str(adobj["id"])
+                ad[aid] = _build_ad_label(adobj)
+                img = adobj.get("imageAd") or {}
+                w, h = img.get("pixelWidth"), img.get("pixelHeight")
+                if w and h:
+                    ad_size[aid] = f"{w}x{h}"
     except Exception as e:
         logger.info("Ad-name fetch skipped: %s", e)
 
@@ -248,7 +258,7 @@ def fetch_names() -> dict:
         logger.info("Sitelink-name fetch skipped: %s", e)
 
     return {"campaign": campaign, "adgroup": adgroup, "ad": ad,
-            "sitelink": sitelink, "campaign_type": campaign_type,
+            "sitelink": sitelink, "campaign_type": campaign_type, "ad_size": ad_size,
             "live_campaigns": live_campaigns, "live_adgroups": live_adgroups}
 
 
