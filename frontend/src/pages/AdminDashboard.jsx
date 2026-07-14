@@ -127,6 +127,7 @@ export default function AdminDashboard() {
   const [leadSeg, setLeadSeg] = useState('all');
   const [leadCampaign, setLeadCampaign] = useState('all');
   const [enabledCampaigns, setEnabledCampaigns] = useState([]);
+  const [adInfo, setAdInfo] = useState(null);
   const [leadNetwork, setLeadNetwork] = useState('all');
   const [leadCols, setLeadCols] = useState(loadLeadCols);
   useEffect(() => { try { localStorage.setItem(LEAD_COLS_KEY, JSON.stringify(leadCols)); } catch { /* ignore */ } }, [leadCols]);
@@ -285,6 +286,17 @@ export default function AdminDashboard() {
   useEffect(() => {
     api.get('/admin/campaigns').then((res) => setEnabledCampaigns(res.data.campaigns || [])).catch(() => {});
   }, []);
+  // When a lead is opened, resolve the ad it came from by ID (works even for
+  // renamed / paused / removed ads that aren't in the live name cache).
+  useEffect(() => {
+    setAdInfo(null);
+    const aid = selected?.ad_id;
+    if (selected && aid && !selected.ad_name) {
+      api.get('/admin/google-ads/ad-lookup', { params: { ad_id: aid } })
+        .then((res) => { if (res.data?.found) setAdInfo(res.data); })
+        .catch(() => {});
+    }
+  }, [selected]);
   useEffect(() => { loadLeads(); }, [loadLeads]);
   useEffect(() => { loadStats(); }, [loadStats]);
 
@@ -823,7 +835,9 @@ export default function AdminDashboard() {
                   ['Email', selected.email, 'lead-detail-email'],
                   ['Source', ({ lapa: 'PA page (lapa)', laspa: 'Spanish PA (laspa)', sp: 'Spanish Landing (sp)', ladg: 'Demand Gen (ladg)', ladgs: 'Spanish Demand Gen (ladgs)', latm: 'Team Attorneys — Overlay (latm)', latm2: 'Team Attorneys — Split (latm2)', dg: 'Demand Gen (dg)', dgs: 'Spanish Demand Gen (dgs)', tm: 'Team Attorneys — Overlay (tm)', tm2: 'Team Attorneys — Split (tm2)' }[selected.source_page]) || (selected.source_page || 'home'), 'lead-detail-source'],
                   ['Ad Group', selected.adgroup_name || selected.adgroup_id, 'lead-detail-adgroup'],
-                  ['Ad', selected.ad_name || selected.ad_id, 'lead-detail-ad'],
+                  ['Ad', selected.ad_name || (adInfo && adInfo.ad_name) || selected.ad_id, 'lead-detail-ad'],
+                  ...(adInfo && adInfo.status && adInfo.status !== 'ENABLED'
+                    ? [[`Ad status`, adInfo.status, 'lead-detail-ad-status']] : []),
                   selected.ad_size
                     ? ['Size', selected.ad_size, 'lead-detail-size']
                     : ['Keyword', selected.keyword, 'lead-detail-keyword'],

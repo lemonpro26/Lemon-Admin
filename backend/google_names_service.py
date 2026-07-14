@@ -150,6 +150,46 @@ def _search(c, token, query):
     return rows
 
 
+def fetch_ad_by_id(ad_id: str) -> dict:
+    """Look up a single ad by its numeric ID regardless of status (ENABLED /
+    PAUSED / REMOVED). Returns its current name/label, pixel size, type, status,
+    and its ad group + campaign. Used to resolve the ad an old lead came from
+    even after it's been renamed or paused. Returns {} if not found / not configured."""
+    if not is_configured():
+        return {}
+    aid = re.sub(r"\D", "", str(ad_id or ""))
+    if not aid:
+        return {}
+    c = _cfg()
+    try:
+        token = _access_token(c)
+        q = ("SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.ad.type, "
+             "ad_group_ad.ad.responsive_search_ad.headlines, "
+             "ad_group_ad.ad.image_ad.pixel_width, ad_group_ad.ad.image_ad.pixel_height, "
+             "ad_group_ad.status, ad_group.name, campaign.name "
+             f"FROM ad_group_ad WHERE ad_group_ad.ad.id = {aid} LIMIT 1")
+        rows = _search(c, token, q)
+        if not rows:
+            return {"found": False, "ad_id": aid}
+        row = rows[0]
+        adobj = row.get("adGroupAd", {}).get("ad", {})
+        img = adobj.get("imageAd") or {}
+        w, h = img.get("pixelWidth"), img.get("pixelHeight")
+        return {
+            "found": True,
+            "ad_id": aid,
+            "ad_name": _build_ad_label(adobj),
+            "type": adobj.get("type") or "",
+            "size": f"{w}x{h}" if (w and h) else "",
+            "status": row.get("adGroupAd", {}).get("status") or "",
+            "adgroup_name": (row.get("adGroup", {}) or {}).get("name") or "",
+            "campaign_name": (row.get("campaign", {}) or {}).get("name") or "",
+        }
+    except Exception as e:
+        logger.info("Ad lookup for %s failed: %s", aid, e)
+        return {"found": False, "ad_id": aid, "error": str(e)[:200]}
+
+
 def fetch_spend_by_day(start: str, end: str) -> dict:
     """Return real Google Ads account spend for a date range:
     {"total": float, "by_day": [{"date": "YYYY-MM-DD", "cost": float}], "currency": str}.

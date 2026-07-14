@@ -3487,6 +3487,18 @@ async def google_ads_sitelinks(_: dict = Depends(require_admin), start: str = Qu
         return {"connected": True, "sitelinks": [], "error": str(e)[:300]}
 
 
+@api_router.get("/admin/google-ads/ad-lookup")
+async def google_ads_ad_lookup(ad_id: str = Query(""), _: dict = Depends(require_admin)):
+    """Resolve a single Google ad by its ID (any status), so you can see which ad
+    an old/renamed lead came from. Returns current name, size, type, status,
+    ad group and campaign."""
+    if not gnames.is_configured():
+        return {"connected": False, "found": False}
+    res = await asyncio.to_thread(gnames.fetch_ad_by_id, ad_id)
+    return {"connected": True, **(res or {})}
+
+
+
 @api_router.post("/admin/leads/{lead_id}/sold")
 async def mark_lead_sold(lead_id: str, body: SaleBody, _: dict = Depends(require_editor)):
     """Mark a lead as sold with a revenue value, then upload an offline

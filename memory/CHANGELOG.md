@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13j (fork continuation)
+- **Resolve the ad an old/renamed lead came from:** New `fetch_ad_by_id` + `GET /admin/google-ads/ad-lookup?ad_id=` resolves any Google ad by ID regardless of status (ENABLED/PAUSED/REMOVED), returning current name, size, type, status, ad group, campaign (only 74 of 1,495 ads are enabled, so the live name cache misses paused/renamed ones). Lead detail dialog now auto-resolves the ad by ID on open and shows the real name + an "Ad status" row when paused/removed. Verified on a paused ad.
+
 ## 2026-07-13i (fork continuation)
 - **Analytics tab load delay fixed (caching):** The delay was live Google Ads API calls made on every open. Added (1) an in-process **OAuth access-token cache** (55-min TTL — was minting a fresh token on every Google call, app-wide) and (2) a **5-min report cache** for `fetch_spend_by_campaign`, `fetch_spend_by_day`, and `fetch_sitelink_metrics`. Result: `/admin/analytics` 0.72s→0.16s and `/admin/google-ads/sitelinks` 1.58s→0.18s on warm loads. Cold (first open per 5 min) still refreshes from Google.
 
