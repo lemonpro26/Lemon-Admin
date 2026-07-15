@@ -18,6 +18,7 @@ import PresellPA from '@/pages/PresellPA';
 import PresellSPA from '@/pages/PresellSPA';
 import { TeamOverlay, TeamSplit } from '@/pages/TeamLanding';
 import SplitEntry from '@/pages/SplitEntry';
+import CreatorPortal from '@/pages/CreatorPortal';
 import { trackPageView } from '@/lib/analytics';
 
 // Sends a GA4 page_view on every client-side route change (SPA tracking).
@@ -66,6 +67,7 @@ function App() {
           <Route path="/do-not-sell" element={<LegalPage />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/creator-portal" element={<CreatorPortal />} />
           {/* Split-test entry slugs: /split, /split2, /split3, or custom. Must stay
               last so all explicit routes above take precedence. */}
           <Route path="/:splitSlug" element={<SplitEntry />} />

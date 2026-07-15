@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid, Filter,
-  FileText, Percent, Sigma, Search, X, AlertTriangle, Award, SlidersHorizontal, Share2,
+  FileText, Percent, Sigma, Search, X, AlertTriangle, Award, SlidersHorizontal, Share2, Palette,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -36,6 +36,7 @@ import { AdminPages } from '@/components/admin/AdminPages';
 import { AdminFunnel } from '@/components/admin/AdminFunnel';
 import { AdminRetained } from '@/components/admin/AdminRetained';
 import { AdminChannels } from '@/components/admin/AdminChannels';
+import { AdminCreatives } from '@/components/admin/AdminCreatives';
 import { NetworkChips, getNetwork, NetworkBadge } from '@/lib/networks';
 import { CallDetailDialog } from '@/components/admin/CallDetailDialog';
 import { CampaignEditor, CampaignCell } from '@/components/admin/CampaignEditor';
@@ -477,6 +478,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
             <TabsTrigger value="retained" data-testid="admin-tab-retained"><Award className="h-4 w-4 mr-2" /> Retained ({stats?.total_retained ?? 0})</TabsTrigger>
             <TabsTrigger value="channels" data-testid="admin-tab-channels"><Share2 className="h-4 w-4 mr-2" /> Channels</TabsTrigger>
+            <TabsTrigger value="creatives" data-testid="admin-tab-creatives"><Palette className="h-4 w-4 mr-2" /> Creatives</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>
           </TabsList>
 
@@ -805,6 +807,11 @@ export default function AdminDashboard() {
           {/* CHANNELS (mockup) */}
           <TabsContent value="channels">
             <AdminChannels />
+          </TabsContent>
+
+          {/* CREATIVES (mockup) */}
+          <TabsContent value="creatives">
+            <AdminCreatives />
           </TabsContent>
 
           {/* SETTINGS */}
