@@ -546,6 +546,28 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 <DateRangeFilter value={range} onChange={setRange} />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="inline-flex items-center gap-2 h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 hover:border-slate-300" data-testid="leads-columns-button">
+                      <SlidersHorizontal className="h-4 w-4" /> Columns
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {LEAD_COLS.map((col) => (
+                      <DropdownMenuCheckboxItem
+                        key={col.key}
+                        checked={!!leadCols[col.key]}
+                        onCheckedChange={() => toggleLeadCol(col.key)}
+                        onSelect={(e) => e.preventDefault()}
+                        data-testid={`leads-col-toggle-${col.key}`}
+                      >
+                        {col.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 {editable && (
                   <Button
                     onClick={createTestLead}
@@ -560,79 +582,46 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Calls vs Form Leads summary */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4" data-testid="admin-stats-summary">
-              {[
-                { key: 'form-leads', label: 'Form Leads', value: stats?.total_leads ?? 0, icon: FileText, cls: 'text-blue-600', bg: 'bg-blue-50' },
-                { key: 'calls', label: 'Phone Calls', value: stats?.total_calls ?? 0, icon: Phone, cls: 'text-emerald-600', bg: 'bg-emerald-50' },
-                { key: 'total-leads', label: 'Total Leads', value: (stats?.total_leads ?? 0) + (stats?.total_calls ?? 0), icon: Sigma, cls: 'text-slate-900', bg: 'bg-slate-100' },
-                { key: 'conv-rate', label: 'Form Conv. Rate', value: `${stats?.conversion_rate ?? 0}%`, icon: Percent, cls: 'text-amber-600', bg: 'bg-amber-50' },
-              ].map((s) => (
-                <div key={s.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3" data-testid={`stat-card-${s.key}`}>
-                  <div className={`h-10 w-10 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
-                    <s.icon className={`h-5 w-5 ${s.cls}`} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs text-slate-500 truncate">{s.label}</div>
-                    <div className={`text-xl font-bold ${s.cls}`} data-testid={`stat-value-${s.key}`}>{s.value}</div>
-                  </div>
-                </div>
+            {/* Source segment filters (matches the Calls layout) */}
+            <div className="flex items-center gap-2 flex-wrap mb-3" data-testid="lead-segment-filters">
+              {LEAD_SEGMENTS.map((seg) => (
+                <button
+                  key={seg.key}
+                  onClick={() => selectLeadSeg(seg.key)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadSeg === seg.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+                  data-testid={`lead-seg-${seg.key}`}
+                >
+                  {seg.label}
+                  <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{leadCounts[seg.key] ?? 0}</span>
+                </button>
               ))}
             </div>
 
-            {/* Source segment filters + per-segment counters */}
-            <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
-              <div className="flex items-center gap-2 flex-wrap" data-testid="lead-segment-filters">
-                {LEAD_SEGMENTS.map((seg) => (
+            {/* Campaign filter chips — auto-populated (matches the Calls layout) */}
+            {leadCampaignOptions.length > 0 && (
+              <div className="mb-4">
+                <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Campaign</div>
+                <div className="flex items-center gap-2 flex-wrap" data-testid="lead-campaign-filters">
                   <button
-                    key={seg.key}
-                    onClick={() => selectLeadSeg(seg.key)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadSeg === seg.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                    data-testid={`lead-seg-${seg.key}`}
+                    onClick={() => setLeadCampaign('all')}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadCampaign === 'all' ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
+                    data-testid="lead-campaign-all"
                   >
-                    {seg.label}
-                    <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{leadCounts[seg.key] ?? 0}</span>
+                    All <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadCampaign === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{segLeads.length}</span>
                   </button>
-                ))}
-                {/* Secondary filter: campaign within the selected source segment */}
-                <Select value={leadCampaign} onValueChange={setLeadCampaign}>
-                  <SelectTrigger className="h-9 w-auto min-w-[200px] rounded-full border-slate-200 bg-white text-sm font-semibold text-slate-600" data-testid="lead-campaign-filter">
-                    <Filter className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
-                    <SelectValue placeholder="All campaigns" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    <SelectItem value="all" data-testid="lead-campaign-opt-all">All campaigns ({segLeads.length})</SelectItem>
-                    {leadCampaignOptions.map((c) => (
-                      <SelectItem key={c.key} value={c.key} data-testid={`lead-campaign-opt-${c.key}`}>
-                        {c.label} ({c.count})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:border-slate-300" data-testid="leads-columns-button">
-                    <SlidersHorizontal className="h-4 w-4" /> Columns
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuLabel>Show columns</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {LEAD_COLS.map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.key}
-                      checked={!!leadCols[col.key]}
-                      onCheckedChange={() => toggleLeadCol(col.key)}
-                      onSelect={(e) => e.preventDefault()}
-                      data-testid={`leads-col-toggle-${col.key}`}
+                  {leadCampaignOptions.map((c) => (
+                    <button
+                      key={c.key}
+                      onClick={() => setLeadCampaign(leadCampaign === c.key ? 'all' : c.key)}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadCampaign === c.key ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
+                      data-testid={`lead-campaign-chip-${c.key}`}
                     >
-                      {col.label}
-                    </DropdownMenuCheckboxItem>
+                      {c.label} <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadCampaign === c.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{c.count}</span>
+                    </button>
                   ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                </div>
+              </div>
+            )}
 
             {/* Network filter (mockup) — separate a lead by traffic source */}
             <div className="mb-4 -mt-1">
