@@ -3,6 +3,7 @@ import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus,
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
+import { CopyButton } from '@/components/admin/CopyButton';
 import { NetworkChips, getNetwork, NetworkBadge } from '@/lib/networks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -537,7 +538,14 @@ export const AdminCalls = () => {
                     )}
                   </div>
                 </TableCell>
-                {cols.number && <TableCell className="text-slate-700">{formatPhone(c.caller_number) || '—'}</TableCell>}
+                {cols.number && (
+                  <TableCell className="text-slate-700 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      {formatPhone(c.caller_number) || '—'}
+                      {c.caller_number && <CopyButton value={formatPhone(c.caller_number)} label="Copied" testid={`call-copy-number-${c.id}`} />}
+                    </span>
+                  </TableCell>
+                )}
                 {cols.called && (
                   <TableCell className="text-slate-700 whitespace-nowrap" data-testid={`call-called-number-${c.id}`}>
                     <div className="flex flex-col leading-tight">
@@ -683,7 +691,12 @@ export const AdminCalls = () => {
               <div className="grid gap-2 text-sm">
                 {[
                   ['Caller', selected.qb_name || selected.caller_name, 'call-detail-name'],
-                  ['Number', formatPhone(selected.caller_number), 'call-detail-number'],
+                  ['Number', selected.caller_number ? (
+                    <span className="inline-flex items-center gap-1.5 justify-end">
+                      {formatPhone(selected.caller_number)}
+                      <CopyButton value={formatPhone(selected.caller_number)} label="Copied" testid="call-detail-copy-number" />
+                    </span>
+                  ) : '', 'call-detail-number'],
                   ['Called #', selected.tracked_number_display || selected.tracking_number, 'call-detail-tracking'],
                   ['Landing group', selected.number_group_label, 'call-detail-group'],
                   ['Duration', fmtDuration(selected.duration), 'call-detail-duration'],

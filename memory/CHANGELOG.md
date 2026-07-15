@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13m (fork continuation)
+- **Copy button next to caller phone numbers:** New reusable `CopyButton` (clipboard API + execCommand fallback, stops row-click propagation). Added next to the caller Number in the Calls table and the call detail dialog's Number row. One click copies the formatted number with a toast + check confirmation.
+
 ## 2026-07-13l (fork continuation)
 - **Split Test: traffic sources per test:** `_experiment_stats` now returns a `sources` breakdown — the routed clicks + their leads grouped by campaign (ids resolved to names via ad_labels; no-campaign clicks bucketed as "Direct / Untracked", listed last). AdminSplitTest renders a "Traffic sources feeding this test" section under each test's results, respecting the date range. Verified: seeded clicks/leads resolved to "The Lemon Law Lawyers", "Lemon Display 2026", "Direct / Untracked" with correct counts.
 
