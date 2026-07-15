@@ -10,7 +10,7 @@ export const makeLogo = (slug) => `${LOGO_BASE}/${slug}.png`;
 
 // 2026 → 2021 (newest first).
 export const CAR_YEARS = (() => {
-  const start = 2026;
+  const start = 2027;
   const end = 2021;
   const years = [];
   for (let y = start; y >= end; y -= 1) years.push(String(y));
@@ -71,10 +71,10 @@ export const CAR_MAKES = [
 // Current-lineup models per make (2021+). "Other / Not listed" is appended automatically.
 export const CAR_MODELS = {
   Toyota: [
-    'Camry', 'Corolla', 'Corolla Cross', 'Corolla Hatchback', 'Crown', 'Prius', 'Prius Prime',
-    'Mirai', 'GR86', 'GR Corolla', 'GR Supra', 'RAV4', 'RAV4 Prime', 'Venza', 'bZ4X', 'C-HR',
-    'Highlander', 'Grand Highlander', '4Runner', 'Sequoia', 'Land Cruiser', 'Sienna',
-    'Tacoma', 'Tundra',
+    'Camry', 'Corolla', 'Corolla Cross', 'Corolla Hatchback', 'Crown', 'Crown Signia', 'Avalon',
+    'Prius', 'Prius Prime', 'Mirai', 'GR86', 'GR Corolla', 'GR Supra', 'RAV4', 'RAV4 Prime',
+    'Venza', 'bZ4X', 'C-HR', 'Highlander', 'Grand Highlander', '4Runner', 'Sequoia',
+    'Land Cruiser', 'Sienna', 'Tacoma', 'Tundra',
   ],
   Ford: [
     'F-150', 'F-150 Lightning', 'F-250 Super Duty', 'F-350 Super Duty', 'Ranger', 'Maverick',
@@ -107,10 +107,10 @@ export const CAR_MODELS = {
   Dodge: ['Charger', 'Charger Daytona', 'Challenger', 'Durango', 'Hornet'],
   Hyundai: [
     'Accent', 'Elantra', 'Elantra N', 'Sonata', 'Venue', 'Kona', 'Kona Electric', 'Tucson',
-    'Santa Fe', 'Santa Cruz', 'Palisade', 'Ioniq 5', 'Ioniq 5 N', 'Ioniq 6', 'Nexo',
+    'Santa Fe', 'Santa Cruz', 'Palisade', 'Ioniq 5', 'Ioniq 5 N', 'Ioniq 6', 'Ioniq 9', 'Nexo',
   ],
   Kia: [
-    'Rio', 'Forte', 'K5', 'Stinger', 'Soul', 'Seltos', 'Sportage', 'Sorento', 'Telluride',
+    'Rio', 'Forte', 'K4', 'K5', 'Stinger', 'Soul', 'Seltos', 'Sportage', 'Sorento', 'Telluride',
     'Carnival', 'Niro', 'Niro EV', 'EV6', 'EV9',
   ],
   Subaru: ['Impreza', 'Legacy', 'WRX', 'BRZ', 'Crosstrek', 'Forester', 'Outback', 'Ascent', 'Solterra'],
@@ -135,7 +135,7 @@ export const CAR_MODELS = {
     'e-tron GT', 'S3', 'S4', 'S5', 'S6', 'RS5', 'RS6', 'RS7', 'R8', 'TT',
   ],
   Acura: ['ILX', 'TLX', 'Integra', 'RDX', 'MDX', 'ZDX'],
-  Cadillac: ['CT4', 'CT5', 'XT4', 'XT5', 'XT6', 'Escalade', 'Escalade IQ', 'Lyriq', 'Celestiq', 'Optiq'],
+  Cadillac: ['CT4', 'CT5', 'XT4', 'XT5', 'XT6', 'Escalade', 'Escalade IQ', 'Lyriq', 'Vistiq', 'Celestiq', 'Optiq'],
   Chrysler: ['300', 'Pacifica', 'Voyager'],
   Buick: ['Encore', 'Encore GX', 'Envista', 'Envision', 'Enclave'],
   Lincoln: ['Corsair', 'Nautilus', 'Aviator', 'Navigator'],
