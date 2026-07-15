@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13l (fork continuation)
+- **Split Test: traffic sources per test:** `_experiment_stats` now returns a `sources` breakdown — the routed clicks + their leads grouped by campaign (ids resolved to names via ad_labels; no-campaign clicks bucketed as "Direct / Untracked", listed last). AdminSplitTest renders a "Traffic sources feeding this test" section under each test's results, respecting the date range. Verified: seeded clicks/leads resolved to "The Lemon Law Lawyers", "Lemon Display 2026", "Direct / Untracked" with correct counts.
+
 ## 2026-07-13k (fork continuation)
 - **Leads table Campaign column:** Added a sortable, toggleable **Campaign** column to the Leads table with inline editing (`CampaignCell`, updates in place). Shows the resolved campaign (e.g. Demand Gen 2026) or "—". The campaign filter (the "All campaigns" dropdown, enabled-campaigns-aware) was already present above the table. Verified via screenshot.
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker, Pencil, CalendarRange, SlidersHorizontal } from 'lucide-react';
+import { FlaskConical, Copy, Check, Trophy, Play, Square, Trash2, Plus, X, Beaker, Pencil, CalendarRange, SlidersHorizontal, Megaphone } from 'lucide-react';
 import { withAdTracking } from '@/lib/tracking';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
@@ -252,6 +252,24 @@ function ExperimentCard({ exp, origin, canEdit, defaultRange, onStart, onStop, o
             </div>
             {stats.winner === 'tie' && <p className="mt-2 px-3 text-xs text-amber-600">Variants are tied so far.</p>}
             {!stats.winner && <p className="mt-2 px-3 text-xs text-slate-400">Need traffic on 2+ variants to call a winner. Stats count only visitors routed through this test's entry URL.</p>}
+
+            {(stats.sources || []).length > 0 && (
+              <div className="mt-3 px-3" data-testid={`exp-sources-${exp.id}`}>
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <Megaphone className="h-3.5 w-3.5" /> Traffic sources feeding this test
+                </div>
+                <div className="space-y-1">
+                  {stats.sources.map((s) => (
+                    <div key={s.campaign} className="flex items-center justify-between gap-3 text-xs border-b border-slate-100 py-1" data-testid={`exp-source-${exp.id}-${s.campaign}`}>
+                      <span className="truncate text-slate-600" title={s.campaign}>{s.campaign}</span>
+                      <span className="shrink-0 tabular-nums text-slate-500">
+                        <span className="font-semibold text-slate-700">{s.clicks}</span> clicks · <span className="font-semibold text-slate-700">{s.leads}</span> leads
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -1652,7 +1652,38 @@ async def _experiment_stats(exp: dict, s_iso: str = "", e_iso: str = "") -> dict
         top = max(v["conversion_rate"] for v in with_traffic)
         leaders = [v for v in with_traffic if v["conversion_rate"] == top]
         winner = "tie" if len(leaders) > 1 else leaders[0]["label"]
-    return {"variants": variants, "winner": winner}
+    sources = await _experiment_sources(click_match, lead_match)
+    return {"variants": variants, "winner": winner, "sources": sources}
+
+
+async def _experiment_sources(click_match: dict, lead_match: dict) -> list:
+    """Which campaigns / traffic sources are feeding this split test — groups the
+    routed clicks (and their leads) by campaign, resolving campaign ids to names.
+    Clicks with no campaign are bucketed as 'Direct / Untracked'."""
+    DIRECT = "Direct / Untracked"
+    cfg = await get_or_create_config()
+    camp_map = {str(k): v for k, v in ((cfg.get("ad_labels") or {}).get("campaign") or {}).items() if v}
+
+    def _label(cid):
+        cid = str(cid or "").strip()
+        return camp_map.get(cid, cid) if cid else DIRECT
+
+    clicks, leads = {}, {}
+    async for c in db.clicks.aggregate([
+        {"$match": click_match},
+        {"$group": {"_id": {"$ifNull": ["$campaign_id", ""]}, "n": {"$sum": 1}}},
+    ]):
+        clicks[_label(c["_id"])] = clicks.get(_label(c["_id"]), 0) + c["n"]
+    async for l in db.leads.aggregate([
+        {"$match": lead_match},
+        {"$group": {"_id": {"$ifNull": ["$campaign_id", ""]}, "n": {"$sum": 1}}},
+    ]):
+        leads[_label(l["_id"])] = leads.get(_label(l["_id"]), 0) + l["n"]
+    names = set(clicks) | set(leads)
+    rows = [{"campaign": n, "clicks": clicks.get(n, 0), "leads": leads.get(n, 0)} for n in names]
+    # Real campaigns first (by clicks), Direct/Untracked last.
+    rows.sort(key=lambda r: (r["campaign"] == DIRECT, -r["clicks"], -r["leads"]))
+    return rows
 
 
 async def _next_split_slug() -> str:
