@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13o (fork continuation)
+- **Analytics By Campaign spend reconciliation:** The By Campaign table only rendered campaigns with tracked clicks/leads, so paused/PMax campaigns that had Google spend (but no tracked click) were dropped — making the spend total fall short of the Channels total. Now appends those as `spend_only` rows (tagged `paused` when not in `live_campaigns`), so the Spend column sums exactly to the Channels total (verified 176,968.81 = 176,968.81). Added an **"Include paused / PMax (spend-only)"** toggle (default ON) in the By Campaign header to show/hide them.
+
 ## 2026-07-13n (fork continuation)
 - **Leads section relaid out to match Calls (approved):** Removed the 4 stat boxes (Form Leads / Phone Calls / Total Leads / Conv. Rate). Toolbar now mirrors Calls (Search · Date range · Columns · Submit Test Lead — Columns moved into the toolbar). Replaced the campaign dropdown with an auto-populated **CAMPAIGN chip row** (sky-blue active, same styling as Calls), above the existing Network chips + Campaign column. Reviewed and approved by user on preview.
 

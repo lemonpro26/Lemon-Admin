@@ -4395,6 +4395,19 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         cid = r.get("campaign_id") or ""
         contacts = r.get("leads", 0) + r.get("calls", 0)
         r.update(_fin(spend_by_campaign.get(cid, 0.0), rev_camp.get(cid, 0.0), contacts, ret_camp.get(cid, 0)))
+    # Include campaigns that had Google spend but no tracked clicks/leads/calls in
+    # this range (paused, PMax, or impression-only) so the Spend column reconciles
+    # with the Channels total. Tagged `spend_only` so the UI can toggle them.
+    live_ids = set(str(x) for x in (cfg.get("live_campaigns") or []))
+    shown_now = {r.get("campaign_id") or "" for r in by_campaign}
+    for cid, sp in spend_by_campaign.items():
+        if cid and cid not in shown_now and sp:
+            by_campaign.append({
+                "campaign_id": cid, "clicks": 0, "leads": 0, "calls": 0, "bounced": 0,
+                "conversion_rate": 0.0, "bounce_rate": 0.0,
+                "spend_only": True, "paused": cid not in live_ids,
+                **_fin(sp, rev_camp.get(cid, 0.0), 0, ret_camp.get(cid, 0)),
+            })
     for r in by_landing_page:
         sp = r.get("source_page") or ""
         contacts = r.get("leads", 0) + r.get("calls", 0)

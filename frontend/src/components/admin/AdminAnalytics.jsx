@@ -323,6 +323,7 @@ export const AdminAnalytics = () => {
   const [range, setRange] = useState(todayRange());
   const [syncing, setSyncing] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
+  const [showPausedSpend, setShowPausedSpend] = useState(true);
   const [drill, setDrill] = useState({ campaign: null, adgroup: null, ad: null });
   const [sitelinks, setSitelinks] = useState(null); // {connected, sitelinks, error}
   const [slLoading, setSlLoading] = useState(true);
@@ -512,7 +513,8 @@ export const AdminAnalytics = () => {
 
   if (level === 'campaign') {
     rows = (data.by_campaign || []).filter((r) =>
-      typeFilter === 'all' || prettyType(campaignTypes[String(r.campaign_id)]) === typeFilter);
+      (showPausedSpend || !r.spend_only) &&
+      (typeFilter === 'all' || prettyType(campaignTypes[String(r.campaign_id)]) === typeFilter));
     columns = [
       { key: 'campaign_id', label: 'Campaign', render: nameCell('campaign', 'campaign_id') },
       { key: 'type', label: 'Type', render: typeCell },
@@ -603,6 +605,18 @@ export const AdminAnalytics = () => {
           )}
         </div>
 
+        {level === 'campaign' && (
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer select-none" data-testid="analytics-include-paused">
+            <input
+              type="checkbox"
+              checked={showPausedSpend}
+              onChange={(e) => setShowPausedSpend(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 accent-[#0F1B3D]"
+              data-testid="analytics-include-paused-checkbox"
+            />
+            Include paused / PMax (spend-only)
+          </label>
+        )}
         {level === 'campaign' && availableTypes.length > 0 && (
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="h-9 w-[200px] rounded-xl border-slate-200" data-testid="analytics-type-filter">
