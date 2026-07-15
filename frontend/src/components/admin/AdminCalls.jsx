@@ -487,8 +487,9 @@ export const AdminCalls = () => {
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <Table>
-          <TableHeader>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
             <TableRow>
               <TableHead><SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
               {cols.number && <TableHead><SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
@@ -633,7 +634,8 @@ export const AdminCalls = () => {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </div>
 
       {/* CALL DETAIL DIALOG */}
