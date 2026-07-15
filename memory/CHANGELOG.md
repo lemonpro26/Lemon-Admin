@@ -1,5 +1,13 @@
 # Lemon Pros — Changelog
 
+## 2026-07-15 (fork continuation) — Lemon Pros Creator Portal (LIVE)
+- **Creator Portal (`/creator-portal`):** Creators self-register (name/email/password), log in, and see a grid of their uploads with Pending/Approved/Rejected status. Upload dialog toggles Video vs Display; Display requires an IAB size (300x250, 728x90, 160x600, 300x600, 320x50, 970x250, 336x280) from a dropdown; both take Title + Notes. Real file upload with progress bar.
+- **Admin "Creatives" tab:** New dashboard tab with Videos / Display Ads sub-tabs (Display has size-filter chips). Admin can Approve / Reject each submission; creator statuses update accordingly.
+- **Backend:** JWT auth (role `creator`, `require_creator` dep) reusing existing pbkdf2 `_hash_pw`/`_verify_pw`. New Mongo collections `creators` + `creatives`. Files stored in Emergent Object Storage (`object_storage.py`, uses `EMERGENT_LLM_KEY`); served via `GET /api/creatives/{id}/file?auth=TOKEN`. Endpoints: `/api/creator/register|login|me|creatives`, `/api/admin/creatives`, `/api/admin/creatives/{id}/status`.
+- **Tested:** 21/21 backend pytest pass; full UI flow verified by testing agent (register→login→upload display+video→admin approve/reject/size-filter). No blocking issues.
+- Known non-blockers (backlog): no upload size cap (user requested "no limits" — OOM risk on huge videos), token-in-query for file serving, no login rate-limit on creator login.
+
+
 ## 2026-07-13o (fork continuation)
 - **Analytics By Campaign spend reconciliation:** The By Campaign table only rendered campaigns with tracked clicks/leads, so paused/PMax campaigns that had Google spend (but no tracked click) were dropped — making the spend total fall short of the Channels total. Now appends those as `spend_only` rows (tagged `paused` when not in `live_campaigns`), so the Spend column sums exactly to the Channels total (verified 176,968.81 = 176,968.81). Added an **"Include paused / PMax (spend-only)"** toggle (default ON) in the By Campaign header to show/hide them.
 
