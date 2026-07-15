@@ -1,5 +1,8 @@
 # Lemon Pros — Changelog
 
+## 2026-07-13n (fork continuation)
+- **Leads section relaid out to match Calls (approved):** Removed the 4 stat boxes (Form Leads / Phone Calls / Total Leads / Conv. Rate). Toolbar now mirrors Calls (Search · Date range · Columns · Submit Test Lead — Columns moved into the toolbar). Replaced the campaign dropdown with an auto-populated **CAMPAIGN chip row** (sky-blue active, same styling as Calls), above the existing Network chips + Campaign column. Reviewed and approved by user on preview.
+
 ## 2026-07-13m (fork continuation)
 - **Copy button next to caller phone numbers:** New reusable `CopyButton` (clipboard API + execCommand fallback, stops row-click propagation). Added next to the caller Number in the Calls table and the call detail dialog's Number row. One click copies the formatted number with a toast + check confirmation.
 
