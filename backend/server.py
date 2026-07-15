@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends, Query, BackgroundTasks
+from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends, Query, BackgroundTasks, UploadFile, File, Form, Header
+from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -24,6 +25,7 @@ import google_ads_service as gads
 import datamanager_service as dm
 import google_names_service as gnames
 import quickbase_service as qb
+import object_storage as objstore
 from email_service import (
     send_email,
     build_internal_notification_html,
@@ -363,6 +365,21 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class CreatorRegister(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class CreatorLogin(BaseModel):
+    email: str
+    password: str
+
+
+class CreativeStatusBody(BaseModel):
+    status: str  # approved | rejected | pending
+
+
 class ConfigUpdate(BaseModel):
     hook1: str
     hook2: str
@@ -682,6 +699,36 @@ def require_owner(user: dict = Depends(require_admin)) -> dict:
     if user.get("role") != "owner":
         raise HTTPException(status_code=403, detail="Only the master admin can do this.")
     return user
+
+
+# ----------------------------- Creator auth -----------------------------
+def create_creator_token(creator_id: str, email: str) -> str:
+    payload = {
+        "sub": creator_id,
+        "email": email,
+        "role": "creator",
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+
+
+def _decode_token(token: str) -> dict:
+    return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+
+
+def require_creator(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
+    if creds is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = _decode_token(creds.credentials)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if payload.get("role") != "creator":
+        raise HTTPException(status_code=403, detail="Creator access required.")
+    return {"id": payload.get("sub"), "email": payload.get("email")}
 
 
 # ----------------------------- Activity / audit log -----------------------------
@@ -4551,6 +4598,189 @@ async def admin_metrics(
 
     return build_metrics(date_str, hook_variants, real_geo, real_dims, days=days,
                          real_hourly=real_hourly)
+
+
+# ----------------------------- Creator Portal + Creatives -----------------------------
+DISPLAY_SIZES = ["300x250", "728x90", "160x600", "300x600", "320x50", "970x250", "336x280"]
+_VIDEO_EXTS = {"mp4", "mov", "webm", "avi", "m4v", "mpeg", "mpg"}
+_IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp", "svg", "html", "zip"}
+_CONTENT_TYPES = {
+    "mp4": "video/mp4", "mov": "video/quicktime", "webm": "video/webm", "avi": "video/x-msvideo",
+    "m4v": "video/x-m4v", "mpeg": "video/mpeg", "mpg": "video/mpeg",
+    "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif",
+    "webp": "image/webp", "svg": "image/svg+xml", "html": "text/html", "zip": "application/zip",
+}
+
+
+def _creative_public(doc: dict) -> dict:
+    if not doc:
+        return doc
+    return {
+        "id": doc.get("id"),
+        "type": doc.get("type"),
+        "title": doc.get("title"),
+        "notes": doc.get("notes", ""),
+        "size": doc.get("size", ""),
+        "status": doc.get("status", "pending"),
+        "creator_id": doc.get("creator_id"),
+        "creator_name": doc.get("creator_name", ""),
+        "original_filename": doc.get("original_filename", ""),
+        "content_type": doc.get("content_type", ""),
+        "created_at": doc.get("created_at"),
+        "reviewed_at": doc.get("reviewed_at"),
+    }
+
+
+@api_router.post("/creator/register")
+async def creator_register(body: CreatorRegister):
+    email = (body.email or "").strip().lower()
+    name = (body.name or "").strip()
+    if not email or not name or not body.password:
+        raise HTTPException(status_code=400, detail="Name, email and password are required.")
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+    if await db.creators.find_one({"email": email}):
+        raise HTTPException(status_code=409, detail="An account with that email already exists.")
+    creator = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "email": email,
+        "password_hash": _hash_pw(body.password),
+        "created_at": _now_iso(),
+    }
+    await db.creators.insert_one(creator)
+    token = create_creator_token(creator["id"], email)
+    return {"token": token, "creator": {"id": creator["id"], "name": name, "email": email}}
+
+
+@api_router.post("/creator/login")
+async def creator_login(body: CreatorLogin):
+    email = (body.email or "").strip().lower()
+    creator = await db.creators.find_one({"email": email})
+    if not creator or not _verify_pw(body.password, creator.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+    token = create_creator_token(creator["id"], email)
+    return {"token": token, "creator": {"id": creator["id"], "name": creator.get("name", ""), "email": email}}
+
+
+@api_router.get("/creator/me")
+async def creator_me(creator: dict = Depends(require_creator)):
+    doc = await db.creators.find_one({"id": creator["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    return {"id": doc["id"], "name": doc.get("name", ""), "email": doc.get("email", "")}
+
+
+@api_router.post("/creator/creatives")
+async def creator_upload_creative(
+    creator: dict = Depends(require_creator),
+    file: UploadFile = File(...),
+    type: str = Form(...),
+    title: str = Form(...),
+    notes: str = Form(""),
+    size: str = Form(""),
+):
+    ctype = (type or "").strip().lower()
+    if ctype not in ("video", "display"):
+        raise HTTPException(status_code=400, detail="Type must be 'video' or 'display'.")
+    if not (title or "").strip():
+        raise HTTPException(status_code=400, detail="Title is required.")
+    if ctype == "display" and size not in DISPLAY_SIZES:
+        raise HTTPException(status_code=400, detail="A valid display ad size is required.")
+
+    ext = (file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else "bin").lower()
+    allowed = _VIDEO_EXTS if ctype == "video" else _IMAGE_EXTS
+    if ext not in allowed:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type .{ext} for a {ctype} ad.")
+
+    data = await file.read()
+    content_type = file.content_type or _CONTENT_TYPES.get(ext, "application/octet-stream")
+    path = f"{objstore.APP_NAME}/creatives/{creator['id']}/{uuid.uuid4()}.{ext}"
+    try:
+        result = objstore.put_object(path, data, content_type)
+    except Exception as e:
+        logger.error("Creative upload failed: %s", e)
+        raise HTTPException(status_code=502, detail="Upload failed. Please try again.")
+
+    acct = await db.creators.find_one({"id": creator["id"]}, {"name": 1})
+    doc = {
+        "id": str(uuid.uuid4()),
+        "creator_id": creator["id"],
+        "creator_name": (acct or {}).get("name", ""),
+        "type": ctype,
+        "title": title.strip(),
+        "notes": (notes or "").strip(),
+        "size": size if ctype == "display" else "",
+        "status": "pending",
+        "storage_path": result["path"],
+        "original_filename": file.filename or "",
+        "content_type": content_type,
+        "size_bytes": result.get("size", len(data)),
+        "is_deleted": False,
+        "created_at": _now_iso(),
+        "reviewed_at": None,
+    }
+    await db.creatives.insert_one(doc)
+    return _creative_public(doc)
+
+
+@api_router.get("/creator/creatives")
+async def creator_list_creatives(creator: dict = Depends(require_creator)):
+    cur = db.creatives.find({"creator_id": creator["id"], "is_deleted": {"$ne": True}}).sort("created_at", -1)
+    rows = await cur.to_list(500)
+    return {"creatives": [_creative_public(r) for r in rows]}
+
+
+@api_router.get("/admin/creatives")
+async def admin_list_creatives(_: dict = Depends(require_admin), type: str = Query("")):
+    q = {"is_deleted": {"$ne": True}}
+    if type in ("video", "display"):
+        q["type"] = type
+    cur = db.creatives.find(q).sort("created_at", -1)
+    rows = await cur.to_list(1000)
+    return {"creatives": [_creative_public(r) for r in rows]}
+
+
+@api_router.post("/admin/creatives/{creative_id}/status")
+async def admin_set_creative_status(creative_id: str, body: CreativeStatusBody, _: dict = Depends(require_editor)):
+    status = (body.status or "").strip().lower()
+    if status not in ("approved", "rejected", "pending"):
+        raise HTTPException(status_code=400, detail="Invalid status.")
+    res = await db.creatives.update_one(
+        {"id": creative_id},
+        {"$set": {"status": status, "reviewed_at": _now_iso()}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Creative not found.")
+    doc = await db.creatives.find_one({"id": creative_id})
+    return _creative_public(doc)
+
+
+@api_router.get("/creatives/{creative_id}/file")
+async def creative_file(
+    creative_id: str,
+    authorization: Optional[str] = Header(None),
+    auth: str = Query(""),
+):
+    """Serve a creative's file. Accepts a bearer token via header or ?auth= query
+    (needed for <img>/<video> tags). Any valid admin or creator token is allowed."""
+    token = auth or (authorization.split(" ", 1)[1] if authorization and authorization.lower().startswith("bearer ") else "")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        _decode_token(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    doc = await db.creatives.find_one({"id": creative_id, "is_deleted": {"$ne": True}})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Creative not found.")
+    try:
+        data, content_type = objstore.get_object(doc["storage_path"])
+    except Exception as e:
+        logger.error("Creative fetch failed: %s", e)
+        raise HTTPException(status_code=502, detail="Could not load file.")
+    return Response(content=data, media_type=doc.get("content_type") or content_type)
+
 
 
 # Include the router in the main app
