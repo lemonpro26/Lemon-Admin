@@ -102,3 +102,9 @@
 - P3: Conversions by Sitelink, lead qualification logic, "Unattributed/Direct" filter chip in Calls/Leads, live-call webhook view
 - P3 (blocked): SMTP email notifications (need creds)
 - Top Tabs UI mockup at `/mockup/tabs` — user chose "don't do this yet"
+
+## 2026-07-16 — Retained campaign attribution fix
+- BUG FIX: Retained tab showed blank campaign for items whose campaign lived in the free-text `campaign`/`google_campaign` fields (Retained only checked `campaign_name`/`campaign_id`). Backend `/api/admin/retained` now returns those fields for leads; frontend `campaignLabel` uses the same fallback chain as the Leads tab.
+- NEW: Retained CALLS now inherit attribution (campaign, gclid, keyword, adgroup, network) from a matching LEAD with the same phone number (e.g., Chris Esfandiary: retained call was blank while his lead had "Lemon Law 2026"). Flagged with `campaign_from_lead`.
+- RESEARCH: Attributed 6/7 production unattributed retained clients via Google Ads call_view (area code + timestamp) cross-referenced with Quickbase Date Created. Note: API exposes area code only; user's Google Ads UI Call details report shows full numbers for verification. Chris's match corrected — he was a form lead (gclid on lead record), not the Google-logged call.
+- Verified in production (read-only): the other 7 unattributed retained calls have NO campaign data anywhere in the DB (no matching leads); attribution only possible via Google call-log research or manual entry.

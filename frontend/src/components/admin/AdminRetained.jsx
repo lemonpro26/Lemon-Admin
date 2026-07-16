@@ -29,7 +29,7 @@ const SOURCE_LABELS = { lapa: 'PA', laspa: 'Spanish PA', sp: 'Spanish', dg: 'Dem
 const UNATTRIBUTED = 'Unattributed / Direct';
 // Best human-readable campaign for a retained lead/call (falls back to the raw id,
 // then to an "unattributed" bucket for calls/leads with no Google campaign).
-const campaignLabel = (it) => (it.campaign_name || it.campaign_id || UNATTRIBUTED);
+const campaignLabel = (it) => (it.campaign_name || it.google_campaign || it.campaign || it.campaign_id || UNATTRIBUTED);
 
 const UNKNOWN_CITY = 'Unknown location';
 // City label for a retained lead/call (city + state), for the "Retained by city" view.

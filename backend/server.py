@@ -3969,6 +3969,34 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
     leads = await db.leads.find(q, {"_id": 0}).sort("retained_at", -1).to_list(length=2000)
     calls = await db.calls.find(q, {"_id": 0}).sort("retained_at", -1).to_list(length=2000)
     calls = await _enrich_calls_with_hooks(calls)
+    # A retained CALL often belongs to a person who ALSO submitted the lead form
+    # (where the campaign/gclid attribution lives). Inherit that attribution by
+    # matching phone numbers, so the Retained tab shows the real campaign.
+    no_camp = [c for c in calls if not (c.get("campaign_id") or c.get("campaign_name")
+                                        or c.get("campaign") or c.get("google_campaign"))]
+    want = {_digits10(c.get("caller_number")) for c in no_camp if _digits10(c.get("caller_number"))}
+    if want:
+        lead_attr = {}
+        proj = {"_id": 0, "phone": 1, "phone_digits": 1, "campaign_id": 1, "campaign_name": 1,
+                "campaign": 1, "google_campaign": 1, "gclid": 1, "keyword": 1,
+                "adgroup_id": 1, "adgroup_name": 1, "network": 1, "created_at": 1}
+        attr_q = {"$or": [{"campaign_id": {"$nin": ["", None]}},
+                          {"campaign_name": {"$nin": ["", None]}},
+                          {"campaign": {"$nin": ["", None]}}]}
+        async for l in db.leads.find(attr_q, proj):
+            d = _digits10(l.get("phone_digits") or l.get("phone"))
+            if d in want:
+                cur = lead_attr.get(d)
+                if not cur or (l.get("created_at") or "") > (cur.get("created_at") or ""):
+                    lead_attr[d] = l
+        for c in no_camp:
+            l = lead_attr.get(_digits10(c.get("caller_number")))
+            if l:
+                for k in ("campaign_id", "campaign_name", "campaign", "google_campaign",
+                          "gclid", "keyword", "adgroup_id", "adgroup_name", "network"):
+                    if l.get(k) and not c.get(k):
+                        c[k] = l[k]
+                c["campaign_from_lead"] = True
     # Auto-fill name + email from Quickbase (by phone) for any retained item that
     # still has no name — so nameless clients (e.g. calls showing only a city)
     # get re-attempted every time the tab loads, and self-heal.
@@ -4004,6 +4032,8 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
             # Vehicle parts + attribution for the rich detail popup
             "car_year": l.get("car_year"), "car_make": l.get("car_make"), "car_model": l.get("car_model"),
             "campaign_id": l.get("campaign_id"), "campaign_name": l.get("campaign_name"),
+            "campaign": l.get("campaign"), "google_campaign": l.get("google_campaign"),
+            "google_campaign_id": l.get("google_campaign_id"),
             "adgroup_id": l.get("adgroup_id"), "adgroup_name": l.get("adgroup_name"),
             "ad_id": l.get("ad_id"), "ad_name": l.get("ad_name"),
             "keyword": l.get("keyword"), "gclid": l.get("gclid"),
