@@ -112,3 +112,10 @@
 ## 2026-07-16 — Analytics ad-group financials + all-time retained search
 - Analytics drill-down: clicking a campaign now shows per-ad-group Spend (live from Google Ads `ad_group` report), Revenue, ROAS, CPL, CPA, Retained. Added `fetch_spend_by_adgroup` to google_names_service.py; `/api/admin/analytics` enriches `by_adgroup` rows with `_fin` and appends spend-only ad groups so ad-group spend reconciles with campaign spend. Retained-per-adgroup counted from retained leads/calls `adgroup_id`.
 - Retained tab: search now automatically covers ALL TIME (lazy all-time fetch on first keystroke) regardless of selected date range.
+
+## 2026-07-16 — Per-ad & per-video Analytics breakdowns
+- Clicking a DISPLAY / DEMAND_GEN / VIDEO / PMAX campaign in Analytics now drills DIRECTLY to per-ad (creative) stats: Impressions, Ad Clicks, Video Views, Spend, CPL, Retained (live from Google Ads `ad_group_ad` report via new `fetch_ad_stats`).
+- New "By Video" table (per-video impressions/views/view rate/spend/CPV from Google's `video` resource via `fetch_video_stats`) shown when drilled into any campaign that has video data (Demand Gen).
+- Search campaigns keep Campaign → Ad Group → Ad → Keyword drill; ad level now also shows Google impressions/clicks and per-ad spend, revenue/retained per ad from DB (ad_id on leads/calls).
+- Tested via testing_agent iteration_26.json — 100% pass, no issues.
+- Known nit: paused Demand Gen campaigns show ID-only (names not synced for paused campaigns in ad_labels).
