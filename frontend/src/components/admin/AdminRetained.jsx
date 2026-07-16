@@ -170,11 +170,16 @@ export const AdminRetained = () => {
   const [cols, setCols] = useState(() => Object.fromEntries(TOGGLE_COLS.map((c) => [c.key, true])));
   const colOn = (k) => cols[k] !== false;
 
+  // All-time items, fetched lazily the first time the user types a search so
+  // searching always covers every retained client regardless of the date range.
+  const [allTime, setAllTime] = useState(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get('/admin/retained', { params: { start: range.start, end: range.end } });
       setData(res.data || { items: [] });
+      setAllTime(null); // stale after edits/range change; refetched on next search
     } catch (e) {
       toast.error('Failed to load retained clients');
     } finally {
@@ -183,6 +188,13 @@ export const AdminRetained = () => {
   }, [range]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!search.trim() || allTime) return;
+    api.get('/admin/retained', { params: { start: '2000-01-01', end: '' } })
+      .then((res) => setAllTime(res.data?.items || []))
+      .catch(() => {});
+  }, [search, allTime]);
 
   const saveRetainedDate = async (item, dateStr) => {
     const path = item.type === 'call' ? 'calls' : 'leads';
@@ -229,7 +241,9 @@ export const AdminRetained = () => {
     }
   };
 
-  const allItems = data.items || [];
+  // While searching, look across ALL retained clients (all time), not just the
+  // currently selected date range.
+  const allItems = (search.trim() && allTime) ? allTime : (data.items || []);
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return allItems;
@@ -305,7 +319,7 @@ export const AdminRetained = () => {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search retained by name, number…"
+              placeholder="Search all retained by name, number…"
               className="pl-9 pr-8 h-9 w-64 rounded-xl border-slate-200"
               data-testid="retained-search"
             />
