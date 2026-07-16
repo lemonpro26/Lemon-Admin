@@ -454,6 +454,148 @@ const HourlyBreakdown = ({ data, loading }) => {
 };
 
 
+// Year × Make heatmap — pure first-party data (leads captured with vehicle info).
+// Calls from CTM don't have vehicle data, so this card is lead-form-driven.
+const VehicleBreakdown = ({ data, loading }) => {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid="analytics-by-vehicle">
+        <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900">Vehicle breakdown</div>
+        <div className="p-8 text-center text-slate-500 text-sm">Loading…</div>
+      </div>
+    );
+  }
+  const byYear = data?.by_year || [];
+  const byMake = data?.by_make || [];
+  const matrix = data?.matrix || [];
+  const withVehicle = data?.with_vehicle || 0;
+
+  if (withVehicle === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid="analytics-by-vehicle">
+        <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2">
+          Vehicle breakdown
+          <span className="text-[11px] font-sans font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5">First-party leads</span>
+        </div>
+        <div className="p-8 text-center text-slate-500 text-sm" data-testid="analytics-by-vehicle-empty">
+          No leads with a vehicle year/make captured in this date range.
+        </div>
+      </div>
+    );
+  }
+
+  // Top 10 makes by lead volume, last 12 model years (chronological).
+  const topMakes = byMake.slice(0, 10).map((m) => m.make);
+  const years = byYear.map((y) => y.year); // already sorted asc
+  const yearsShown = years.slice(-12);
+
+  const cellMap = new Map();
+  for (const r of matrix) cellMap.set(`${r.year}|${r.make}`, r);
+
+  const maxCell = Math.max(1, ...matrix
+    .filter((r) => yearsShown.includes(r.year) && topMakes.includes(r.make))
+    .map((r) => r.leads));
+
+  const colTotals = yearsShown.map((y) => {
+    const r = byYear.find((z) => z.year === y);
+    return { year: y, leads: r?.leads || 0, retained: r?.retained || 0 };
+  });
+  const rowTotals = topMakes.map((m) => {
+    const r = byMake.find((z) => z.make === m);
+    return { make: m, leads: r?.leads || 0, retained: r?.retained || 0 };
+  });
+
+  const cellBg = (leads) => {
+    if (!leads) return 'bg-slate-50';
+    const intensity = leads / maxCell;
+    if (intensity > 0.75) return 'bg-indigo-600 text-white';
+    if (intensity > 0.50) return 'bg-indigo-500 text-white';
+    if (intensity > 0.30) return 'bg-indigo-400 text-white';
+    if (intensity > 0.15) return 'bg-indigo-200 text-indigo-900';
+    if (intensity > 0.05) return 'bg-indigo-100 text-indigo-900';
+    return 'bg-indigo-50 text-indigo-800';
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid="analytics-by-vehicle">
+      <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+        <span className="font-slab font-bold text-slate-900">Vehicle breakdown</span>
+        <span className="text-[11px] font-sans font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5">First-party leads</span>
+        <div className="ml-auto flex items-center gap-3 text-xs font-medium text-slate-500">
+          <span data-testid="vehicle-total-with-info">{withVehicle} leads w/ vehicle</span>
+          <span className="text-slate-300">•</span>
+          <span data-testid="vehicle-total-retained">{data?.total_retained || 0} retained</span>
+        </div>
+      </div>
+      <div className="p-4 sm:p-5 space-y-6">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm" data-testid="vehicle-heatmap">
+            <thead>
+              <tr>
+                <th className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 pb-2 pr-3">Make ↓ / Year →</th>
+                {yearsShown.map((y) => (
+                  <th key={y} className="px-1.5 pb-2 text-center text-xs font-semibold text-slate-600" data-testid={`vehicle-year-header-${y}`}>{y}</th>
+                ))}
+                <th className="pl-3 pb-2 text-right text-[11px] font-bold uppercase tracking-wide text-slate-400">Row total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topMakes.map((m) => {
+                const rt = rowTotals.find((r) => r.make === m);
+                return (
+                  <tr key={m} data-testid={`vehicle-row-${m}`}>
+                    <td className="pr-3 py-1 text-sm font-semibold text-slate-800 whitespace-nowrap">{m}</td>
+                    {yearsShown.map((y) => {
+                      const cell = cellMap.get(`${y}|${m}`);
+                      const n = cell?.leads || 0;
+                      const ret = cell?.retained || 0;
+                      return (
+                        <td key={y} className="px-0.5 py-0.5">
+                          <div
+                            className={`h-9 min-w-[42px] rounded-md flex flex-col items-center justify-center text-xs font-semibold tabular-nums ${cellBg(n)}`}
+                            title={n ? `${m} ${y}: ${n} lead${n === 1 ? '' : 's'}${ret ? ` · ${ret} retained` : ''}` : `${m} ${y}: no leads`}
+                            data-testid={`vehicle-cell-${y}-${m}`}
+                          >
+                            <span>{n || ''}</span>
+                            {ret > 0 && <span className="text-[9px] font-bold opacity-90">✓{ret}</span>}
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td className="pl-3 py-1 text-right text-sm font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                      {rt?.leads || 0}
+                      {rt?.retained ? <span className="ml-1.5 text-[10px] font-semibold text-emerald-600">✓{rt.retained}</span> : null}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="border-t-2 border-slate-200">
+                <td className="pr-3 pt-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">Col total</td>
+                {yearsShown.map((y) => {
+                  const ct = colTotals.find((c) => c.year === y);
+                  return (
+                    <td key={y} className="px-0.5 pt-2 text-center text-xs font-bold text-slate-900 tabular-nums" data-testid={`vehicle-col-total-${y}`}>
+                      {ct?.leads || 0}
+                      {ct?.retained ? <span className="block text-[9px] font-semibold text-emerald-600">✓{ct.retained}</span> : null}
+                    </td>
+                  );
+                })}
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-slate-400 leading-snug">
+          Cells shade darker as lead volume grows. <span className="font-semibold text-emerald-600">✓N</span> = retained clients from that model-year × make cohort.
+          Calls aren&apos;t included here because our call-tracking provider doesn&apos;t capture vehicle info.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+
+
 export const AdminAnalytics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -466,6 +608,8 @@ export const AdminAnalytics = () => {
   const [slLoading, setSlLoading] = useState(true);
   const [hourly, setHourly] = useState(null);
   const [hourlyLoading, setHourlyLoading] = useState(true);
+  const [vehicles, setVehicles] = useState(null);
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const adColFilter = useColumnFilter('analytics.cols.ad', ['ad_id']);
   const sitelinkColFilter = useColumnFilter('analytics.cols.sitelink', ['link_text']);
   const editable = canEditFn();
@@ -504,6 +648,18 @@ export const AdminAnalytics = () => {
       setHourly({ hours: [], total_calls: 0, total_leads: 0 });
     } finally {
       setHourlyLoading(false);
+    }
+  }, [range]);
+
+  const loadVehicles = useCallback(async () => {
+    setVehiclesLoading(true);
+    try {
+      const res = await api.get('/admin/analytics/vehicles', { params: { start: range.start, end: range.end } });
+      setVehicles(res.data);
+    } catch (e) {
+      setVehicles({ total_leads: 0, total_retained: 0, with_vehicle: 0, by_year: [], by_make: [], matrix: [] });
+    } finally {
+      setVehiclesLoading(false);
     }
   }, [range]);
 
@@ -548,6 +704,7 @@ export const AdminAnalytics = () => {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadSitelinks(); }, [loadSitelinks]);
   useEffect(() => { loadHourly(); }, [loadHourly]);
+  useEffect(() => { loadVehicles(); }, [loadVehicles]);
 
   useEffect(() => {
     if (data?.google_ads_connected && !autoSynced.current) {
@@ -725,6 +882,8 @@ export const AdminAnalytics = () => {
       <CallsByNumberStrip rows={data.calls_by_number || []} />
 
       <HourlyBreakdown data={hourly} loading={hourlyLoading} />
+
+      <VehicleBreakdown data={vehicles} loading={vehiclesLoading} />
 
       <LandingPageTable rows={data.by_landing_page || []} directCalls={data.direct_calls || 0} />
 

@@ -3265,6 +3265,71 @@ async def admin_analytics_hourly(start: str = "", end: str = "", _: dict = Depen
     }
 
 
+@api_router.get("/admin/analytics/vehicles")
+async def admin_analytics_vehicles(start: str = "", end: str = "", _: dict = Depends(require_admin)):
+    """Year × Make breakdown for leads whose intake form captured the vehicle.
+    Calls from CallTrackingMetrics don't carry car_year/car_make, so this card is
+    lead-form-driven. Quickbase is NOT queried here — this is 100% first-party
+    data from our own leads collection."""
+    s_iso, e_iso, _d = _date_range(start, end)
+    leads = await db.leads.find(
+        {"created_at": {"$gte": s_iso, "$lte": e_iso}},
+        {"car_year": 1, "car_make": 1, "retained": 1},
+    ).to_list(50000)
+
+    def _norm_year(v):
+        s = str(v or "").strip()
+        # Accept 4-digit years 1980..2099. Anything else → blank.
+        if len(s) == 4 and s.isdigit() and 1980 <= int(s) <= 2099:
+            return s
+        return ""
+
+    def _norm_make(v):
+        s = str(v or "").strip()
+        if not s:
+            return ""
+        # Title-case so "toyota", "TOYOTA", "Toyota" merge.
+        return s.title()
+
+    by_year = {}  # year -> {leads, retained}
+    by_make = {}  # make -> {leads, retained}
+    matrix = {}   # (year, make) -> {leads, retained}
+    total_leads = 0
+    total_retained = 0
+    with_vehicle = 0
+    for l in leads:
+        y = _norm_year(l.get("car_year"))
+        m = _norm_make(l.get("car_make"))
+        ret = bool(l.get("retained"))
+        total_leads += 1
+        if ret:
+            total_retained += 1
+        if not y and not m:
+            continue
+        with_vehicle += 1
+        if y:
+            b = by_year.setdefault(y, {"year": y, "leads": 0, "retained": 0})
+            b["leads"] += 1
+            if ret: b["retained"] += 1
+        if m:
+            b = by_make.setdefault(m, {"make": m, "leads": 0, "retained": 0})
+            b["leads"] += 1
+            if ret: b["retained"] += 1
+        if y and m:
+            b = matrix.setdefault((y, m), {"year": y, "make": m, "leads": 0, "retained": 0})
+            b["leads"] += 1
+            if ret: b["retained"] += 1
+
+    return {
+        "total_leads": total_leads,
+        "total_retained": total_retained,
+        "with_vehicle": with_vehicle,
+        "by_year": sorted(by_year.values(), key=lambda r: r["year"]),
+        "by_make": sorted(by_make.values(), key=lambda r: -r["leads"]),
+        "matrix": list(matrix.values()),
+    }
+
+
 @api_router.get("/admin/phone-numbers")
 async def admin_phone_numbers(_: dict = Depends(require_admin)):
     """The tracked phone numbers and which landing pages use each — shown in Settings."""
