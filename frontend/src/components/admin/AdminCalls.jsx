@@ -140,6 +140,7 @@ export const AdminCalls = () => {
   const [network, setNetwork] = useState('all');
   const [campaignFilter, setCampaignFilter] = useState('all');
   const [enabledCampaigns, setEnabledCampaigns] = useState([]);
+  const [campaignList, setCampaignList] = useState([]);
   const [cols, setCols] = useState(loadCols);
   const [matchedLeads, setMatchedLeads] = useState([]);
   const [openedLead, setOpenedLead] = useState(null);
@@ -149,6 +150,13 @@ export const AdminCalls = () => {
   const [testName, setTestName] = useState('');
   const [testNumber, setTestNumber] = useState('');
   const [numbers, setNumbers] = useState([]);
+  // Manual "Add call" (real, attributed) — for calls that bypassed the tracking number.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addSaving, setAddSaving] = useState(false);
+  const [addForm, setAddForm] = useState({
+    name: '', phone: '', min: '', sec: '', when: '', campaign_id: '', number_group: 'home_pa', city: '', state: '',
+  });
+  const setAdd = (patch) => setAddForm((p) => ({ ...p, ...patch }));
   const editable = canEditFn();
   const { sorted: sortedCalls, sortKey, sortDir, toggle } = useSortable(calls, 'created_at', 'desc');
 
@@ -160,7 +168,11 @@ export const AdminCalls = () => {
   // Enabled Google campaigns → always-visible campaign chips (so Lemon Display &
   // any newly-enabled campaign auto-appear on the top bar, even with 0 calls yet).
   useEffect(() => {
-    api.get('/admin/campaigns').then((res) => setEnabledCampaigns((res.data.campaigns || []).map((c) => c.name))).catch(() => {});
+    api.get('/admin/campaigns').then((res) => {
+      const list = res.data.campaigns || [];
+      setCampaignList(list);
+      setEnabledCampaigns(list.map((c) => c.name));
+    }).catch(() => {});
   }, []);
 
   // Campaign chips = enabled campaigns ∪ any campaign already present in the data
@@ -319,8 +331,37 @@ export const AdminCalls = () => {
     }
   };
 
-  const syncGoogleCalls = async () => {
-    setSyncingGoogle(true);
+  const submitManualCall = async () => {
+    const digits = (addForm.phone || '').replace(/\D/g, '');
+    if (digits.length < 10) { toast.error('Enter a valid 10-digit phone number.'); return; }
+    setAddSaving(true);
+    try {
+      const duration = (parseInt(addForm.min || 0, 10) * 60) + parseInt(addForm.sec || 0, 10);
+      const camp = campaignList.find((c) => c.id === addForm.campaign_id);
+      const payload = {
+        phone: addForm.phone.trim(),
+        name: addForm.name.trim(),
+        duration,
+        called_at: addForm.when || null,
+        campaign_id: addForm.campaign_id || '',
+        campaign_name: camp ? camp.name : '',
+        number_group: addForm.number_group || 'home_pa',
+        city: addForm.city.trim(),
+        state: addForm.state.trim(),
+      };
+      await api.post('/admin/calls/manual', payload);
+      toast.success('Call added.');
+      setAddOpen(false);
+      setAddForm({ name: '', phone: '', min: '', sec: '', when: '', campaign_id: '', number_group: 'home_pa', city: '', state: '' });
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Could not add call.');
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
+  const syncGoogleCalls = async () => {    setSyncingGoogle(true);
     try {
       const res = await api.post('/admin/calls/sync-google');
       const m = res.data?.matched ?? 0;
@@ -359,6 +400,11 @@ export const AdminCalls = () => {
               </button>
             )}
           </div>
+          {editable && (
+            <Button variant="outline" size="sm" onClick={() => setAddOpen(true)} className="rounded-xl border-slate-200" data-testid="calls-add-manual">
+              <Plus className="h-4 w-4 mr-2" /> Add call
+            </Button>
+          )}
           {editable && (
             <Button variant="outline" size="sm" onClick={() => setTestOpen(true)} className="rounded-xl border-slate-200" data-testid="calls-add-test">
               <Plus className="h-4 w-4 mr-2" /> Test call
@@ -639,6 +685,83 @@ export const AdminCalls = () => {
       </div>
 
       {/* CALL DETAIL DIALOG */}
+      <Dialog open={addOpen} onOpenChange={(o) => { if (!addSaving) setAddOpen(o); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="add-call-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-slab">Add a call</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">Manually log a real inbound call with the correct campaign — useful for location/call-extension calls that came in as "Online Organic".</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Caller name</label>
+                <Input value={addForm.name} onChange={(e) => setAdd({ name: e.target.value })} placeholder="Issac Flores" className="mt-1 rounded-xl border-slate-200" data-testid="add-call-name" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Phone number</label>
+                <Input value={addForm.phone} onChange={(e) => setAdd({ phone: e.target.value })} placeholder="(714) 904-8073" className="mt-1 rounded-xl border-slate-200" data-testid="add-call-phone" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Campaign</label>
+              <select
+                value={addForm.campaign_id}
+                onChange={(e) => setAdd({ campaign_id: e.target.value })}
+                className="mt-1 w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0F1B3D]/20"
+                data-testid="add-call-campaign"
+              >
+                <option value="">No campaign</option>
+                {campaignList.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Tracked line</label>
+              <select
+                value={addForm.number_group}
+                onChange={(e) => setAdd({ number_group: e.target.value })}
+                className="mt-1 w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0F1B3D]/20"
+                data-testid="add-call-line"
+              >
+                <option value="home_pa">Home &amp; PA — 844-335-8911</option>
+                <option value="spanish">Spanish &amp; SPA — 866-524-3722</option>
+                <option value="dg">Demand Gen — 833-240-9312</option>
+                <option value="dgs">Demand Gen Spanish — 833-868-1802</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Date &amp; time</label>
+                <Input type="datetime-local" value={addForm.when} onChange={(e) => setAdd({ when: e.target.value })} className="mt-1 rounded-xl border-slate-200" data-testid="add-call-when" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Duration</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <Input type="number" min="0" value={addForm.min} onChange={(e) => setAdd({ min: e.target.value })} placeholder="min" className="rounded-xl border-slate-200" data-testid="add-call-min" />
+                  <Input type="number" min="0" max="59" value={addForm.sec} onChange={(e) => setAdd({ sec: e.target.value })} placeholder="sec" className="rounded-xl border-slate-200" data-testid="add-call-sec" />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600">City (optional)</label>
+                <Input value={addForm.city} onChange={(e) => setAdd({ city: e.target.value })} className="mt-1 rounded-xl border-slate-200" data-testid="add-call-city" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">State (optional)</label>
+                <Input value={addForm.state} onChange={(e) => setAdd({ state: e.target.value })} placeholder="CA" className="mt-1 rounded-xl border-slate-200" data-testid="add-call-state" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setAddOpen(false)} disabled={addSaving} className="rounded-xl" data-testid="add-call-cancel">Cancel</Button>
+              <Button onClick={submitManualCall} disabled={addSaving} className="rounded-xl bg-[#0F1B3D] hover:bg-[#0a1330]" data-testid="add-call-submit">{addSaving ? 'Adding…' : 'Add call'}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* TEST CALL DIALOG */}
       <Dialog open={testOpen} onOpenChange={(o) => { if (!o) { setTestOpen(false); } }}>
         <DialogContent className="max-w-md" data-testid="test-call-dialog">
           <DialogHeader>

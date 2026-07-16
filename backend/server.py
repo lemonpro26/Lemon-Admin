@@ -3285,6 +3285,20 @@ class TestCallBody(BaseModel):
     tracking_number: Optional[str] = None
 
 
+class ManualCallBody(BaseModel):
+    """Manually add a real inbound call (e.g. a location/call-extension call that
+    bypassed the tracking number) with correct campaign attribution."""
+    phone: str
+    name: Optional[str] = ""
+    duration: Optional[int] = 0
+    called_at: Optional[str] = None            # ISO or 'YYYY-MM-DDTHH:MM'
+    campaign_id: Optional[str] = ""
+    campaign_name: Optional[str] = ""
+    number_group: Optional[str] = "home_pa"    # which tracked line it belongs to
+    city: Optional[str] = ""
+    state: Optional[str] = ""
+
+
 @api_router.post("/admin/calls/test")
 async def create_test_call(body: Optional[TestCallBody] = None, _: dict = Depends(require_editor)):
     """Create a sample inbound call so the team can practice the revenue-passback
@@ -3337,6 +3351,80 @@ async def create_test_call(body: Optional[TestCallBody] = None, _: dict = Depend
     # caller ID (name/email) shows — handy for testing the lookup.
     if custom_phone and qb.is_configured():
         await _enrich_from_quickbase(rec, db.calls)
+    fresh = await db.calls.find_one({"id": rec["id"]}, {"_id": 0})
+    return {"success": True, "call": fresh or {k: v for k, v in rec.items() if k != "_id"}}
+
+
+@api_router.post("/admin/calls/manual")
+async def create_manual_call(body: ManualCallBody, _: dict = Depends(require_editor)):
+    """Add a REAL inbound call by hand with correct campaign attribution. Use this
+    for calls that bypassed the tracking number (e.g. Google location/call
+    extensions logged as 'Online Organic') so they show up attributed. Does NOT
+    auto-upload a Google Ads conversion (avoids double-counting extension calls)."""
+    digits = _re.sub(r"\D", "", body.phone or "")
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10:
+        raise HTTPException(status_code=400, detail="Enter a valid 10-digit phone number.")
+    num = f"({digits[0:3]}) {digits[3:6]}-{digits[6:]}"
+
+    grp = next((g for g in CALL_NUMBER_GROUPS if g["key"] == (body.number_group or "home_pa")), CALL_NUMBER_GROUPS[0])
+
+    cfg = await get_or_create_config()
+    camp_map = {str(k): v for k, v in ((cfg.get("ad_labels") or {}).get("campaign") or {}).items()}
+    name_to_id = _campaign_name_to_id(cfg.get("ad_labels") or {})
+    cid = str(body.campaign_id or "").strip()
+    cname = str(body.campaign_name or "").strip()
+    if not cid and cname:
+        cid = name_to_id.get(cname.lower(), "")
+    if cid and not cname:
+        cname = camp_map.get(cid, "")
+
+    when = (body.called_at or "").strip() or _now_iso()
+    try:
+        # Normalize 'YYYY-MM-DDTHH:MM' (datetime-local) → ISO with tz.
+        dt = datetime.fromisoformat(when.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        when = dt.isoformat()
+    except Exception:
+        when = _now_iso()
+
+    rec = {
+        "id": str(uuid.uuid4()),
+        "caller_number": num,
+        "caller_name": (body.name or "").strip(),
+        "caller_digits": digits,
+        "tracking_number": grp["display"],
+        "number_group": grp["key"],
+        "number_group_label": grp["label"],
+        "tracked_number_display": grp["display"],
+        "duration": max(0, int(body.duration or 0)),
+        "source": "google" if cname else "manual",
+        "call_type": "inbound",
+        "keyword": "",
+        "gclid": "",
+        "campaign_id": cid,
+        "campaign_name": cname,
+        "campaign": cname,
+        "campaign_manual": True,
+        "campaign_cleared": False,
+        "google_matched": bool(cname),
+        "google_campaign": cname,
+        "city": (body.city or "").strip(),
+        "state": (body.state or "").strip(),
+        "recording_url": "",
+        "called_at": when,
+        "created_at": when,
+        "is_test": False,
+        "manual_entry": True,
+    }
+    await db.calls.insert_one({**rec})
+    if qb.is_configured():
+        try:
+            await _enrich_from_quickbase(rec, db.calls)
+        except Exception:
+            pass
     fresh = await db.calls.find_one({"id": rec["id"]}, {"_id": 0})
     return {"success": True, "call": fresh or {k: v for k, v in rec.items() if k != "_id"}}
 
