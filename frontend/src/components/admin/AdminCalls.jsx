@@ -596,7 +596,7 @@ export const AdminCalls = () => {
         <Table className="table-fixed w-full">
             <TableHeader>
             <TableRow>
-              <TableHead className="w-[17%]"><SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              <TableHead className="w-[15%]"><SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
               {cols.number && <TableHead className="w-[11%]"><SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
               {cols.called && <TableHead className="w-[10%]"><SortLabel label="Called #" k="tracked_number_display" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
               {cols.duration && <TableHead className="w-[7%]"><SortLabel label="Duration" k="duration" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
@@ -604,8 +604,8 @@ export const AdminCalls = () => {
               {cols.hook && <TableHead className="hidden lg:table-cell w-[9%]"><SortLabel label="Hook seen" k="hook_label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
               {cols.revenue && <TableHead className="hidden sm:table-cell w-[9%]"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
               {cols.location && <TableHead className="hidden lg:table-cell w-[10%]"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.when && <TableHead className="w-[11%]"><SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              <TableHead className="text-right w-[9%]">Actions</TableHead>
+              {cols.when && <TableHead className="w-[13%]"><SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              <TableHead className="text-right w-[12%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -712,7 +712,7 @@ export const AdminCalls = () => {
                 )}
                 {cols.location && <TableCell className="hidden lg:table-cell text-slate-600">{[c.city, c.state].filter(Boolean).join(', ') || '—'}</TableCell>}
                 {cols.when && (
-                  <TableCell className="text-slate-600 whitespace-nowrap">
+                  <TableCell className="text-slate-600 align-top">
                     {fmtDate(c.called_at || c.created_at)}
                     {c.__count > 1 && c.__firstCallAt && (
                       <span className="block text-[10px] text-slate-400" data-testid={`call-first-${c.id}`}>First: {fmtDate(c.__firstCallAt)}</span>
