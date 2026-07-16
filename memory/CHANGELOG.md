@@ -108,3 +108,7 @@
 - NEW: Retained CALLS now inherit attribution (campaign, gclid, keyword, adgroup, network) from a matching LEAD with the same phone number (e.g., Chris Esfandiary: retained call was blank while his lead had "Lemon Law 2026"). Flagged with `campaign_from_lead`.
 - RESEARCH: Attributed 6/7 production unattributed retained clients via Google Ads call_view (area code + timestamp) cross-referenced with Quickbase Date Created. Note: API exposes area code only; user's Google Ads UI Call details report shows full numbers for verification. Chris's match corrected — he was a form lead (gclid on lead record), not the Google-logged call.
 - Verified in production (read-only): the other 7 unattributed retained calls have NO campaign data anywhere in the DB (no matching leads); attribution only possible via Google call-log research or manual entry.
+
+## 2026-07-16 — Analytics ad-group financials + all-time retained search
+- Analytics drill-down: clicking a campaign now shows per-ad-group Spend (live from Google Ads `ad_group` report), Revenue, ROAS, CPL, CPA, Retained. Added `fetch_spend_by_adgroup` to google_names_service.py; `/api/admin/analytics` enriches `by_adgroup` rows with `_fin` and appends spend-only ad groups so ad-group spend reconciles with campaign spend. Retained-per-adgroup counted from retained leads/calls `adgroup_id`.
+- Retained tab: search now automatically covers ALL TIME (lazy all-time fetch on first keystroke) regardless of selected date range.

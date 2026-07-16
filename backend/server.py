@@ -4569,9 +4569,10 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     # Spend comes from Google (per campaign); landing-page spend is estimated by
     # allocating each campaign's spend across the pages its clicks landed on.
     spend_by_campaign = await asyncio.to_thread(gnames.fetch_spend_by_campaign, start, end)
+    spend_by_adgroup = await asyncio.to_thread(gnames.fetch_spend_by_adgroup, start, end)
     lead_docs = await db.leads.find(
         {"created_at": {"$gte": s_iso, "$lte": e_iso}},
-        {"_id": 0, "campaign_id": 1, "source_page": 1, "sale_status": 1, "sale_value": 1, "retained": 1},
+        {"_id": 0, "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "source_page": 1, "sale_status": 1, "sale_value": 1, "retained": 1},
     ).to_list(length=20000)
 
     def _page_of_call(c):
@@ -4582,6 +4583,8 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         return GROUP_PRIMARY_PAGE.get(grp) or ""
 
     rev_camp, ret_camp, rev_page, ret_page = {}, {}, {}, {}
+    rev_ag, ret_ag = {}, {}  # keyed (campaign_id, adgroup_id)
+    rev_ad3, ret_ad3 = {}, {}  # keyed (campaign_id, adgroup_id, ad_id)
 
     def _acc(d, k, v=1.0):
         if k:
@@ -4592,11 +4595,17 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         if l.get("sale_status") == "sold":
             v = float(l.get("sale_value") or 0)
             _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
+            if cid:
+                _acc(rev_ag, (cid, l.get("adgroup_id") or ""), v)
+                _acc(rev_ad3, (cid, l.get("adgroup_id") or "", l.get("ad_id") or ""), v)
     for c in _enriched_calls:
         cid, pg = c.get("campaign_id") or "", _page_of_call(c)
         if c.get("sale_status") == "sold":
             v = float(c.get("sale_value") or 0)
             _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
+            if cid:
+                _acc(rev_ag, (cid, c.get("adgroup_id") or ""), v)
+                _acc(rev_ad3, (cid, c.get("adgroup_id") or "", c.get("ad_id") or ""), v)
 
     # Retained clients are counted by retained_at (exactly like the Retained tab) so
     # the "Retained" column reconciles with it. Attribute each to its campaign /
@@ -4604,7 +4613,7 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     # with no campaign roll into an "Unattributed / Direct" bucket.
     retained_q = {"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}
     ret_lead_docs = await db.leads.find(
-        retained_q, {"_id": 0, "campaign_id": 1, "source_page": 1}).to_list(length=20000)
+        retained_q, {"_id": 0, "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "source_page": 1}).to_list(length=20000)
     ret_call_docs = await _enrich_calls_with_hooks(await db.calls.find(
         retained_q,
         {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1,
@@ -4615,6 +4624,10 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         cid, pg = r.get("campaign_id") or "", _canon_page(r.get("source_page"))
         if cid:
             ret_camp[cid] = ret_camp.get(cid, 0) + 1
+            k = (cid, r.get("adgroup_id") or "")
+            ret_ag[k] = ret_ag.get(k, 0) + 1
+            k3 = (cid, r.get("adgroup_id") or "", r.get("ad_id") or "")
+            ret_ad3[k3] = ret_ad3.get(k3, 0) + 1
         else:
             ret_unattr += 1
         _acc(ret_page, pg)
@@ -4622,6 +4635,10 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         cid, pg = r.get("campaign_id") or "", _page_of_call(r)
         if cid:
             ret_camp[cid] = ret_camp.get(cid, 0) + 1
+            k = (cid, r.get("adgroup_id") or "")
+            ret_ag[k] = ret_ag.get(k, 0) + 1
+            k3 = (cid, r.get("adgroup_id") or "", r.get("ad_id") or "")
+            ret_ad3[k3] = ret_ad3.get(k3, 0) + 1
         else:
             ret_unattr += 1
         _acc(ret_page, pg)
@@ -4718,12 +4735,61 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             **_fin(0.0, 0.0, 0, ret_unattr),
         })
 
+    # ---- Per-ad-group financials (spend from Google, revenue/retained from DB) ----
+    by_adgroup = await breakdown(["campaign_id", "adgroup_id"])
+    for r in by_adgroup:
+        key = (r.get("campaign_id") or "", r.get("adgroup_id") or "")
+        contacts = r.get("leads", 0) + r.get("calls", 0)
+        r.update(_fin(spend_by_adgroup.get(key, 0.0), rev_ag.get(key, 0.0), contacts, ret_ag.get(key, 0)))
+    # Ad groups that had Google spend but no tracked clicks/leads/calls in range,
+    # so per-ad-group spend reconciles with the campaign's total spend.
+    shown_ag = {(r.get("campaign_id") or "", r.get("adgroup_id") or "") for r in by_adgroup}
+    for (cid, agid), sp in spend_by_adgroup.items():
+        if sp and (cid, agid) not in shown_ag and (not live_campaigns or cid in live_campaigns):
+            by_adgroup.append({
+                "campaign_id": cid, "adgroup_id": agid,
+                "clicks": 0, "leads": 0, "calls": 0, "bounced": 0,
+                "conversion_rate": 0.0, "bounce_rate": 0.0, "spend_only": True,
+                **_fin(sp, rev_ag.get((cid, agid), 0.0), 0, ret_ag.get((cid, agid), 0)),
+            })
+
+    # ---- Per-ad Google stats (impressions / clicks / spend / video views) so
+    # Display & Demand Gen campaigns show a real per-creative breakdown even
+    # though their clicks rarely carry first-party tracking. ----
+    ad_stats = await asyncio.to_thread(gnames.fetch_ad_stats, start, end)
+    by_ad = await breakdown(["campaign_id", "adgroup_id", "ad_id"])
+    for r in by_ad:
+        k3 = (r.get("campaign_id") or "", r.get("adgroup_id") or "", r.get("ad_id") or "")
+        st = ad_stats.get(k3, {})
+        r["impressions"] = st.get("impressions", 0)
+        r["google_clicks"] = st.get("google_clicks", 0)
+        r["video_views"] = st.get("video_views", 0)
+        contacts = r.get("leads", 0) + r.get("calls", 0)
+        r.update(_fin(st.get("spend", 0.0), rev_ad3.get(k3, 0.0), contacts, ret_ad3.get(k3, 0)))
+    shown_ads = {(r.get("campaign_id") or "", r.get("adgroup_id") or "", r.get("ad_id") or "") for r in by_ad}
+    for k3, st in ad_stats.items():
+        cid = k3[0]
+        if k3 in shown_ads or not (st.get("impressions") or st.get("spend")):
+            continue
+        if live_campaigns and cid not in live_campaigns:
+            continue
+        by_ad.append({
+            "campaign_id": cid, "adgroup_id": k3[1], "ad_id": k3[2],
+            "clicks": 0, "leads": 0, "calls": 0, "bounced": 0,
+            "conversion_rate": 0.0, "bounce_rate": 0.0, "spend_only": True,
+            "impressions": st.get("impressions", 0), "google_clicks": st.get("google_clicks", 0),
+            "video_views": st.get("video_views", 0),
+            **_fin(st.get("spend", 0.0), rev_ad3.get(k3, 0.0), 0, ret_ad3.get(k3, 0)),
+        })
+    by_ad.sort(key=lambda r: (r.get("leads", 0), r.get("clicks", 0), r.get("impressions", 0)), reverse=True)
+
     return {
         "by_campaign": by_campaign,
         "by_landing_page": by_landing_page,
         "direct_calls": direct_calls,
-        "by_adgroup": await breakdown(["campaign_id", "adgroup_id"]),
-        "by_ad": await breakdown(["campaign_id", "adgroup_id", "ad_id"]),
+        "by_adgroup": by_adgroup,
+        "by_ad": by_ad,
+        "by_video": await asyncio.to_thread(gnames.fetch_video_stats, start, end),
         "by_keyword": await breakdown(["campaign_id", "adgroup_id", "ad_id", "keyword"]),
         "by_sitelink": await breakdown(["sitelink_id"]),
         "calls_by_number": await _calls_by_number(s_iso, e_iso),

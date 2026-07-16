@@ -255,6 +255,122 @@ def fetch_spend_by_campaign(start: str, end: str) -> dict:
 
 
 
+def fetch_spend_by_adgroup(start: str, end: str) -> dict:
+    """Return {(campaign_id, adgroup_id): cost_float} aggregated over the date
+    range. Cached ~5 min. Returns {} if not configured / on error."""
+    if not is_configured():
+        return {}
+    ck = ("spend_adgroup", start, end)
+    hit = _report_cache.get(ck)
+    if hit and (time.time() - hit[0]) < _REPORT_TTL:
+        return hit[1]
+    c = _cfg()
+    try:
+        token = _access_token(c)
+        q = (f"SELECT campaign.id, ad_group.id, metrics.cost_micros FROM ad_group "
+             f"WHERE segments.date BETWEEN '{start}' AND '{end}'")
+        rows = _search(c, token, q)
+        out = {}
+        for r in rows:
+            cid = str(r.get("campaign", {}).get("id", "") or "")
+            agid = str(r.get("adGroup", {}).get("id", "") or "")
+            micros = int(r.get("metrics", {}).get("costMicros", 0) or 0)
+            if cid and agid:
+                out[(cid, agid)] = out.get((cid, agid), 0) + micros
+        result = {k: round(v / 1_000_000, 2) for k, v in out.items()}
+        _report_cache[ck] = (time.time(), result)
+        return result
+    except Exception as e:
+        logger.info("Google per-adgroup spend fetch failed: %s", e)
+        return {}
+
+
+def fetch_ad_stats(start: str, end: str) -> dict:
+    """Per-ad Google stats over the range:
+    {(campaign_id, adgroup_id, ad_id): {impressions, google_clicks, spend, video_views}}.
+    Cached ~5 min. Returns {} if not configured / on error."""
+    if not is_configured():
+        return {}
+    ck = ("ad_stats", start, end)
+    hit = _report_cache.get(ck)
+    if hit and (time.time() - hit[0]) < _REPORT_TTL:
+        return hit[1]
+    c = _cfg()
+    try:
+        token = _access_token(c)
+        q = (f"SELECT campaign.id, ad_group.id, ad_group_ad.ad.id, "
+             f"metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.video_views "
+             f"FROM ad_group_ad WHERE segments.date BETWEEN '{start}' AND '{end}'")
+        rows = _search(c, token, q)
+        out = {}
+        for r in rows:
+            cid = str(r.get("campaign", {}).get("id", "") or "")
+            agid = str(r.get("adGroup", {}).get("id", "") or "")
+            adid = str(r.get("adGroupAd", {}).get("ad", {}).get("id", "") or "")
+            if not (cid and adid):
+                continue
+            m = r.get("metrics", {})
+            agg = out.setdefault((cid, agid, adid),
+                                 {"impressions": 0, "google_clicks": 0, "spend": 0, "video_views": 0})
+            agg["impressions"] += int(m.get("impressions", 0) or 0)
+            agg["google_clicks"] += int(m.get("clicks", 0) or 0)
+            agg["spend"] += int(m.get("costMicros", 0) or 0)
+            agg["video_views"] += int(m.get("videoViews", 0) or 0)
+        for v in out.values():
+            v["spend"] = round(v["spend"] / 1_000_000, 2)
+        _report_cache[ck] = (time.time(), out)
+        return out
+    except Exception as e:
+        logger.info("Google per-ad stats fetch failed: %s", e)
+        return {}
+
+
+def fetch_video_stats(start: str, end: str) -> list:
+    """Per-VIDEO Google stats over the range (Demand Gen / Video campaigns):
+    [{campaign_id, video_id, title, impressions, views, view_rate, spend}].
+    Cached ~5 min. Returns [] if not configured / on error."""
+    if not is_configured():
+        return []
+    ck = ("video_stats", start, end)
+    hit = _report_cache.get(ck)
+    if hit and (time.time() - hit[0]) < _REPORT_TTL:
+        return hit[1]
+    c = _cfg()
+    try:
+        token = _access_token(c)
+        q = (f"SELECT campaign.id, video.id, video.title, video.duration_millis, "
+             f"metrics.impressions, metrics.video_views, metrics.cost_micros, metrics.clicks "
+             f"FROM video WHERE segments.date BETWEEN '{start}' AND '{end}'")
+        rows = _search(c, token, q)
+        agg = {}
+        for r in rows:
+            cid = str(r.get("campaign", {}).get("id", "") or "")
+            vid = r.get("video", {}) or {}
+            vkey = (cid, str(vid.get("id", "") or ""))
+            m = r.get("metrics", {})
+            a = agg.setdefault(vkey, {
+                "campaign_id": cid, "video_id": vkey[1],
+                "title": vid.get("title") or vkey[1],
+                "duration_sec": round(int(vid.get("durationMillis", 0) or 0) / 1000),
+                "impressions": 0, "views": 0, "clicks": 0, "spend": 0,
+            })
+            a["impressions"] += int(m.get("impressions", 0) or 0)
+            a["views"] += int(m.get("videoViews", 0) or 0)
+            a["clicks"] += int(m.get("clicks", 0) or 0)
+            a["spend"] += int(m.get("costMicros", 0) or 0)
+        result = []
+        for a in agg.values():
+            a["spend"] = round(a["spend"] / 1_000_000, 2)
+            a["view_rate"] = round(a["views"] / a["impressions"] * 100, 1) if a["impressions"] else 0.0
+            result.append(a)
+        result.sort(key=lambda x: (x["impressions"], x["views"]), reverse=True)
+        _report_cache[ck] = (time.time(), result)
+        return result
+    except Exception as e:
+        logger.info("Google per-video stats fetch failed: %s", e)
+        return []
+
+
 def fetch_names() -> dict:
     """Return {"campaign": {id: name}, "adgroup": {id: name}, "ad": {id: name},
     "sitelink": {id: link_text}, "campaign_type": {id: channel_type},

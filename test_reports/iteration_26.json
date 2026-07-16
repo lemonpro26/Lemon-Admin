@@ -1,0 +1,24 @@
+{
+  "summary": "Verified new Analytics drill-downs (Search->AdGroup, Display->Ad, Demand Gen video stats) and Retained all-time search. Backend /api/admin/analytics returns real Google Ads values for by_adgroup (24 rows w/ spend>0, e.g. 12564.41), by_ad (73 rows w/ impressions & google_clicks, e.g. camp 24020884697 ad 816722663677 impr=28731 clicks=1833 spend=1607.28), and by_video (18 rows across campaigns 23988829664 & 23953153395 with title/impressions/views/view_rate/spend). Frontend UI: Search campaign drills to Ad Groups (Spend/CPL/Retained cols present); Display campaign 'Los Angeles Display' drills DIRECTLY to Ads/Creatives level (breadcrumb 'All Ads / Creatives') listing 6 display ads with Impr./Ad Clicks/Spend populated ($9/$3/$45/$47 etc.). Retained tab search for 'Morgan' finds July retained lead 'Morgan Davis' even though tab defaults to Today range — all-time search works. Leads/Calls tabs load cleanly. All acceptance criteria met.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_26.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py still >4900 lines — should be split into routers (analytics/creatives/leads/calls/retained).",
+    "AdminAnalytics.jsx is large; VideoStatsTable/SitelinkTable/DrillTable could be extracted into separate files for readability.",
+    "Demand Gen campaigns (23988829664, 23953153395) have no campaign name in ad_labels.campaign so they appear as ID-only rows in the campaign table — UX could label them 'Demand Gen (id)' when name is missing. Not a blocker."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (all analytics/retained fields verified via curl)", "frontend": "100% (all drill flows and retained search work)"},
+  "test_credentials": "owner / LemonPros2026! at /admin",
+  "seed_data_creation": "No seed data created — existing 'Morgan Davis' retained record (retained_at 2026-07-02) already covered the all-time search case.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Include-paused checkbox defaults to CHECKED (showPausedSpend=true), so spend-only DISPLAY/PMax campaigns appear in the campaign table without any toggle. AD_FIRST_TYPES = ['DISPLAY','DEMAND_GEN','VIDEO','PERFORMANCE_MAX','DISCOVERY'] — clicking these bypasses ad-group level and jumps to analytics-level-ad with drill.adgroup=ALL_ADGROUPS ('__all__'). VideoStatsTable renders only when drill.campaign is set AND by_video has rows for that campaign_id — Demand Gen campaign ids in preview are 23988829664 & 23953153395 (visible in campaign table only as IDs since ad_labels lacks names). Retained tab lazily fetches allTime dataset when the search box has text — verified 'Morgan Davis' returns as expected. Date range widget is a custom picker (data-testid=date-range-trigger), not <input type=date>.",
+  "rca of the issue": "N/A — no failures found."
+}

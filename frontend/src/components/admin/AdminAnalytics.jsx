@@ -43,6 +43,10 @@ const money = (v) => (v == null ? <span className="text-slate-400">—</span>
   : <span className="font-medium text-slate-900">${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>);
 const roasCell = (r) => (r.roas == null ? <span className="text-slate-400">—</span>
   : <span className={`font-semibold ${r.roas >= 1 ? 'text-emerald-600' : 'text-rose-600'}`}>{r.roas}x</span>);
+// Sentinel: "all ad groups" — used when a Display / Demand Gen / Video / PMax
+// campaign drills straight to its ads/creatives.
+const ALL_ADGROUPS = '__all__';
+const AD_FIRST_TYPES = ['DISPLAY', 'DEMAND_GEN', 'VIDEO', 'PERFORMANCE_MAX', 'DISCOVERY'];
 const FIN_COLS = [
   { key: 'spend', label: 'Spend', num: true, render: (r) => money(r.spend) },
   { key: 'revenue', label: 'Revenue', num: true, render: (r) => money(r.revenue) },
@@ -520,7 +524,14 @@ export const AdminAnalytics = () => {
       { key: 'type', label: 'Type', render: typeCell },
       ...metricCols,
     ];
-    onRowClick = (r) => { if (r.kind) return; setDrill({ campaign: r.campaign_id, adgroup: null, ad: null }); };
+    onRowClick = (r) => {
+      if (r.kind) return;
+      // Display / Demand Gen / Video / PMax → jump straight to the per-ad
+      // (creative/video) breakdown; Search keeps Campaign → Ad Group → Ad.
+      const t = campaignTypes[String(r.campaign_id)];
+      const adFirst = AD_FIRST_TYPES.includes(t);
+      setDrill({ campaign: r.campaign_id, adgroup: adFirst ? ALL_ADGROUPS : null, ad: null });
+    };
     levelTestid = 'analytics-level-campaign';
   } else if (level === 'adgroup') {
     rows = (data.by_adgroup || []).filter((r) => r.campaign_id === drill.campaign);
@@ -531,16 +542,23 @@ export const AdminAnalytics = () => {
     onRowClick = (r) => setDrill({ campaign: drill.campaign, adgroup: r.adgroup_id, ad: null });
     levelTestid = 'analytics-level-adgroup';
   } else if (level === 'ad') {
-    rows = (data.by_ad || []).filter((r) => r.campaign_id === drill.campaign && r.adgroup_id === drill.adgroup);
+    rows = (data.by_ad || []).filter((r) => r.campaign_id === drill.campaign
+      && (drill.adgroup === ALL_ADGROUPS || r.adgroup_id === drill.adgroup));
+    const hasVideoViews = rows.some((r) => (r.video_views || 0) > 0);
     columns = [
       { key: 'ad_id', label: 'Ad / Creative', render: nameCell('ad', 'ad_id') },
+      { key: 'impressions', label: 'Impr.', num: true, render: (r) => (r.impressions || 0).toLocaleString() },
+      { key: 'google_clicks', label: 'Ad Clicks', num: true, render: (r) => (r.google_clicks || 0).toLocaleString() },
+      ...(hasVideoViews ? [{ key: 'video_views', label: 'Video Views', num: true, render: (r) => (r.video_views || 0).toLocaleString() }] : []),
       ...metricCols,
     ];
     onRowClick = (r) => setDrill({ campaign: drill.campaign, adgroup: drill.adgroup, ad: r.ad_id });
     levelTestid = 'analytics-level-ad';
   } else {
     rows = (data.by_keyword || []).filter((r) =>
-      r.campaign_id === drill.campaign && r.adgroup_id === drill.adgroup && r.ad_id === drill.ad);
+      r.campaign_id === drill.campaign
+      && (drill.adgroup === ALL_ADGROUPS || r.adgroup_id === drill.adgroup)
+      && r.ad_id === drill.ad);
     columns = [
       { key: 'keyword', label: 'Keyword' },
       ...metricCols,
@@ -593,7 +611,7 @@ export const AdminAnalytics = () => {
             <>
               <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
               <Crumb onClick={() => setDrill({ campaign: drill.campaign, adgroup: drill.adgroup, ad: null })} active={level === 'ad'} testid="crumb-adgroup">
-                {crumbName('adgroup', drill.adgroup)}
+                {drill.adgroup === ALL_ADGROUPS ? 'All Ads / Creatives' : crumbName('adgroup', drill.adgroup)}
               </Crumb>
             </>
           )}
@@ -632,6 +650,11 @@ export const AdminAnalytics = () => {
 
       <DrillTable title={levelTitle} columns={columns} rows={rows} onRowClick={onRowClick} testid={levelTestid} showTotals />
 
+      {/* Per-video performance (Demand Gen / Video campaigns) — live from Google Ads. */}
+      {drill.campaign != null && (data.by_video || []).some((v) => v.campaign_id === drill.campaign) && (
+        <VideoStatsTable rows={(data.by_video || []).filter((v) => v.campaign_id === drill.campaign)} />
+      )}
+
       {/* Sitelinks — pulled LIVE from Google Ads (independent of first-party capture). */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid="analytics-by-sitelink">
         <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2">
@@ -653,6 +676,57 @@ export const AdminAnalytics = () => {
     </div>
   );
 };
+
+function VideoStatsTable({ rows }) {
+  const fmtDur = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '—');
+  const withCpv = rows.map((r) => ({
+    ...r,
+    cpv: r.views ? Math.round((r.spend / r.views) * 100) / 100 : null,
+  }));
+  const { sorted, sortKey, sortDir, toggle } = useSortable(withCpv, 'impressions', 'desc');
+  const cols = [
+    { key: 'title', label: 'Video' },
+    { key: 'duration_sec', label: 'Length', num: true, render: (r) => fmtDur(r.duration_sec) },
+    { key: 'impressions', label: 'Impressions', num: true },
+    { key: 'views', label: 'Views', num: true },
+    { key: 'view_rate', label: 'View Rate', num: true, render: (r) => `${r.view_rate}%` },
+    { key: 'clicks', label: 'Clicks', num: true },
+    { key: 'spend', label: 'Spend', num: true, render: (r) => money(r.spend) },
+    { key: 'cpv', label: 'CPV', num: true, render: (r) => money(r.cpv) },
+  ];
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid="analytics-by-video">
+      <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2">
+        By Video
+        <span className="text-[11px] font-sans font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">Live from Google Ads</span>
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {cols.map((c) => (
+                <TableHead key={c.key} className={c.num ? 'text-right' : ''}>
+                  <SortLabel label={c.label} k={c.key} sortKey={sortKey} sortDir={sortDir} onClick={toggle} align={c.num ? 'right' : 'left'} />
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((r, i) => (
+              <TableRow key={r.video_id || i} data-testid={`video-row-${i}`}>
+                {cols.map((c) => (
+                  <TableCell key={c.key} className={c.num ? 'text-right tabular-nums text-slate-700' : 'font-medium text-slate-900'}>
+                    {c.render ? c.render(r) : (c.num ? (r[c.key] ?? 0).toLocaleString() : r[c.key])}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
 
 function SitelinkTable({ rows }) {
   const withCtr = rows.map((r) => ({
