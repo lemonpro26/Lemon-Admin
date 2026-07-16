@@ -533,20 +533,19 @@ export const AdminCalls = () => {
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
+        <Table className="table-fixed w-full">
             <TableHeader>
             <TableRow>
-              <TableHead><SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              {cols.number && <TableHead><SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.called && <TableHead><SortLabel label="Called #" k="tracked_number_display" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.duration && <TableHead><SortLabel label="Duration" k="duration" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.campaign && <TableHead className="hidden md:table-cell"><SortLabel label="Campaign" k="campaign" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.hook && <TableHead className="hidden lg:table-cell"><SortLabel label="Hook seen" k="hook_label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.revenue && <TableHead className="hidden sm:table-cell"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.location && <TableHead className="hidden lg:table-cell"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.when && <TableHead><SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[17%]"><SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
+              {cols.number && <TableHead className="w-[11%]"><SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.called && <TableHead className="w-[10%]"><SortLabel label="Called #" k="tracked_number_display" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.duration && <TableHead className="w-[7%]"><SortLabel label="Duration" k="duration" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.campaign && <TableHead className="hidden md:table-cell w-[14%]"><SortLabel label="Campaign" k="campaign" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.hook && <TableHead className="hidden lg:table-cell w-[9%]"><SortLabel label="Hook seen" k="hook_label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.revenue && <TableHead className="hidden sm:table-cell w-[9%]"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.location && <TableHead className="hidden lg:table-cell w-[10%]"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              {cols.when && <TableHead className="w-[11%]"><SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
+              <TableHead className="text-right w-[9%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -586,7 +585,7 @@ export const AdminCalls = () => {
                   </div>
                 </TableCell>
                 {cols.number && (
-                  <TableCell className="text-slate-700 whitespace-nowrap">
+                  <TableCell className="text-slate-700">
                     <span className="inline-flex items-center gap-1.5">
                       {formatPhone(c.caller_number) || '—'}
                       {c.caller_number && <CopyButton value={formatPhone(c.caller_number)} label="Copied" testid={`call-copy-number-${c.id}`} />}
@@ -594,7 +593,7 @@ export const AdminCalls = () => {
                   </TableCell>
                 )}
                 {cols.called && (
-                  <TableCell className="text-slate-700 whitespace-nowrap" data-testid={`call-called-number-${c.id}`}>
+                  <TableCell className="text-slate-700" data-testid={`call-called-number-${c.id}`}>
                     <div className="flex flex-col leading-tight">
                       <span className="font-medium">{c.tracked_number_display || '—'}</span>
                       {c.number_group && c.number_group !== 'other' && (
@@ -681,7 +680,6 @@ export const AdminCalls = () => {
             ))}
           </TableBody>
           </Table>
-        </div>
       </div>
 
       {/* CALL DETAIL DIALOG */}
