@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award, FileText, Sparkles, Target } from 'lucide-react';
+import { Phone, RefreshCw, Trash2, PlayCircle, DollarSign, Send, RotateCw, Plus, FlaskConical, Search, X, SlidersHorizontal, Award, FileText, Sparkles, Target, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { formatPhone } from '@/lib/format';
@@ -114,6 +114,22 @@ const fmtDate = (iso) => {
   try { return new Date(iso).toLocaleString(); } catch { return iso; }
 };
 
+const toLocalInput = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+
+const CALL_GROUPS = [
+  { key: 'home_pa', label: 'Home & PA' },
+  { key: 'spanish', label: 'Spanish & SPA' },
+  { key: 'dg', label: 'Demand Gen' },
+  { key: 'dgs', label: 'Demand Gen Spanish' },
+  { key: 'other', label: 'Other / Unknown' },
+];
+
 const convBadge = (c) => {
   if (c?.sale_status !== 'sold') return null;
   const st = c.conversion_status;
@@ -130,6 +146,9 @@ export const AdminCalls = () => {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState(todayRange());
   const [selected, setSelected] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [draft, setDraft] = useState({});
   const [saleAmount, setSaleAmount] = useState('');
   const [saleCurrency, setSaleCurrency] = useState('USD');
   const [marking, setMarking] = useState(false);
@@ -247,9 +266,50 @@ export const AdminCalls = () => {
 
   const openCall = (c) => {
     setSelected(c);
+    setEditing(false);
     setSaleAmount(c.sale_value != null ? String(c.sale_value) : '');
     setSaleCurrency(c.sale_currency || 'USD');
   };
+
+  const startEditCall = () => {
+    const c = selected;
+    setDraft({
+      caller_name: c.caller_name || c.qb_name || '',
+      caller_number: formatPhone(c.caller_number) || c.caller_number || '',
+      tracked_number_display: c.tracked_number_display || c.tracking_number || '',
+      number_group: c.number_group || 'other',
+      duration: c.duration || 0,
+      city: c.city || '', state: c.state || '',
+      keyword: c.keyword || '', gclid: c.gclid || '',
+      adgroup_name: c.adgroup_name || '', ad_name: c.ad_name || '',
+      when: toLocalInput(c.called_at || c.created_at),
+    });
+    setEditing(true);
+  };
+
+  const saveEditCall = async () => {
+    setSavingEdit(true);
+    try {
+      const payload = {
+        caller_name: draft.caller_name, qb_name: draft.caller_name,
+        caller_number: draft.caller_number,
+        tracked_number_display: draft.tracked_number_display,
+        number_group: draft.number_group,
+        duration: parseInt(draft.duration || 0, 10),
+        city: draft.city, state: draft.state,
+        keyword: draft.keyword, gclid: draft.gclid,
+        adgroup_name: draft.adgroup_name, ad_name: draft.ad_name,
+      };
+      if (draft.when) payload.called_at = new Date(draft.when).toISOString();
+      const res = await api.patch(`/admin/calls/${selected.id}`, payload);
+      setSelected(res.data.call);
+      setEditing(false);
+      toast.success('Call updated.');
+      load();
+    } catch { toast.error('Could not save changes.'); } finally { setSavingEdit(false); }
+  };
+
+  const setD = (patch) => setDraft((p) => ({ ...p, ...patch }));
 
   const markSold = async () => {
     const value = parseFloat(saleAmount);
@@ -342,7 +402,7 @@ export const AdminCalls = () => {
         phone: addForm.phone.trim(),
         name: addForm.name.trim(),
         duration,
-        called_at: addForm.when || null,
+        called_at: addForm.when ? new Date(addForm.when).toISOString() : null,
         campaign_id: addForm.campaign_id || '',
         campaign_name: camp ? camp.name : '',
         number_group: addForm.number_group || 'home_pa',
@@ -807,10 +867,48 @@ export const AdminCalls = () => {
                   <Phone className="h-3 w-3" /> {selected.__count} calls
                 </Badge>
               )}
+              {editable && !editing && (
+                <Button variant="outline" size="sm" onClick={startEditCall} className="ml-auto rounded-lg border-slate-200 h-8" data-testid="call-detail-edit">
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
           {selected && (
             <div className="grid gap-4">
+              {editing ? (
+                <div className="grid gap-1 rounded-xl border border-slate-200 p-3 bg-slate-50/50 text-sm" data-testid="call-detail-edit-form">
+                  {[
+                    ['Caller', 'caller_name', 'text'],
+                    ['Number', 'caller_number', 'text'],
+                    ['Called #', 'tracked_number_display', 'text'],
+                    ['Landing group', 'number_group', 'group'],
+                    ['Duration (sec)', 'duration', 'number'],
+                    ['Ad Group', 'adgroup_name', 'text'],
+                    ['Ad', 'ad_name', 'text'],
+                    ['Keyword', 'keyword', 'text'],
+                    ['GCLID', 'gclid', 'text'],
+                    ['City', 'city', 'text'],
+                    ['State', 'state', 'text'],
+                    ['When', 'when', 'datetime'],
+                  ].map(([label, k, type]) => (
+                    <div key={k} className="flex items-center justify-between gap-4 py-1">
+                      <span className="text-slate-500 shrink-0">{label}</span>
+                      {type === 'group' ? (
+                        <select value={draft.number_group} onChange={(e) => setD({ number_group: e.target.value })} className="flex-1 max-w-[230px] h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm" data-testid={`call-edit-${k}`}>
+                          {CALL_GROUPS.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
+                        </select>
+                      ) : (
+                        <Input type={type === 'datetime' ? 'datetime-local' : type} value={draft[k]} onChange={(e) => setD({ [k]: e.target.value })} className="flex-1 max-w-[230px] h-9 rounded-lg border-slate-200" data-testid={`call-edit-${k}`} />
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-2">
+                    <Button onClick={saveEditCall} disabled={savingEdit} className="flex-1 rounded-lg bg-[#0F1B3D]" data-testid="call-edit-save">{savingEdit ? 'Saving…' : 'Save changes'}</Button>
+                    <Button variant="outline" onClick={() => setEditing(false)} disabled={savingEdit} className="rounded-lg" data-testid="call-edit-cancel"><X className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ) : (
               <div className="grid gap-2 text-sm">
                 {[
                   ['Caller', selected.qb_name || selected.caller_name, 'call-detail-name'],
@@ -837,6 +935,7 @@ export const AdminCalls = () => {
                 ))}
                 <CampaignEditor kind="calls" item={selected} onChanged={() => { setSelected({ ...selected }); load(); }} />
               </div>
+              )}
 
               {/* Call history — every time this number called (repeat callers) */}
               {selected.__group && selected.__group.length > 1 && (

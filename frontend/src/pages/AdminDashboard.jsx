@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Users, Megaphone, BarChart3, Phone, Settings as SettingsIcon,
   DollarSign, Send, RotateCw, Crown, Shield, Eye, FlaskConical, Trash2, Languages, LayoutGrid, Filter,
-  FileText, Percent, Sigma, Search, X, AlertTriangle, Award, SlidersHorizontal, Share2, Palette,
+  FileText, Percent, Sigma, Search, X, AlertTriangle, Award, SlidersHorizontal, Share2, Palette, Pencil,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -113,6 +113,9 @@ export default function AdminDashboard() {
   const [total, setTotal] = useState(0);
   const [range, setRange] = useState(todayRange());
   const [selected, setSelected] = useState(null);
+  const [editingLead, setEditingLead] = useState(false);
+  const [savingLeadEdit, setSavingLeadEdit] = useState(false);
+  const [leadDraft, setLeadDraft] = useState({});
   const [loading, setLoading] = useState(true);
   const [gaStatus, setGaStatus] = useState(null);
   const [gaHealth, setGaHealth] = useState(null);
@@ -323,8 +326,54 @@ export default function AdminDashboard() {
 
   const openLead = (lead) => {
     setSelected(lead);
+    setEditingLead(false);
     setSaleAmount(lead.sale_value != null ? String(lead.sale_value) : '');
     setSaleCurrency(lead.sale_currency || 'USD');
+  };
+
+  const toLocalInput = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  };
+
+  const startEditLead = () => {
+    const s = selected;
+    setLeadDraft({
+      full_name: s.full_name || s.qb_name || [s.first_name, s.last_name].filter(Boolean).join(' ') || s.name || '',
+      phone: formatPhone(s.phone) || s.phone || '',
+      email: s.email || '',
+      car_year: s.car_year || '', car_make: s.car_make || '', car_model: s.car_model || '',
+      source_page: s.source_page || '',
+      adgroup_name: s.adgroup_name || '', ad_name: s.ad_name || '',
+      keyword: s.keyword || '', ad_size: s.ad_size || '',
+      gclid: s.gclid || '', ip: s.ip || '',
+      when: toLocalInput(s.created_at),
+    });
+    setEditingLead(true);
+  };
+
+  const setLD = (patch) => setLeadDraft((p) => ({ ...p, ...patch }));
+
+  const saveEditLead = async () => {
+    setSavingLeadEdit(true);
+    try {
+      const payload = {
+        full_name: leadDraft.full_name, qb_name: leadDraft.full_name,
+        phone: leadDraft.phone, email: leadDraft.email,
+        car_year: leadDraft.car_year, car_make: leadDraft.car_make, car_model: leadDraft.car_model,
+        source_page: leadDraft.source_page, adgroup_name: leadDraft.adgroup_name, ad_name: leadDraft.ad_name,
+        keyword: leadDraft.keyword, ad_size: leadDraft.ad_size, gclid: leadDraft.gclid, ip: leadDraft.ip,
+      };
+      if (leadDraft.when) payload.created_at = new Date(leadDraft.when).toISOString();
+      const res = await api.patch(`/admin/leads/${selected.id}`, payload);
+      setSelected(res.data.lead);
+      setEditingLead(false);
+      toast.success('Lead updated.');
+      loadLeads();
+    } catch { toast.error('Could not save changes.'); } finally { setSavingLeadEdit(false); }
   };
 
   const reportConversion = (conv) => {
@@ -825,10 +874,46 @@ export default function AdminDashboard() {
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-md" data-testid="admin-lead-detail">
           <DialogHeader>
-            <DialogTitle className="font-slab">{selected?.qb_name || selected?.full_name}</DialogTitle>
+            <DialogTitle className="font-slab flex items-center gap-2">
+              {selected?.qb_name || selected?.full_name}
+              {editable && !editingLead && (
+                <Button variant="outline" size="sm" onClick={startEditLead} className="ml-auto rounded-lg border-slate-200 h-8" data-testid="lead-detail-edit">
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+                </Button>
+              )}
+            </DialogTitle>
           </DialogHeader>
           {selected && (
             <div className="grid gap-4">
+              {editingLead ? (
+                <div className="grid gap-1 rounded-xl border border-slate-200 p-3 bg-slate-50/50 text-sm max-h-[55vh] overflow-y-auto" data-testid="lead-detail-edit-form">
+                  {[
+                    ['Name', 'full_name'],
+                    ['Phone', 'phone'],
+                    ['Email', 'email'],
+                    ['Vehicle Year', 'car_year'],
+                    ['Vehicle Make', 'car_make'],
+                    ['Vehicle Model', 'car_model'],
+                    ['Source', 'source_page'],
+                    ['Ad Group', 'adgroup_name'],
+                    ['Ad', 'ad_name'],
+                    ['Keyword', 'keyword'],
+                    ['Size', 'ad_size'],
+                    ['GCLID', 'gclid'],
+                    ['IP Address', 'ip'],
+                    ['Submitted', 'when', 'datetime'],
+                  ].map(([label, k, type]) => (
+                    <div key={k} className="flex items-center justify-between gap-4 py-1">
+                      <span className="text-slate-500 shrink-0">{label}</span>
+                      <Input type={type === 'datetime' ? 'datetime-local' : 'text'} value={leadDraft[k]} onChange={(e) => setLD({ [k]: e.target.value })} className="flex-1 max-w-[230px] h-9 rounded-lg border-slate-200" data-testid={`lead-edit-${k}`} />
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-2">
+                    <Button onClick={saveEditLead} disabled={savingLeadEdit} className="flex-1 rounded-lg bg-[#0F1B3D]" data-testid="lead-edit-save">{savingLeadEdit ? 'Saving…' : 'Save changes'}</Button>
+                    <Button variant="outline" onClick={() => setEditingLead(false)} disabled={savingLeadEdit} className="rounded-lg" data-testid="lead-edit-cancel"><X className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ) : (
               <div className="grid gap-2 text-sm">
                 {[
                   ['Vehicle Year', selected.car_year, 'lead-detail-car-year'],
@@ -855,6 +940,7 @@ export default function AdminDashboard() {
                 ))}
                 <CampaignEditor kind="leads" item={selected} onChanged={() => { setSelected({ ...selected }); loadLeads(); }} />
               </div>
+              )}
 
               {/* Revenue + Google Ads conversion */}
               <div className="rounded-xl border border-slate-200 p-4 bg-slate-50" data-testid="lead-revenue-section">

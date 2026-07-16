@@ -3279,6 +3279,98 @@ async def delete_call(call_id: str, _: dict = Depends(require_editor)):
     return {"success": True}
 
 
+def _norm_iso(val):
+    """Normalize a datetime string to ISO-with-tz; return None if unparseable/empty."""
+    s = str(val or "").strip()
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    except Exception:
+        return None
+
+
+CALL_EDITABLE = {
+    "caller_name", "qb_name", "caller_number", "tracked_number_display", "number_group",
+    "duration", "city", "state", "keyword", "gclid", "adgroup_name", "ad_name", "called_at",
+}
+LEAD_EDITABLE = {
+    "full_name", "qb_name", "phone", "email", "car_year", "car_make", "car_model",
+    "source_page", "adgroup_name", "ad_name", "keyword", "ad_size", "gclid", "ip",
+    "city", "state", "created_at",
+}
+
+
+@api_router.patch("/admin/calls/{call_id}")
+async def update_call(call_id: str, body: dict, _: dict = Depends(require_editor)):
+    if not await db.calls.find_one({"id": call_id}):
+        raise HTTPException(status_code=404, detail="Call not found")
+    updates = {}
+    for k, v in (body or {}).items():
+        if k in CALL_EDITABLE:
+            updates[k] = v
+    if "caller_number" in updates:
+        digits = _re.sub(r"\D", "", str(updates["caller_number"] or ""))
+        if len(digits) == 11 and digits.startswith("1"):
+            digits = digits[1:]
+        if len(digits) == 10:
+            updates["caller_number"] = f"({digits[0:3]}) {digits[3:6]}-{digits[6:]}"
+            updates["caller_digits"] = digits
+    if "number_group" in updates:
+        grp = next((g for g in CALL_NUMBER_GROUPS if g["key"] == updates["number_group"]), None)
+        if grp:
+            updates["number_group_label"] = grp["label"]
+            if not updates.get("tracked_number_display"):
+                updates["tracked_number_display"] = grp["display"]
+            updates["tracking_number"] = grp["display"]
+        else:
+            updates["number_group_label"] = "Other"
+    if "duration" in updates:
+        try:
+            updates["duration"] = max(0, int(updates["duration"]))
+        except Exception:
+            updates.pop("duration", None)
+    if "called_at" in updates:
+        iso = _norm_iso(updates["called_at"])
+        if iso:
+            updates["called_at"] = iso
+            updates["created_at"] = iso
+        else:
+            updates.pop("called_at", None)
+    if updates:
+        await db.calls.update_one({"id": call_id}, {"$set": updates})
+    fresh = await db.calls.find_one({"id": call_id}, {"_id": 0})
+    return {"success": True, "call": fresh}
+
+
+@api_router.patch("/admin/leads/{lead_id}")
+async def update_lead(lead_id: str, body: dict, _: dict = Depends(require_editor)):
+    if not await db.leads.find_one({"id": lead_id}):
+        raise HTTPException(status_code=404, detail="Lead not found")
+    updates = {}
+    for k, v in (body or {}).items():
+        if k in LEAD_EDITABLE:
+            updates[k] = v
+    if "full_name" in updates:
+        updates["name"] = updates["full_name"]
+        parts = str(updates["full_name"] or "").split()
+        updates["first_name"] = parts[0] if parts else ""
+        updates["last_name"] = " ".join(parts[1:]) if len(parts) > 1 else ""
+    if "created_at" in updates:
+        iso = _norm_iso(updates["created_at"])
+        if iso:
+            updates["created_at"] = iso
+        else:
+            updates.pop("created_at", None)
+    if updates:
+        await db.leads.update_one({"id": lead_id}, {"$set": updates})
+    fresh = await db.leads.find_one({"id": lead_id}, {"_id": 0})
+    return {"success": True, "lead": fresh}
+
+
 class TestCallBody(BaseModel):
     phone: Optional[str] = None
     name: Optional[str] = None

@@ -1,5 +1,14 @@
 # Lemon Pros — Changelog
 
+## 2026-07-16 — Editable call/lead details + date fixes
+- **Fixed manual "Add call" date bug:** the form now sends the entered date/time as an absolute ISO (`new Date(when).toISOString()`), so the chosen time is stored instead of the current time. Backend `_norm_iso` preserves timezone.
+- **Full edit mode for every call & lead:** added an "Edit" button in all detail dialogs (Calls tab inline, Leads tab inline, and the shared cross-search dialogs). Editable fields — calls: caller, number, called #, landing group, duration, ad group, ad, keyword, gclid, city, state, when; leads: name, phone, email, year/make/model, source, ad group, ad, keyword/size, gclid, ip, when.
+- **New backend endpoints:** `PATCH /api/admin/calls/{id}` and `PATCH /api/admin/leads/{id}` (whitelisted fields, recomputes phone digits + number-group label, normalizes dates). Tested via curl — both persist edits and preserve the exact date/time.
+- **Calls table:** switched to `table-fixed` so it always fits the viewport (no horizontal scrollbar); columns wrap instead of overflowing.
+- **"Add call" tool:** manual attributed-call entry in the Calls tab (name, phone, campaign, tracked line, date/time, duration, city/state); does not trigger Google Ads conversion upload.
+
+
+
 ## 2026-07-15 (fork continuation) — Lemon Pros Creator Portal (LIVE)
 - **Creator Portal (`/creator-portal`):** Creators self-register (name/email/password), log in, and see a grid of their uploads with Pending/Approved/Rejected status. Upload dialog toggles Video vs Display; Display requires an IAB size (300x250, 728x90, 160x600, 300x600, 320x50, 970x250, 336x280) from a dropdown; both take Title + Notes. Real file upload with progress bar.
 - **Admin "Creatives" tab:** New dashboard tab with Videos / Display Ads sub-tabs (Display has size-filter chips). Admin can Approve / Reject each submission; creator statuses update accordingly.
