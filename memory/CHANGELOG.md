@@ -119,3 +119,6 @@
 - Search campaigns keep Campaign → Ad Group → Ad → Keyword drill; ad level now also shows Google impressions/clicks and per-ad spend, revenue/retained per ad from DB (ad_id on leads/calls).
 - Tested via testing_agent iteration_26.json — 100% pass, no issues.
 - Known nit: paused Demand Gen campaigns show ID-only (names not synced for paused campaigns in ad_labels).
+
+## 2026-07-16 — Top scrollbar on Analytics tables
+- Added DualScroll wrapper to DrillTable (AdminAnalytics.jsx): a synced horizontal scrollbar ABOVE every analytics table (Campaigns / Ad Groups / Ads-Creatives / Keywords / Landing pages) mirroring the shadcn Table's inner overflow-auto wrapper. Verified two-way sync via local Playwright.

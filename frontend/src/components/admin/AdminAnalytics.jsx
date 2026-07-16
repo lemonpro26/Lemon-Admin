@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { BarChart3, RefreshCw, Pencil, ChevronRight, ChevronDown, Home, Phone, Clock, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
@@ -117,6 +117,51 @@ function computeTotals(rows) {
   };
 }
 
+// Horizontal scroller with a second scrollbar ON TOP (kept in sync with the
+// bottom one) so wide tables can be scrolled without scrolling to the bottom.
+// The shadcn <Table> wraps the <table> in its own overflow-auto div — that
+// inner wrapper is the real scroller we mirror.
+function DualScroll({ children, testid }) {
+  const topRef = useRef(null);
+  const wrapRef = useRef(null);
+  const [scrollW, setScrollW] = useState(0);
+  useEffect(() => {
+    const scroller = wrapRef.current && wrapRef.current.firstElementChild;
+    if (!scroller) return;
+    const update = () => setScrollW(scroller.scrollWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(scroller);
+    if (scroller.firstElementChild) ro.observe(scroller.firstElementChild);
+    const onBody = () => {
+      if (topRef.current && topRef.current.scrollLeft !== scroller.scrollLeft) {
+        topRef.current.scrollLeft = scroller.scrollLeft;
+      }
+    };
+    scroller.addEventListener('scroll', onBody);
+    return () => { ro.disconnect(); scroller.removeEventListener('scroll', onBody); };
+  }, [children]);
+  const onTop = () => {
+    const scroller = wrapRef.current && wrapRef.current.firstElementChild;
+    if (scroller && topRef.current && scroller.scrollLeft !== topRef.current.scrollLeft) {
+      scroller.scrollLeft = topRef.current.scrollLeft;
+    }
+  };
+  return (
+    <>
+      <div
+        ref={topRef}
+        onScroll={onTop}
+        className="overflow-x-auto overflow-y-hidden"
+        data-testid={testid ? `${testid}-top-scrollbar` : undefined}
+      >
+        <div style={{ width: scrollW, height: 1 }} />
+      </div>
+      <div ref={wrapRef}>{children}</div>
+    </>
+  );
+}
+
 function DrillTable({ title, columns, rows, onRowClick, testid, showTotals, expandable }) {
   // Default-sorted by most clicks from the top.
   const { sorted, sortKey, sortDir, toggle } = useSortable(rows, 'clicks', 'desc');
@@ -153,7 +198,7 @@ function DrillTable({ title, columns, rows, onRowClick, testid, showTotals, expa
       {rows.length === 0 ? (
         <div className="p-8 text-center text-slate-500 text-sm">No data yet.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <DualScroll testid={testid}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -204,7 +249,7 @@ function DrillTable({ title, columns, rows, onRowClick, testid, showTotals, expa
               </TableFooter>
             )}
           </Table>
-        </div>
+        </DualScroll>
       )}
     </div>
   );
