@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { BarChart3, RefreshCw, Pencil, ChevronRight, ChevronDown, Home, Phone, Clock, FileText } from 'lucide-react';
+import { BarChart3, RefreshCw, Pencil, ChevronRight, ChevronDown, Home, Phone, Clock, FileText, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -101,6 +101,84 @@ const bounceCell = (r) => {
   );
 };
 
+// Persistent per-section column visibility (remembered across page refresh).
+// Locked keys can never be hidden (identifier columns).
+function useColumnFilter(storageKey, lockedKeys = []) {
+  const [hidden, setHidden] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(hidden)); } catch { /* quota / private mode */ }
+  }, [hidden, storageKey]);
+  const isHidden = (k) => !lockedKeys.includes(k) && !!hidden[k];
+  const filterColumns = (cols) => cols.filter((c) => !isHidden(c.key));
+  return { hidden, setHidden, isHidden, filterColumns, lockedKeys };
+}
+
+function ColumnFilter({ columns, filter, testid }) {
+  const { hidden, setHidden, lockedKeys } = filter;
+  const toggle = (key) => setHidden((h) => ({ ...h, [key]: !h[key] }));
+  const visibleCount = columns.filter((c) => !hidden[c.key]).length;
+  const allShown = visibleCount === columns.length;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          data-testid={`${testid}-column-filter-trigger`}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Columns
+          {!allShown && (
+            <span className="ml-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] px-1.5 py-0.5 font-bold tabular-nums">
+              {visibleCount}/{columns.length}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-2 z-[200]" data-testid={`${testid}-column-filter-popover`}>
+        <div className="flex items-center justify-between px-2 pt-1 pb-2">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Show columns</div>
+          {!allShown && (
+            <button
+              type="button"
+              onClick={() => setHidden({})}
+              className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
+              data-testid={`${testid}-column-filter-reset`}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+        <div className="max-h-80 overflow-auto">
+          {columns.map((c) => {
+            const locked = lockedKeys.includes(c.key);
+            const checked = !hidden[c.key];
+            return (
+              <label
+                key={c.key}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm ${locked ? 'opacity-60 cursor-not-allowed' : 'hover:bg-slate-50 cursor-pointer'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={locked}
+                  onChange={() => toggle(c.key)}
+                  className="h-4 w-4 rounded border-slate-300 accent-[#0F1B3D]"
+                  data-testid={`${testid}-column-filter-${c.key}`}
+                />
+                <span className="text-slate-700 flex-1">{c.label}</span>
+                {locked && <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">locked</span>}
+              </label>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function computeTotals(rows) {
   const sum = (k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
   const clicks = sum('clicks'), leads = sum('leads'), calls = sum('calls');
@@ -162,7 +240,7 @@ function DualScroll({ children, testid }) {
   );
 }
 
-function DrillTable({ title, columns, rows, onRowClick, testid, showTotals, expandable }) {
+function DrillTable({ title, columns, rows, onRowClick, testid, showTotals, expandable, headerRight }) {
   // Default-sorted by most clicks from the top.
   const { sorted, sortKey, sortDir, toggle } = useSortable(rows, 'clicks', 'desc');
   const [expanded, setExpanded] = useState({});
@@ -194,7 +272,12 @@ function DrillTable({ title, columns, rows, onRowClick, testid, showTotals, expa
     });
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" data-testid={testid}>
-      {title && <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900">{title}</div>}
+      {(title || headerRight) && (
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+          <span className="font-slab font-bold text-slate-900">{title}</span>
+          {headerRight && <span className="ml-auto">{headerRight}</span>}
+        </div>
+      )}
       {rows.length === 0 ? (
         <div className="p-8 text-center text-slate-500 text-sm">No data yet.</div>
       ) : (
@@ -271,12 +354,17 @@ const LandingPageTable = ({ rows, directCalls }) => {
     ...FIN_COLS,
     { key: 'bounce_rate', label: 'Bounce Rate', num: true, render: bounceCell },
   ];
+  const colFilter = useColumnFilter('analytics.cols.landing', ['source_page']);
+  const visibleCols = colFilter.filterColumns(cols);
   return (
     <div data-testid="analytics-by-landing-page">
       <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-slate-500">
         <BarChart3 className="h-4 w-4" /> Performance by landing page
+        <div className="ml-auto">
+          <ColumnFilter columns={cols} filter={colFilter} testid="analytics-landing-table" />
+        </div>
       </div>
-      <DrillTable title="By Landing Page" columns={cols} rows={rows || []} testid="analytics-landing-table" showTotals expandable />
+      <DrillTable title="By Landing Page" columns={visibleCols} rows={rows || []} testid="analytics-landing-table" showTotals expandable />
       {directCalls > 0 && (
         <p className="mt-2 text-[11px] text-slate-400" data-testid="analytics-direct-calls-note">
           + {directCalls} call{directCalls === 1 ? '' : 's'} from untracked numbers (couldn&apos;t be tied to a specific landing page above).
@@ -378,6 +466,8 @@ export const AdminAnalytics = () => {
   const [slLoading, setSlLoading] = useState(true);
   const [hourly, setHourly] = useState(null);
   const [hourlyLoading, setHourlyLoading] = useState(true);
+  const adColFilter = useColumnFilter('analytics.cols.ad', ['ad_id']);
+  const sitelinkColFilter = useColumnFilter('analytics.cols.sitelink', ['link_text']);
   const editable = canEditFn();
   const autoSynced = React.useRef(false);
 
@@ -693,7 +783,17 @@ export const AdminAnalytics = () => {
         )}
       </div>
 
-      <DrillTable title={levelTitle} columns={columns} rows={rows} onRowClick={onRowClick} testid={levelTestid} showTotals />
+      <DrillTable
+        title={levelTitle}
+        columns={level === 'ad' ? adColFilter.filterColumns(columns) : columns}
+        rows={rows}
+        onRowClick={onRowClick}
+        testid={levelTestid}
+        showTotals
+        headerRight={level === 'ad'
+          ? <ColumnFilter columns={columns} filter={adColFilter} testid="analytics-level-ad" />
+          : null}
+      />
 
       {/* Per-video performance (Demand Gen / Video campaigns) — live from Google Ads. */}
       {drill.campaign != null && (data.by_video || []).some((v) => v.campaign_id === drill.campaign) && (
@@ -705,6 +805,11 @@ export const AdminAnalytics = () => {
         <div className="px-5 py-3 border-b border-slate-100 font-slab font-bold text-slate-900 flex items-center gap-2">
           By Sitelink
           <span className="text-[11px] font-sans font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">Live from Google Ads</span>
+          {sitelinks && sitelinks.connected !== false && !sitelinks.error && (sitelinks.sitelinks || []).length > 0 && (
+            <div className="ml-auto">
+              <ColumnFilter columns={SITELINK_COLS} filter={sitelinkColFilter} testid="analytics-by-sitelink" />
+            </div>
+          )}
         </div>
         {slLoading ? (
           <div className="p-8 text-center text-slate-500 text-sm">Loading sitelink data from Google Ads…</div>
@@ -715,7 +820,7 @@ export const AdminAnalytics = () => {
         ) : !sitelinks || (sitelinks.sitelinks || []).length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm">No sitelink clicks in this date range.</div>
         ) : (
-          <SitelinkTable rows={sitelinks.sitelinks} />
+          <SitelinkTable rows={sitelinks.sitelinks} visibleKeys={sitelinkColFilter.filterColumns(SITELINK_COLS).map((c) => c.key)} />
         )}
       </div>
     </div>
@@ -773,20 +878,22 @@ function VideoStatsTable({ rows }) {
   );
 }
 
-function SitelinkTable({ rows }) {
+const SITELINK_COLS = [
+  { key: 'link_text', label: 'Sitelink' },
+  { key: 'impressions', label: 'Impressions', num: true },
+  { key: 'clicks', label: 'Clicks', num: true },
+  { key: 'ctr', label: 'CTR', num: true, render: (r) => `${r.ctr}%` },
+  { key: 'conv', label: 'Conversions', num: true },
+];
+
+function SitelinkTable({ rows, visibleKeys }) {
   const withCtr = rows.map((r) => ({
     ...r,
     ctr: r.impressions ? Math.round((r.clicks / r.impressions) * 1000) / 10 : 0,
     conv: Math.round((r.conversions || 0) * 10) / 10,
   }));
   const { sorted, sortKey, sortDir, toggle } = useSortable(withCtr, 'clicks', 'desc');
-  const cols = [
-    { key: 'link_text', label: 'Sitelink' },
-    { key: 'impressions', label: 'Impressions', num: true },
-    { key: 'clicks', label: 'Clicks', num: true },
-    { key: 'ctr', label: 'CTR', num: true, render: (r) => `${r.ctr}%` },
-    { key: 'conv', label: 'Conversions', num: true },
-  ];
+  const cols = visibleKeys ? SITELINK_COLS.filter((c) => visibleKeys.includes(c.key)) : SITELINK_COLS;
   return (
     <div className="overflow-x-auto">
       <Table>
