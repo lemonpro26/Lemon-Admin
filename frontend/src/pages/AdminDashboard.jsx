@@ -525,7 +525,14 @@ export default function AdminDashboard() {
             <TabsTrigger value="pages" data-testid="admin-tab-pages"><LayoutGrid className="h-4 w-4 mr-2" /> Pages</TabsTrigger>
             <TabsTrigger value="calls" data-testid="admin-tab-calls"><Phone className="h-4 w-4 mr-2" /> Calls ({stats?.unique_callers ?? stats?.total_calls ?? 0})</TabsTrigger>
             <TabsTrigger value="leads" data-testid="admin-tab-leads"><Users className="h-4 w-4 mr-2" /> Leads ({total})</TabsTrigger>
-            <TabsTrigger value="retained" data-testid="admin-tab-retained"><Award className="h-4 w-4 mr-2" /> Retained ({stats?.total_retained ?? 0})</TabsTrigger>
+            <TabsTrigger value="retained" data-testid="admin-tab-retained">
+              <Award className="h-4 w-4 mr-2" /> Retained ({stats?.total_retained ?? 0})
+              {(stats?.retained_leads != null || stats?.retained_calls != null) && (stats?.total_retained ?? 0) > 0 && (
+                <span className="ml-1.5 text-[10px] font-semibold text-slate-400 tabular-nums" data-testid="admin-tab-retained-breakdown">
+                  {stats?.retained_leads ?? 0}L·{stats?.retained_calls ?? 0}C
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="channels" data-testid="admin-tab-channels"><Share2 className="h-4 w-4 mr-2" /> Channels</TabsTrigger>
             <TabsTrigger value="creatives" data-testid="admin-tab-creatives"><Palette className="h-4 w-4 mr-2" /> Creatives</TabsTrigger>
             <TabsTrigger value="settings" data-testid="admin-tab-settings"><SettingsIcon className="h-4 w-4 mr-2" /> Settings</TabsTrigger>

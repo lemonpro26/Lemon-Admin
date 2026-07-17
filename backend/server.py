@@ -4189,7 +4189,8 @@ async def admin_stats(_: dict = Depends(require_admin), start: str = Query(""), 
     retained_calls = await db.calls.count_documents(retained_q)
     return {"total_leads": total, "total_clicks": total_clicks,
             "total_calls": total_calls, "unique_callers": unique_callers, "conversion_rate": conv,
-            "total_retained": retained_leads + retained_calls}
+            "total_retained": retained_leads + retained_calls,
+            "retained_leads": retained_leads, "retained_calls": retained_calls}
 
 
 # ----------------------------- Hooks (targeting merged in) -----------------------------
