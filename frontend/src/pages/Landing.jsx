@@ -91,7 +91,12 @@ export default function Landing({ sourcePage = 'home', pageLang = 'en' }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 pt-8 sm:pt-14 text-center" data-testid="page-landing">
-      <div className={`transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}>
+      {/* Hero paints IMMEDIATELY with default hooks — no opacity gate on the API
+          response. LCP used to wait for /config/public to return (~2-4s on 3G)
+          which tanked mobile Lighthouse LCP to 11+ seconds. Now the fallback
+          copy renders synchronously and admin-configured hooks swap in the
+          moment they arrive (no visible flash — same font, same layout). */}
+      <div>
         <h1
           className="font-mock font-extrabold tracking-tight text-[#0F1B3D] leading-[1.05] text-[clamp(2.1rem,5.6vw,4rem)]"
           data-testid="hero-hook1"

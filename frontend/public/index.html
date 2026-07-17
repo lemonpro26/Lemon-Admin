@@ -15,12 +15,21 @@
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content="The Lemon Pros — Lemon Law Help | Free Case Review" />
         <meta name="twitter:description" content="Lemon Law firm helping consumers with defective vehicles across California. Free case review — find out in 60 seconds if you qualify. No win, no fee." />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link rel="preconnect" href="https://www.googletagmanager.com" />
         <link rel="preconnect" href="https://us.i.posthog.com" crossorigin />
-        <link rel="preconnect" href="https://us-assets.i.posthog.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
+        <!-- Non-render-blocking Google Fonts load: fetched with media="print"
+             so it doesn't block the initial paint, then swapped to "all"
+             once loaded. The <noscript> fallback covers users with JS off. -->
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap"
+          media="print"
+          onload="this.media='all'"
+        />
+        <noscript>
+          <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" />
+        </noscript>
         <!--
         manifest.json provides metadata used when your web app is installed on a
         user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
