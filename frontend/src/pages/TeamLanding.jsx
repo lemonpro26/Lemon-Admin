@@ -258,3 +258,10 @@ export function TeamSplit({ sourcePage = 'latm2', phone = COMPANY.phone, phoneHr
     </div>
   );
 }
+
+// Default export used by the lazy loader in App.js. Picks the right variant
+// so both TeamOverlay & TeamSplit can share a single lazy chunk.
+export default function TeamLanding({ variant = 'overlay' }) {
+  return variant === 'split' ? <TeamSplit /> : <TeamOverlay />;
+}
+

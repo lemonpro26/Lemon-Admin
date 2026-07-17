@@ -17,6 +17,9 @@
         <meta name="twitter:description" content="Lemon Law firm helping consumers with defective vehicles across California. Free case review — find out in 60 seconds if you qualify. No win, no fee." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="preconnect" href="https://us.i.posthog.com" crossorigin />
+        <link rel="preconnect" href="https://us-assets.i.posthog.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
         <!--
         manifest.json provides metadata used when your web app is installed on a
@@ -36,14 +39,24 @@
         <!-- Google tag (gtag.js) — GA4 (G-PBB3G61CXB) + Google Ads (AW-318021992).
              GA4 page views are sent manually from the SPA (send_page_view:false).
              The Ads tag is loaded for auto-tagging / GCLID only — conversions are
-             uploaded server-to-server, so no client-side Ads conversion is fired. -->
+             uploaded server-to-server, so no client-side Ads conversion is fired.
+             GA4 fires immediately (needed for landing page-view attribution);
+             Google Ads AW-config is deferred to idle time so its ~150 KiB
+             helper library doesn't compete with the LCP hero paint. -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-PBB3G61CXB"></script>
         <script>
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
           gtag('config', 'G-PBB3G61CXB', { send_page_view: false });
-          gtag('config', 'AW-318021992');
+          // Defer the Google Ads (AW-) config until the page is idle / loaded so
+          // it doesn't fight the hero image + first-party JS for the LCP.
+          function _loadAdsTag(){ try { gtag('config', 'AW-318021992'); } catch(e){} }
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(_loadAdsTag, { timeout: 4000 });
+          } else {
+            window.addEventListener('load', function(){ setTimeout(_loadAdsTag, 1500); });
+          }
         </script>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
@@ -62,7 +75,11 @@
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
         <script>
-            !(function (t, e) {
+          // PostHog — deferred until after the LCP so its ~70 KiB (posthog-core
+          // + rrweb session recorder) doesn't tank mobile performance. The
+          // small stub queue captures early calls (e.g. from React on mount)
+          // and flushes them when the real library loads.
+          !(function (t, e) {
                 var o, n, p, r;
                 e.__SV ||
                     ((window.posthog = e),
@@ -123,14 +140,21 @@
                     }),
                     (e.__SV = 1));
             })(document, window.posthog || []);
+          function _initPosthog(){
             posthog.init("phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs", {
                 api_host: "https://us.i.posthog.com",
-                person_profiles: "identified_only", // or 'always' to create profiles for anonymous users as well,
+                person_profiles: "identified_only",
                 session_recording: {
                     recordCrossOriginIframes: true,
                     capturePerformance: false,
                 },
             });
+          }
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(_initPosthog, { timeout: 5000 });
+          } else {
+            window.addEventListener('load', function(){ setTimeout(_initPosthog, 2500); });
+          }
         </script>
     </body>
 </html>
