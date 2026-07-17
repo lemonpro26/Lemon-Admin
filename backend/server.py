@@ -4169,6 +4169,152 @@ async def retry_lead_conversion(lead_id: str, _: dict = Depends(require_editor))
     return {"success": True, "lead_id": lead_id, "conversion": result}
 
 
+class BulkValueBody(BaseModel):
+    """One-time bulk-assign a sale value to every lead & call (or a range),
+    optionally uploading each as an offline conversion to Google Ads."""
+    lead_value: Optional[float] = None    # None = don't touch leads
+    call_value: Optional[float] = None    # None = don't touch calls
+    currency: Optional[str] = "USD"
+    skip_existing: bool = True            # Don't overwrite records already marked sold
+    upload_to_google: bool = True         # Push each as an offline conversion
+    start: Optional[str] = ""             # Optional date range (created_at). Blank = all time.
+    end: Optional[str] = ""
+    dry_run: bool = False                 # Preview counts without touching data or Google
+
+
+@api_router.post("/admin/conversions/bulk-value")
+async def bulk_assign_conversion_value(body: BulkValueBody, _: dict = Depends(require_editor)):
+    """Assign a flat sale value to every existing lead & call (optionally scoped
+    by date range) and — if requested — pass each back to Google Ads as an
+    offline conversion. Idempotent when skip_existing=True (default): records
+    already marked 'sold' are left alone so re-runs don't double-count.
+
+    Response counts:
+      { leads: {matched, updated, uploaded, skipped_existing, missing_gclid, upload_errors},
+        calls: {...}, dry_run, took_ms }
+    """
+    started = datetime.now(timezone.utc)
+    currency = (body.currency or "USD").upper()
+
+    # Optional date filter — blank start defaults to 2000-01-01 (all-time).
+    if body.start or body.end:
+        s_iso, e_iso, _d = _date_range(body.start or "2000-01-01", body.end or "")
+        date_q = {"created_at": {"$gte": s_iso, "$lte": e_iso}}
+    else:
+        date_q = {}
+
+    lead_stats = {"matched": 0, "updated": 0, "uploaded": 0, "skipped_existing": 0,
+                  "missing_gclid": 0, "upload_errors": 0}
+    call_stats = {"matched": 0, "updated": 0, "uploaded": 0, "skipped_existing": 0,
+                  "missing_gclid": 0, "upload_errors": 0}
+    errors: list[str] = []
+
+    # ---------- LEADS ----------
+    if body.lead_value is not None:
+        leads = await db.leads.find(date_q, {"_id": 0}).to_list(100000)
+        lead_stats["matched"] = len(leads)
+        for lead in leads:
+            if body.skip_existing and lead.get("sale_status") == "sold":
+                lead_stats["skipped_existing"] += 1
+                continue
+            if not (lead.get("gclid") or "").strip():
+                lead_stats["missing_gclid"] += 1  # tracked, but we still record locally
+            if body.dry_run:
+                lead_stats["updated"] += 1
+                continue
+            sale_dt = lead.get("created_at") or _now_iso()
+            sale = SaleBody(value=float(body.lead_value), currency=currency, sale_datetime=sale_dt)
+            fields = {
+                "sale_status": "sold",
+                "sale_value": float(body.lead_value),
+                "sale_currency": currency,
+                "sale_datetime": sale_dt,
+                "sold_at": _now_iso(),
+                "sale_source": "bulk_backfill",
+            }
+            if body.upload_to_google:
+                try:
+                    result = await _upload_lead_conversion(lead, sale)
+                    fields["conversion_uploaded"] = bool(result.get("ok") and not result.get("validate_only"))
+                    fields["conversion_status"] = result.get("status")
+                    fields["conversion_detail"] = result.get("detail")
+                    fields["conversion_validate_only"] = bool(result.get("validate_only"))
+                    fields["conversion_last_attempt"] = _now_iso()
+                    if result.get("ok"):
+                        lead_stats["uploaded"] += 1
+                    else:
+                        lead_stats["upload_errors"] += 1
+                except Exception as exc:  # network / API blow-up
+                    lead_stats["upload_errors"] += 1
+                    fields["conversion_uploaded"] = False
+                    fields["conversion_status"] = "error"
+                    fields["conversion_detail"] = str(exc)[:300]
+                    fields["conversion_last_attempt"] = _now_iso()
+                    errors.append(f"lead {lead.get('id')}: {str(exc)[:120]}")
+            await db.leads.update_one({"id": lead.get("id")}, {"$set": fields})
+            lead_stats["updated"] += 1
+
+    # ---------- CALLS ----------
+    if body.call_value is not None:
+        call_q = {**date_q, "is_test": {"$ne": True}}
+        calls = await db.calls.find(call_q, {"_id": 0}).to_list(100000)
+        call_stats["matched"] = len(calls)
+        for call in calls:
+            if body.skip_existing and call.get("sale_status") == "sold":
+                call_stats["skipped_existing"] += 1
+                continue
+            if not (call.get("gclid") or "").strip():
+                call_stats["missing_gclid"] += 1
+            if body.dry_run:
+                call_stats["updated"] += 1
+                continue
+            sale_dt = call.get("called_at") or call.get("created_at") or _now_iso()
+            sale = SaleBody(value=float(body.call_value), currency=currency, sale_datetime=sale_dt)
+            fields = {
+                "sale_status": "sold",
+                "sale_value": float(body.call_value),
+                "sale_currency": currency,
+                "sale_datetime": sale_dt,
+                "sold_at": _now_iso(),
+                "sale_source": "bulk_backfill",
+            }
+            if body.upload_to_google:
+                try:
+                    result = await _upload_call_conversion(call, sale)
+                    fields["conversion_uploaded"] = bool(result.get("ok") and not result.get("validate_only"))
+                    fields["conversion_status"] = result.get("status")
+                    fields["conversion_detail"] = result.get("detail")
+                    fields["conversion_validate_only"] = bool(result.get("validate_only"))
+                    fields["conversion_last_attempt"] = _now_iso()
+                    if result.get("ok"):
+                        call_stats["uploaded"] += 1
+                    else:
+                        call_stats["upload_errors"] += 1
+                except Exception as exc:
+                    call_stats["upload_errors"] += 1
+                    fields["conversion_uploaded"] = False
+                    fields["conversion_status"] = "error"
+                    fields["conversion_detail"] = str(exc)[:300]
+                    fields["conversion_last_attempt"] = _now_iso()
+                    errors.append(f"call {call.get('id')}: {str(exc)[:120]}")
+            await db.calls.update_one({"id": call.get("id")}, {"$set": fields})
+            call_stats["updated"] += 1
+
+    took_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+    return {
+        "success": True,
+        "dry_run": body.dry_run,
+        "leads": lead_stats,
+        "calls": call_stats,
+        "errors": errors[:20],  # cap so response stays small
+        "error_count": len(errors),
+        "took_ms": took_ms,
+    }
+
+
+
+
+
 @api_router.get("/admin/stats")
 async def admin_stats(_: dict = Depends(require_admin), start: str = Query(""), end: str = Query("")):
     await _auto_clean_bot_clicks()

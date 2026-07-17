@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Bell, Users as UsersIcon, Mail, Plug, Phone } from 'lucide-react';
+import { Bell, Users as UsersIcon, Mail, Plug, Phone, DollarSign } from 'lucide-react';
 import { AdminNotifications } from '@/components/admin/AdminNotifications';
 import { AdminUsers } from '@/components/admin/AdminUsers';
 import { AdminEmailTemplate } from '@/components/admin/AdminEmailTemplate';
 import { AdminIntegrations } from '@/components/admin/AdminIntegrations';
 import { AdminPhoneNumbers } from '@/components/admin/AdminPhoneNumbers';
+import { AdminBulkConversions } from '@/components/admin/AdminBulkConversions';
 
 const TABS = [
   { key: 'integrations', label: 'Integrations', icon: Plug },
   { key: 'phone-numbers', label: 'Phone Numbers', icon: Phone },
+  { key: 'conversions', label: 'Bulk Conversions', icon: DollarSign },
   { key: 'notifications', label: 'Notifications', icon: Bell },
   { key: 'users', label: 'Users', icon: UsersIcon },
   { key: 'email', label: 'Thank-You Email', icon: Mail },
@@ -36,6 +38,7 @@ export const AdminSettings = ({ canEdit }) => {
       </div>
       {tab === 'integrations' && <AdminIntegrations />}
       {tab === 'phone-numbers' && <AdminPhoneNumbers />}
+      {tab === 'conversions' && <AdminBulkConversions />}
       {tab === 'notifications' && <AdminNotifications canEdit={canEdit} />}
       {tab === 'users' && <AdminUsers canEdit={canEdit} />}
       {tab === 'email' && <AdminEmailTemplate canEdit={canEdit} />}
