@@ -28,6 +28,7 @@ const PRETTY_TYPE = {
   SEARCH: 'Search', PERFORMANCE_MAX: 'Performance Max', DEMAND_GEN: 'Demand Gen',
   DISPLAY: 'Display', VIDEO: 'Video', SHOPPING: 'Shopping', MULTI_CHANNEL: 'Demand Gen',
   DISCOVERY: 'Demand Gen', LOCAL: 'Local', SMART: 'Smart',
+  LOCAL_SERVICES: 'Local Services',
 };
 const prettyType = (t) => {
   if (!t) return '';
@@ -778,8 +779,22 @@ export const AdminAnalytics = () => {
   };
 
   const typeCell = (r) => {
-    const t = prettyType(campaignTypes[String(r.campaign_id)]);
-    return t ? <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{t}</span> : NONE;
+    const raw = campaignTypes[String(r.campaign_id)];
+    const t = prettyType(raw);
+    if (!t) return NONE;
+    // Google Local Services Ads (LSA) shells are auto-created by Google when
+    // you enroll in Google Screened — they're real but don't behave like
+    // regular Search/PMax campaigns (no gclids, no click-based attribution).
+    // Label them distinctly so they aren't mistaken for a normal campaign.
+    if (raw === 'LOCAL_SERVICES') {
+      return (
+        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-200 text-slate-700" title="Google Local Services Ads (LSA) — managed from the separate LSA console, not standard Ads.">
+          Local Services
+          <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">LSA</span>
+        </span>
+      );
+    }
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{t}</span>;
   };
 
   const metricCols = [
