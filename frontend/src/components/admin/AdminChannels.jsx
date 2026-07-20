@@ -163,6 +163,14 @@ export function AdminChannels() {
             </div>
           ) : (
             <div className="space-y-2.5" data-testid="channels-campaign-spend-list">
+              {/* Column headers */}
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wide text-slate-400" data-testid="channels-campaign-header-row">
+                <div className="w-56 shrink-0">Campaign</div>
+                <div className="flex-1">Spend share</div>
+                <div className="w-20 shrink-0 text-right">Spend</div>
+                <div className="w-16 shrink-0 text-right">Retained</div>
+                <div className="w-20 shrink-0 text-right" title="Spend ÷ Retained">CPA</div>
+              </div>
               {(() => {
                 const maxCamp = Math.max(...campaigns.campaigns.map((c) => c.spend || 0), 1);
                 return campaigns.campaigns.map((c) => (
@@ -171,10 +179,22 @@ export function AdminChannels() {
                     <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
                       <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.round((c.spend / maxCamp) * 100)}%` }} />
                     </div>
-                    <div className="w-24 shrink-0 text-right font-semibold text-slate-900 tabular-nums">{money(c.spend)}</div>
+                    <div className="w-20 shrink-0 text-right font-semibold text-slate-900 tabular-nums" data-testid={`channels-campaign-spend-${c.campaign_id}`}>{money(c.spend)}</div>
+                    <div className={`w-16 shrink-0 text-right font-semibold tabular-nums ${c.retained > 0 ? 'text-emerald-600' : 'text-slate-400'}`} data-testid={`channels-campaign-retained-${c.campaign_id}`}>{c.retained || 0}</div>
+                    <div className="w-20 shrink-0 text-right text-sm font-semibold text-slate-700 tabular-nums" data-testid={`channels-campaign-cpa-${c.campaign_id}`}>{c.cpa != null ? money(c.cpa) : <span className="text-slate-300">—</span>}</div>
                   </div>
                 ));
               })()}
+              {/* Totals row */}
+              <div className="flex items-center gap-3 pt-2 border-t border-slate-100 text-sm font-bold" data-testid="channels-campaign-total-row">
+                <div className="w-56 shrink-0 text-slate-500 uppercase text-[10px] tracking-wide">Total</div>
+                <div className="flex-1" />
+                <div className="w-20 shrink-0 text-right text-slate-900 tabular-nums">{money(campaigns.total_spend || 0)}</div>
+                <div className="w-16 shrink-0 text-right text-emerald-600 tabular-nums" data-testid="channels-campaign-total-retained">{campaigns.total_retained || 0}</div>
+                <div className="w-20 shrink-0 text-right text-slate-700 tabular-nums" data-testid="channels-campaign-total-cpa">
+                  {campaigns.total_retained > 0 ? money((campaigns.total_spend || 0) / campaigns.total_retained) : <span className="text-slate-300">—</span>}
+                </div>
+              </div>
             </div>
           )}
         </div>

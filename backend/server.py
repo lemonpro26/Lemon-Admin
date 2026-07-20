@@ -4013,14 +4013,58 @@ async def admin_channels_campaigns(network: str = "google", start: str = "", end
     spend_by_campaign = await asyncio.to_thread(gnames.fetch_spend_by_campaign, start, end)
     cfg = await get_or_create_config()
     camp_names = {str(k): v for k, v in ((cfg.get("ad_labels") or {}).get("campaign") or {}).items() if v}
-    campaigns = [
-        {"campaign_id": str(cid), "campaign_name": camp_names.get(str(cid)) or str(cid),
-         "spend": round(float(sp), 2)}
-        for cid, sp in spend_by_campaign.items() if sp
-    ]
-    campaigns.sort(key=lambda r: r["spend"], reverse=True)
+
+    # Retained per campaign — counted the same way as the Retained tab
+    # (retained_at inside the range) and remapped via ad_group → campaign
+    # truth so display ad-groups don't inflate search campaign numbers.
+    from datetime import datetime, timezone
+    s_iso = f"{start}T00:00:00Z"; e_iso = f"{end}T23:59:59Z"
+    ag_to_camp = await asyncio.to_thread(gnames.fetch_adgroup_to_campaign)
+
+    def _fix_cid(cid, agid):
+        if agid:
+            truth = ag_to_camp.get(str(agid))
+            if truth and truth.get("campaign_id"):
+                return truth["campaign_id"]
+        return cid
+
+    retained_q = {"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}
+    proj = {"_id": 0, "campaign_id": 1, "adgroup_id": 1, "sale_value": 1}
+    ret_leads = await db.leads.find(retained_q, proj).to_list(length=20000)
+    ret_calls = await db.calls.find({**retained_q, "is_test": {"$ne": True}}, proj).to_list(length=20000)
+    ret_by_camp: dict = {}
+    rev_by_camp: dict = {}
+    for r in (ret_leads + ret_calls):
+        cid = _fix_cid(r.get("campaign_id") or "", r.get("adgroup_id") or "")
+        if not cid:
+            continue
+        ret_by_camp[cid] = ret_by_camp.get(cid, 0) + 1
+        rev_by_camp[cid] = rev_by_camp.get(cid, 0.0) + float(r.get("sale_value") or 0)
+
+    campaigns = []
+    # Any campaign with either spend OR retained in the range shows a row (so
+    # a campaign with retained but no spend in-range still surfaces).
+    all_cids = set(map(str, spend_by_campaign.keys())) | set(ret_by_camp.keys())
+    for cid in all_cids:
+        spend = round(float(spend_by_campaign.get(cid, 0.0)), 2)
+        retained = int(ret_by_camp.get(cid, 0))
+        revenue = round(float(rev_by_camp.get(cid, 0.0)), 2)
+        campaigns.append({
+            "campaign_id": cid,
+            "campaign_name": camp_names.get(cid) or cid,
+            "spend": spend,
+            "retained": retained,
+            "revenue": revenue,
+            "cpa": round(spend / retained, 2) if (spend > 0 and retained > 0) else None,
+            "roas": round(revenue / spend, 2) if spend > 0 else None,
+        })
+    # Sort by spend desc, then retained desc so zero-spend-but-retained rows
+    # still show at the bottom rather than being dropped.
+    campaigns.sort(key=lambda r: (r["spend"], r["retained"]), reverse=True)
     return {"network": network, "campaigns": campaigns,
-            "total_spend": round(sum(c["spend"] for c in campaigns), 2), "live": True}
+            "total_spend": round(sum(c["spend"] for c in campaigns), 2),
+            "total_retained": sum(c["retained"] for c in campaigns),
+            "live": True}
 
 
 

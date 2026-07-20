@@ -302,7 +302,18 @@ export default function AdminDashboard() {
         .catch(() => {});
     }
   }, [selected]);
-  useEffect(() => { loadLeads(); }, [loadLeads]);
+  // First-mount load shows the "Loading leads…" spinner. Any subsequent trigger
+  // (range change, search-typing) does a SILENT refetch so the table stays put
+  // on screen instead of blanking → collapsing → jump-scrolling the page.
+  const didInitialLeadsLoad = React.useRef(false);
+  useEffect(() => {
+    if (!didInitialLeadsLoad.current) {
+      didInitialLeadsLoad.current = true;
+      loadLeads();
+    } else {
+      loadLeads({ silent: true });
+    }
+  }, [loadLeads]);
   useEffect(() => { loadStats(); }, [loadStats]);
 
   // Live auto-refresh: silently pull new leads + stats every 30s while the
