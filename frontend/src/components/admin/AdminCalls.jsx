@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 import { useSortable, SortLabel } from '@/lib/useSortable';
+import { useResizableColumns, ColResizeHandle } from '@/lib/useResizableColumns';
 import { useLivePoll, LiveBadge } from '@/lib/useLivePoll';
 import { Badge } from '@/components/ui/badge';
 import { LeadDetailDialog } from '@/components/admin/LeadDetailDialog';
@@ -224,6 +225,17 @@ export const AdminCalls = () => {
   const groupedCalls = useMemo(() => groupByCaller(shownCalls), [shownCalls]);
   const groupedForNetwork = useMemo(() => groupByCaller(sortedCalls), [sortedCalls]);
   const colSpanCount = COLS.filter((k) => cols[k.key]).length + 2; // + Caller + Actions
+
+  // Draggable column widths (px), persisted per-browser. Every visible column
+  // (including Caller & Actions) has an entry so the <colgroup> below can
+  // control the whole table's layout. Users can drag any header's right edge
+  // to resize; "Reset widths" in the Columns menu restores defaults.
+  const CALL_COL_KEYS = ['caller', 'number', 'called', 'duration', 'campaign', 'hook', 'revenue', 'location', 'when', 'actions'];
+  const CALL_COL_DEFAULTS = { caller: 220, number: 140, called: 130, duration: 90, campaign: 180, hook: 120, revenue: 110, location: 130, when: 160, actions: 130 };
+  const { widths: colWidths, startResize: startColResize, resetAll: resetColWidths } =
+    useResizableColumns({ storageKey: 'lp_calls_col_widths_v1', defaults: CALL_COL_DEFAULTS, min: 70, max: 700 });
+  const isColShown = (k) => k === 'caller' || k === 'actions' || cols[k];
+  const visibleColKeys = CALL_COL_KEYS.filter(isColShown);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -498,6 +510,15 @@ export const AdminCalls = () => {
                   {col.label}
                 </DropdownMenuCheckboxItem>
               ))}
+              <DropdownMenuSeparator />
+              <button
+                type="button"
+                onClick={resetColWidths}
+                className="w-full text-left px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded"
+                data-testid="calls-reset-col-widths"
+              >
+                Reset column widths
+              </button>
             </DropdownMenuContent>
           </DropdownMenu>
           {!debouncedSearch.trim() && <DateRangeFilter value={range} onChange={setRange} />}
@@ -647,19 +668,68 @@ export const AdminCalls = () => {
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+        <div className="overflow-x-auto">
         <Table className="table-fixed w-full">
+            <colgroup>
+              {visibleColKeys.map((k) => (
+                <col key={k} style={{ width: `${colWidths[k] || 100}px` }} />
+              ))}
+            </colgroup>
             <TableHeader>
             <TableRow>
-              <TableHead className="w-[15%]"><SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>
-              {cols.number && <TableHead className="w-[11%]"><SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.called && <TableHead className="w-[10%]"><SortLabel label="Called #" k="tracked_number_display" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.duration && <TableHead className="w-[7%]"><SortLabel label="Duration" k="duration" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.campaign && <TableHead className="hidden md:table-cell w-[14%]"><SortLabel label="Campaign" k="campaign" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.hook && <TableHead className="hidden lg:table-cell w-[9%]"><SortLabel label="Hook seen" k="hook_label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.revenue && <TableHead className="hidden sm:table-cell w-[9%]"><SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.location && <TableHead className="hidden lg:table-cell w-[10%]"><SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              {cols.when && <TableHead className="w-[13%]"><SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} /></TableHead>}
-              <TableHead className="text-right w-[12%]">Actions</TableHead>
+              <TableHead className="relative">
+                <SortLabel label="Caller" k="caller_name" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                <ColResizeHandle onMouseDown={(e) => startColResize('caller', e)} testid="col-resize-caller" />
+              </TableHead>
+              {cols.number && (
+                <TableHead className="relative">
+                  <SortLabel label="Number" k="caller_number" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                  <ColResizeHandle onMouseDown={(e) => startColResize('number', e)} testid="col-resize-number" />
+                </TableHead>
+              )}
+              {cols.called && (
+                <TableHead className="relative">
+                  <SortLabel label="Called #" k="tracked_number_display" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                  <ColResizeHandle onMouseDown={(e) => startColResize('called', e)} testid="col-resize-called" />
+                </TableHead>
+              )}
+              {cols.duration && (
+                <TableHead className="relative">
+                  <SortLabel label="Duration" k="duration" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                  <ColResizeHandle onMouseDown={(e) => startColResize('duration', e)} testid="col-resize-duration" />
+                </TableHead>
+              )}
+              {cols.campaign && (
+                <TableHead className="hidden md:table-cell relative">
+                  <SortLabel label="Campaign" k="campaign" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                  <ColResizeHandle onMouseDown={(e) => startColResize('campaign', e)} testid="col-resize-campaign" />
+                </TableHead>
+              )}
+              {cols.hook && (
+                <TableHead className="hidden lg:table-cell relative">
+                  <SortLabel label="Hook seen" k="hook_label" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                  <ColResizeHandle onMouseDown={(e) => startColResize('hook', e)} testid="col-resize-hook" />
+                </TableHead>
+              )}
+              {cols.revenue && (
+                <TableHead className="hidden sm:table-cell relative">
+                  <SortLabel label="Revenue" k="sale_value" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                  <ColResizeHandle onMouseDown={(e) => startColResize('revenue', e)} testid="col-resize-revenue" />
+                </TableHead>
+              )}
+              {cols.location && (
+                <TableHead className="hidden lg:table-cell relative">
+                  <SortLabel label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                  <ColResizeHandle onMouseDown={(e) => startColResize('location', e)} testid="col-resize-location" />
+                </TableHead>
+              )}
+              {cols.when && (
+                <TableHead className="relative">
+                  <SortLabel label="When" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggle} />
+                  <ColResizeHandle onMouseDown={(e) => startColResize('when', e)} testid="col-resize-when" />
+                </TableHead>
+              )}
+              <TableHead className="text-right relative">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -794,6 +864,7 @@ export const AdminCalls = () => {
             ))}
           </TableBody>
           </Table>
+        </div>
       </div>
 
       {/* CALL DETAIL DIALOG */}
