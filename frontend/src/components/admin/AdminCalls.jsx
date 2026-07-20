@@ -504,6 +504,54 @@ export const AdminCalls = () => {
         </div>
       </div>
 
+      {/* When a search is active, all three pill-filter rows below are
+          meaningless (they all show 0 because we're filtering by search text
+          on the server). Hide them & lift the Matching-Leads panel up so
+          cross-tab hits are visible without scrolling past a wall of 0s. */}
+      {debouncedSearch.trim() && matchedLeads.length > 0 && (
+        <div data-testid="calls-matched-leads-top">
+          <p className="text-sm text-slate-500 flex items-center gap-2 mb-3">
+            <FileText className="h-4 w-4" /> Matching leads ({matchedLeads.length}) — click any row to open
+          </p>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table data-testid="calls-matched-leads-table-top">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead className="hidden sm:table-cell">Email</TableHead>
+                    <TableHead className="hidden md:table-cell">Vehicle</TableHead>
+                    <TableHead className="hidden sm:table-cell">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {matchedLeads.map((l) => {
+                    const name = l.qb_name || l.full_name || [l.first_name, l.last_name].filter(Boolean).join(' ') || '\u2014';
+                    const vehicle = [l.car_year, l.car_make, l.car_model].filter(Boolean).join(' ');
+                    return (
+                      <TableRow key={l.id} data-testid={`matched-lead-row-top-${l.id}`} className="cursor-pointer hover:bg-slate-50" onClick={() => setOpenedLead(l)}>
+                        <TableCell className="font-medium text-slate-900">
+                          {name}
+                          <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px]">lead</Badge>
+                          {l.retained && <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Retained</Badge>}
+                        </TableCell>
+                        <TableCell className="text-slate-600">{formatPhone(l.phone) || '\u2014'}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-slate-600">{l.email || '\u2014'}</TableCell>
+                        <TableCell className="hidden md:table-cell text-slate-600">{vehicle || '\u2014'}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-slate-500 text-sm">{fmtDate(l.created_at)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!debouncedSearch.trim() && (
+      <>
       <div className="flex items-center gap-2 flex-wrap" data-testid="call-segment-filters">
         {CALL_SEGMENTS.map((s) => (
           <button
@@ -549,8 +597,14 @@ export const AdminCalls = () => {
       <div className="mt-3">
         <NetworkChips items={groupedForNetwork} value={network} onChange={setNetwork} testidPrefix="call-network" />
       </div>
+      </>
+      )}
 
       {debouncedSearch.trim() && matchedLeads.length > 0 && (
+        <div data-testid="calls-matched-leads" style={{display:'none'}} /> /* legacy anchor — panel now lives at top */
+      )}
+      {/* Hide legacy matched-leads panel below (moved above pill filters). */}
+      {false && debouncedSearch.trim() && matchedLeads.length > 0 && (
         <div data-testid="calls-matched-leads">
           <p className="text-sm text-slate-500 flex items-center gap-2 mb-3">
             <FileText className="h-4 w-4" /> Matching leads ({matchedLeads.length})
