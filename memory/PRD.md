@@ -159,3 +159,10 @@ Replace "Licensed and Bonded" with "100% Free Consultation". Backend built the s
 - P1: User to provide SMTP creds for live email notifications.
 - P2: "Hook performance from calls" summary (calls + revenue grouped by hook variant).
 - P2: Vehicle "problem/defect" step to better qualify leads.
+
+
+## Implemented (2026-07-20)
+- **Retained ↔ Revenue reconciliation bug fix (`admin_analytics` + `admin_channels_summary` + `admin_get_retained`)**:
+  User reported: Landing Page row "Home, PA & Team" showed 3 retained but only $2,000 revenue.
+  Root cause: Retained count queried by `retained_at` in range, but Revenue queried leads/calls by `created_at` in range with `sale_status="sold"`. A lead created before the range but retained inside it correctly incremented Retained but its $1,000 was invisible to the created_at-filtered revenue loop. Fix: revenue is now accumulated from the SAME retained set (retained_at in range, sum of sale_value) across all three endpoints — so Revenue reconciles with Retained everywhere (Analytics KPI header, Landing Pages / Campaigns / Ad Groups / Ads tables, Channels summary, Retained tab total).
+  Files: `backend/server.py` — dropped the created_at revenue loop (~30 lines) and folded revenue accumulation into the existing retained-item loop; `admin_channels_summary` revenue query rewritten; `admin_get_retained.total_revenue` no longer filters by `sale_status`.

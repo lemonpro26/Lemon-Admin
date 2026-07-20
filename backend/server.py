@@ -380,6 +380,10 @@ class CreativeStatusBody(BaseModel):
     status: str  # approved | rejected | pending
 
 
+class CreativeAdminNotesBody(BaseModel):
+    admin_notes: str = ""  # Reviewer-only notes (creator never sees these)
+
+
 class ConfigUpdate(BaseModel):
     hook1: str
     hook2: str
@@ -3979,9 +3983,14 @@ async def admin_channels_summary(start: str = "", end: str = "", _: dict = Depen
     calls_count = await db.calls.count_documents({"is_test": {"$ne": True}, "created_at": {"$gte": s_iso, "$lte": e_iso}})
     retained_count = (await db.leads.count_documents({"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}})
                       + await db.calls.count_documents({"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}))
+    # Revenue = sum of sale_value from items retained in this range (aligned
+    # with the retained count above, and how the Retained tab attributes
+    # revenue). Using created_at + sale_status="sold" would silently drop
+    # revenue whenever a lead was retained inside the range but created
+    # earlier — producing "3 retained but $2,000 revenue" mismatches.
     revenue = 0.0
     for coll in (db.leads, db.calls):
-        async for d in coll.find({"sale_status": "sold", "created_at": {"$gte": s_iso, "$lte": e_iso}}, {"sale_value": 1, "_id": 0}):
+        async for d in coll.find({"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}, {"sale_value": 1, "_id": 0}):
             revenue += float(d.get("sale_value") or 0)
 
     spend = await asyncio.to_thread(gnames.fetch_spend_by_day, start, end)
@@ -4189,7 +4198,7 @@ async def admin_get_retained(start: str = "", end: str = "", _: dict = Depends(r
     # Calls & Leads tabs) so the detail popup shows names, not raw numbers.
     cfg = await get_or_create_config()
     items = _resolve_ad_names(items, cfg.get("ad_labels") or {})
-    total_revenue = round(sum(float(i.get("sale_value") or 0) for i in items if i.get("sale_status") == "sold"), 2)
+    total_revenue = round(sum(float(i.get("sale_value") or 0) for i in items), 2)
     return {"items": items, "total": len(items), "lead_count": len(leads), "call_count": len(calls), "total_revenue": total_revenue}
 
 
@@ -4982,11 +4991,6 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
                 return truth["campaign_id"]
         return cid
 
-    lead_docs = await db.leads.find(
-        {"created_at": {"$gte": s_iso, "$lte": e_iso}},
-        {"_id": 0, "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "source_page": 1, "sale_status": 1, "sale_value": 1, "retained": 1},
-    ).to_list(length=20000)
-
     def _page_of_call(c):
         sp = _canon_page(c.get("source_page"))
         if sp:
@@ -5002,66 +5006,61 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         if k:
             d[k] = d.get(k, 0) + v
 
-    for l in lead_docs:
-        agid = l.get("adgroup_id") or ""
-        cid = _fix_cid(l.get("campaign_id") or "", agid)
-        pg = _canon_page(l.get("source_page"))
-        if l.get("sale_status") == "sold":
-            v = float(l.get("sale_value") or 0)
-            _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
-            if cid:
-                _acc(rev_ag, (cid, agid), v)
-                _acc(rev_ad3, (cid, agid, l.get("ad_id") or ""), v)
-    for c in _enriched_calls:
-        agid = c.get("adgroup_id") or ""
-        cid = _fix_cid(c.get("campaign_id") or "", agid)
-        pg = _page_of_call(c)
-        if c.get("sale_status") == "sold":
-            v = float(c.get("sale_value") or 0)
-            _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
-            if cid:
-                _acc(rev_ag, (cid, agid), v)
-                _acc(rev_ad3, (cid, agid, c.get("ad_id") or ""), v)
-
     # Retained clients are counted by retained_at (exactly like the Retained tab) so
     # the "Retained" column reconciles with it. Attribute each to its campaign /
     # landing page (calls are enriched for click + tap attribution). Retained items
     # with no campaign roll into an "Unattributed / Direct" bucket.
+    #
+    # Revenue is attributed from the SAME retained set (not from a separate
+    # created_at query) so a lead created months before the range but retained
+    # inside the range still contributes its sale_value. Prevents the mismatch
+    # where Retained=3 but Revenue=$2,000 (an older-retained lead was invisible
+    # to the created_at-filtered revenue loop).
     retained_q = {"retained": True, "retained_at": {"$gte": s_iso, "$lte": e_iso}}
     ret_lead_docs = await db.leads.find(
-        retained_q, {"_id": 0, "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "source_page": 1}).to_list(length=20000)
+        retained_q, {"_id": 0, "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "source_page": 1, "sale_value": 1}).to_list(length=20000)
     ret_call_docs = await _enrich_calls_with_hooks(await db.calls.find(
         retained_q,
         {"_id": 0, "gclid": 1, "session_id": 1, "tracking_number": 1, "called_at": 1,
          "created_at": 1, "caller_number": 1, "campaign_id": 1, "adgroup_id": 1,
-         "ad_id": 1, "keyword": 1, "source_page": 1}).to_list(length=20000))
+         "ad_id": 1, "keyword": 1, "source_page": 1, "sale_value": 1}).to_list(length=20000))
     ret_unattr = 0
     for r in ret_lead_docs:
         agid = r.get("adgroup_id") or ""
         cid = _fix_cid(r.get("campaign_id") or "", agid)
         pg = _canon_page(r.get("source_page"))
+        v = float(r.get("sale_value") or 0)
         if cid:
             ret_camp[cid] = ret_camp.get(cid, 0) + 1
             k = (cid, agid)
             ret_ag[k] = ret_ag.get(k, 0) + 1
             k3 = (cid, agid, r.get("ad_id") or "")
             ret_ad3[k3] = ret_ad3.get(k3, 0) + 1
+            _acc(rev_camp, cid, v)
+            _acc(rev_ag, k, v)
+            _acc(rev_ad3, k3, v)
         else:
             ret_unattr += 1
         _acc(ret_page, pg)
+        _acc(rev_page, pg, v)
     for r in ret_call_docs:
         agid = r.get("adgroup_id") or ""
         cid = _fix_cid(r.get("campaign_id") or "", agid)
         pg = _page_of_call(r)
+        v = float(r.get("sale_value") or 0)
         if cid:
             ret_camp[cid] = ret_camp.get(cid, 0) + 1
             k = (cid, agid)
             ret_ag[k] = ret_ag.get(k, 0) + 1
             k3 = (cid, agid, r.get("ad_id") or "")
             ret_ad3[k3] = ret_ad3.get(k3, 0) + 1
+            _acc(rev_camp, cid, v)
+            _acc(rev_ag, k, v)
+            _acc(rev_ad3, k3, v)
         else:
             ret_unattr += 1
         _acc(ret_page, pg)
+        _acc(rev_page, pg, v)
 
     # Allocate campaign spend across landing pages by click share.
     cp_clicks = await _agg_clicks(["campaign_id", "source_page"], s_iso, e_iso)
@@ -5353,6 +5352,7 @@ def _creative_public(doc: dict) -> dict:
         "content_type": doc.get("content_type", ""),
         "created_at": doc.get("created_at"),
         "reviewed_at": doc.get("reviewed_at"),
+        "admin_notes": doc.get("admin_notes", ""),
     }
 
 
@@ -5474,6 +5474,21 @@ async def admin_set_creative_status(creative_id: str, body: CreativeStatusBody, 
     res = await db.creatives.update_one(
         {"id": creative_id},
         {"$set": {"status": status, "reviewed_at": _now_iso()}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Creative not found.")
+    doc = await db.creatives.find_one({"id": creative_id})
+    return _creative_public(doc)
+
+
+@api_router.post("/admin/creatives/{creative_id}/admin-notes")
+async def admin_set_creative_notes(creative_id: str, body: CreativeAdminNotesBody, _: dict = Depends(require_editor)):
+    """Save admin/reviewer notes on a creative. Kept separate from the creator's
+    own `notes` field so creators never see reviewer-internal comments."""
+    text = (body.admin_notes or "").strip()[:2000]  # cap length to prevent abuse
+    res = await db.creatives.update_one(
+        {"id": creative_id},
+        {"$set": {"admin_notes": text, "admin_notes_updated_at": _now_iso()}},
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Creative not found.")

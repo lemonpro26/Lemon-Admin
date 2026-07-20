@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Film, Image as ImageIcon, Clock, CheckCircle2, XCircle, User, Palette,
+  Film, Image as ImageIcon, Clock, CheckCircle2, XCircle, User, Palette, Calendar as CalendarIcon,
+  StickyNote, Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, TOKEN_KEY, canEdit as canEditFn } from '@/lib/api';
@@ -8,6 +9,9 @@ import { API as API_BASE } from '@/lib/creatorApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 export const DISPLAY_SIZES = ['300x250', '728x90', '160x600', '300x600', '320x50', '970x250', '336x280'];
 
@@ -18,6 +22,18 @@ const STATUS_META = {
 };
 
 const adminFileUrl = (id) => `${API_BASE}/creatives/${id}/file?auth=${localStorage.getItem(TOKEN_KEY) || ''}`;
+
+// Local YYYY-MM-DD (respects the viewer's timezone). Used everywhere we
+// bucket by "day" so a lead uploaded at 11pm PT stays in that day and
+// isn't shoved forward by UTC conversion.
+function ymd(d) {
+  if (!d) return '';
+  const t = new Date(d);
+  const y = t.getFullYear();
+  const m = String(t.getMonth() + 1).padStart(2, '0');
+  const day = String(t.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 function StatusBadge({ status }) {
   const m = STATUS_META[status] || STATUS_META.pending;
@@ -46,7 +62,50 @@ function Thumb({ item }) {
   );
 }
 
-function SubmissionCard({ s, canEdit, onStatus }) {
+// Inline "Notes" editor per creative — reviewer-only text, saved when the
+// user clicks Save (no per-keystroke server chatter).
+function AdminNotesEditor({ s, canEdit, onSaved }) {
+  const [text, setText] = useState(s.admin_notes || '');
+  const [saving, setSaving] = useState(false);
+  const dirty = text !== (s.admin_notes || '');
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await api.post(`/admin/creatives/${s.id}/admin-notes`, { admin_notes: text });
+      onSaved(res.data);
+      toast.success('Notes saved.');
+    } catch (e) {
+      toast.error('Could not save notes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="mt-3" data-testid={`admin-creative-notes-${s.id}`}>
+      <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+        <StickyNote className="h-3 w-3" /> Reviewer notes
+      </label>
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Add reviewer notes (visible to admins only)…"
+        disabled={!canEdit || saving}
+        rows={2}
+        className="text-xs resize-y min-h-[54px]"
+        data-testid={`admin-creative-notes-input-${s.id}`}
+      />
+      {dirty && canEdit && (
+        <div className="flex justify-end mt-1.5">
+          <Button size="sm" onClick={save} disabled={saving} className="h-7 gap-1 bg-slate-800 hover:bg-slate-900 text-white text-[11px]" data-testid={`admin-creative-notes-save-${s.id}`}>
+            <Save className="h-3 w-3" /> {saving ? 'Saving…' : 'Save notes'}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubmissionCard({ s, canEdit, onStatus, onNotesSaved }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3 hover:shadow-md transition-shadow" data-testid={`admin-creative-card-${s.id}`}>
       <Thumb item={s} />
@@ -58,7 +117,7 @@ function SubmissionCard({ s, canEdit, onStatus }) {
         <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500">
           <User className="h-3 w-3" /> {s.creator_name || '—'} · {s.created_at ? new Date(s.created_at).toLocaleDateString() : ''}
         </div>
-        {s.notes && <p className="text-xs text-slate-500 mt-2 line-clamp-2">{s.notes}</p>}
+        {s.notes && <p className="text-xs text-slate-500 mt-2 line-clamp-2" title={s.notes}>{s.notes}</p>}
         <div className="mt-3"><StatusBadge status={s.status} /></div>
         {canEdit && (
           <div className="flex items-center gap-2 mt-3">
@@ -83,19 +142,63 @@ function SubmissionCard({ s, canEdit, onStatus }) {
             </Button>
           </div>
         )}
+        <AdminNotesEditor s={s} canEdit={canEdit} onSaved={onNotesSaved} />
       </div>
     </div>
   );
 }
 
-function Grid({ items, empty, canEdit, onStatus }) {
+function Grid({ items, empty, canEdit, onStatus, onNotesSaved }) {
   if (!items.length) {
     return <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-400 text-sm">{empty}</div>;
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((s) => <SubmissionCard key={s.id} s={s} canEdit={canEdit} onStatus={onStatus} />)}
+      {items.map((s) => <SubmissionCard key={s.id} s={s} canEdit={canEdit} onStatus={onStatus} onNotesSaved={onNotesSaved} />)}
     </div>
+  );
+}
+
+// Compact date-picker pill — opens a shadcn Calendar in a popover. The user
+// can pick any day; "All dates" clears the filter.
+function DateFilter({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="inline-flex items-center gap-2 h-9 px-3 rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-slate-300"
+          data-testid="admin-creatives-date-trigger"
+        >
+          <CalendarIcon className="h-4 w-4 text-indigo-600" />
+          {value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'All dates'}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-2" data-testid="admin-creatives-date-popover">
+        <Calendar
+          mode="single"
+          selected={value ? new Date(`${value}T12:00:00`) : undefined}
+          onSelect={(d) => { onChange(d ? ymd(d) : ''); setOpen(false); }}
+          initialFocus
+        />
+        <div className="flex items-center justify-between mt-2 px-1 pb-1">
+          <button
+            onClick={() => { onChange(''); setOpen(false); }}
+            className="text-[11px] font-semibold text-slate-500 hover:text-slate-900"
+            data-testid="admin-creatives-date-clear"
+          >
+            Clear
+          </button>
+          <button
+            onClick={() => { onChange(ymd(new Date())); setOpen(false); }}
+            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
+            data-testid="admin-creatives-date-today"
+          >
+            Today
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -105,6 +208,11 @@ export function AdminCreatives() {
   const [sizeFilter, setSizeFilter] = useState('all');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Default to today's date so the view is scoped to "today's uploads" out of
+  // the box (per the user's request "only show me by date"). Cleared string
+  // means "no date filter — show all".
+  const [dateFilter, setDateFilter] = useState(ymd(new Date()));
+  const [creatorFilter, setCreatorFilter] = useState('all');
 
   const load = useCallback(async () => {
     try {
@@ -129,9 +237,41 @@ export function AdminCreatives() {
     }
   };
 
-  const videos = items.filter((s) => s.type === 'video');
-  const allDisplays = items.filter((s) => s.type === 'display');
+  const onNotesSaved = (updated) => {
+    setItems((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
+  };
+
+  // Full list of unique creators (for the user-name filter dropdown). Sort
+  // alphabetically so it's easy to scan.
+  const creators = useMemo(() => {
+    const set = new Map();
+    for (const c of items) {
+      const name = (c.creator_name || '').trim();
+      if (name && !set.has(name)) set.set(name, (c.creator_id || name));
+    }
+    return Array.from(set.keys()).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  // Apply the date + creator filters ONCE — then split by type + size below.
+  const filtered = useMemo(() => items.filter((s) => {
+    if (dateFilter && ymd(s.created_at) !== dateFilter) return false;
+    if (creatorFilter !== 'all' && (s.creator_name || '').trim() !== creatorFilter) return false;
+    return true;
+  }), [items, dateFilter, creatorFilter]);
+
+  const videos = filtered.filter((s) => s.type === 'video');
+  const allDisplays = filtered.filter((s) => s.type === 'display');
   const displays = allDisplays.filter((s) => sizeFilter === 'all' || s.size === sizeFilter);
+
+  // Per-size counts (parenthesized pill counts, e.g. "300x250 (3)").
+  const sizeCounts = useMemo(() => {
+    const c = {};
+    for (const d of allDisplays) {
+      if (d.size) c[d.size] = (c[d.size] || 0) + 1;
+    }
+    return c;
+  }, [allDisplays]);
+
   const pendingCount = items.filter((s) => s.status === 'pending').length;
 
   return (
@@ -144,6 +284,35 @@ export function AdminCreatives() {
         </div>
       </div>
 
+      {/* Global filters — date & creator. Apply to both tabs. */}
+      <div className="flex items-center gap-3 flex-wrap" data-testid="admin-creatives-global-filters">
+        <DateFilter value={dateFilter} onChange={setDateFilter} />
+        <div className="inline-flex items-center gap-2 h-9 px-3 rounded-full border border-slate-200 bg-white text-sm">
+          <User className="h-4 w-4 text-slate-400" />
+          <select
+            value={creatorFilter}
+            onChange={(e) => setCreatorFilter(e.target.value)}
+            className="bg-transparent text-slate-700 font-semibold outline-none pr-2 cursor-pointer text-sm"
+            data-testid="admin-creatives-creator-filter"
+          >
+            <option value="all">All creators</option>
+            {creators.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        {(dateFilter || creatorFilter !== 'all') && (
+          <button
+            onClick={() => { setDateFilter(''); setCreatorFilter('all'); }}
+            className="text-xs font-semibold text-slate-500 hover:text-slate-900 underline underline-offset-2"
+            data-testid="admin-creatives-clear-filters"
+          >
+            Clear filters
+          </button>
+        )}
+        <span className="ml-auto text-xs text-slate-500 tabular-nums" data-testid="admin-creatives-total">
+          {filtered.length} of {items.length} showing
+        </span>
+      </div>
+
       {loading ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-400 text-sm" data-testid="admin-creatives-loading">Loading…</div>
       ) : (
@@ -154,7 +323,7 @@ export function AdminCreatives() {
           </TabsList>
 
           <TabsContent value="videos" className="mt-5">
-            <Grid items={videos} empty="No video submissions yet." canEdit={canEdit} onStatus={onStatus} />
+            <Grid items={videos} empty={dateFilter ? 'No video submissions on this date.' : 'No video submissions yet.'} canEdit={canEdit} onStatus={onStatus} onNotesSaved={onNotesSaved} />
           </TabsContent>
 
           <TabsContent value="display" className="mt-5">
@@ -164,20 +333,26 @@ export function AdminCreatives() {
                 className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${sizeFilter === 'all' ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
                 data-testid="admin-creatives-size-all"
               >
-                All sizes
+                All sizes <span className={`ml-1 text-xs font-bold rounded-full px-1.5 py-0.5 ${sizeFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>({allDisplays.length})</span>
               </button>
-              {DISPLAY_SIZES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSizeFilter(s)}
-                  className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${sizeFilter === s ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                  data-testid={`admin-creatives-size-${s}`}
-                >
-                  {s}
-                </button>
-              ))}
+              {DISPLAY_SIZES.map((s) => {
+                const n = sizeCounts[s] || 0;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setSizeFilter(s)}
+                    disabled={n === 0}
+                    className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${sizeFilter === s ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+                    data-testid={`admin-creatives-size-${s}`}
+                  >
+                    {s}
+                    {' '}
+                    <span className={`text-xs font-bold rounded-full px-1.5 py-0.5 ${sizeFilter === s ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`admin-creatives-size-count-${s}`}>({n})</span>
+                  </button>
+                );
+              })}
             </div>
-            <Grid items={displays} empty="No display ads for this size." canEdit={canEdit} onStatus={onStatus} />
+            <Grid items={displays} empty={dateFilter ? 'No display ads on this date for this size.' : 'No display ads for this size.'} canEdit={canEdit} onStatus={onStatus} onNotesSaved={onNotesSaved} />
           </TabsContent>
         </Tabs>
       )}
