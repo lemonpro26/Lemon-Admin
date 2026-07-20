@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Zap, DollarSign, Info, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Zap, DollarSign, Info, CheckCircle2, XCircle, Loader2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, canEdit as canEditFn } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -277,6 +277,200 @@ export const AdminBulkConversions = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ---------- CLEAR NON-RETAINED (reversal of bulk backfill) ---------- */}
+      <ClearNonRetainedSection />
     </div>
   );
 };
+
+
+// Reverses the bulk backfill for records that never became clients. Retained
+// clients keep their manually-entered revenue. Uses a separate confirm dialog
+// with its own copy so users don't accidentally confuse this with the backfill.
+const ClearNonRetainedSection = () => {
+  const canEdit = canEditFn();
+  const [includeLeads, setIncludeLeads] = useState(true);
+  const [includeCalls, setIncludeCalls] = useState(true);
+  const [retractFromGoogle, setRetractFromGoogle] = useState(true);
+  const [onlyBulkBackfill, setOnlyBulkBackfill] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [result, setResult] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const payload = () => ({
+    include_leads: includeLeads,
+    include_calls: includeCalls,
+    retract_from_google: retractFromGoogle,
+    only_bulk_backfill: onlyBulkBackfill,
+    dry_run: false,
+  });
+
+  const runPreview = async () => {
+    setBusy(true); setResult(null);
+    try {
+      const res = await api.post('/admin/conversions/clear-non-retained', { ...payload(), dry_run: true });
+      setPreview(res.data);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Preview failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runReal = async () => {
+    setConfirmOpen(false);
+    setBusy(true); setResult(null);
+    const toastId = toast.loading(retractFromGoogle
+      ? 'Clearing values and retracting from Google Ads… (this can take a minute)'
+      : 'Clearing values…');
+    try {
+      const res = await api.post('/admin/conversions/clear-non-retained', payload());
+      setResult(res.data);
+      toast.success(
+        `Cleared ${res.data.leads.cleared} leads & ${res.data.calls.cleared} calls (retained kept: ${res.data.leads.skipped_retained}L / ${res.data.calls.skipped_retained}C).`,
+        { id: toastId },
+      );
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Clear failed.', { id: toastId });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-4 mt-8 pt-6 border-t-2 border-dashed border-slate-200" data-testid="admin-clear-non-retained">
+      <div className="flex items-center gap-2">
+        <Undo2 className="h-5 w-5 text-slate-500" />
+        <h3 className="font-slab font-bold text-slate-900">Undo backfill — clear revenue for non-retained records</h3>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 leading-relaxed" data-testid="clear-explainer">
+        <p className="mb-1"><b>What this does:</b> for every lead &amp; call that is <b>NOT marked &quot;Retained&quot;</b>, this will:</p>
+        <ul className="list-disc list-inside space-y-0.5 mt-1">
+          <li>Wipe the local <code className="text-[11px] bg-white px-1 py-0.5 rounded border border-slate-200">sale_value</code> / <code className="text-[11px] bg-white px-1 py-0.5 rounded border border-slate-200">sale_status</code> fields.</li>
+          <li>Send a <b>RETRACTION</b> to Google Ads via the Data Manager API — the conversion is removed from reporting and Smart Bidding.</li>
+          <li>Tag the record with <code className="text-[11px] bg-white px-1 py-0.5 rounded border border-slate-200">sale_source = &quot;backfill_cleared&quot;</code> so we know it was undone.</li>
+        </ul>
+        <p className="mt-2"><b>What stays untouched:</b> retained leads &amp; retained calls keep their revenue (both locally and in Google Ads).</p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3" data-testid="clear-inputs-card">
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input type="checkbox" checked={includeLeads} onChange={(e) => setIncludeLeads(e.target.checked)} disabled={!canEdit || busy}
+                 className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#0F1B3D]" data-testid="clear-include-leads" />
+          <span className="text-sm text-slate-700"><b>Include leads</b> — clear revenue on all non-retained leads.</span>
+        </label>
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input type="checkbox" checked={includeCalls} onChange={(e) => setIncludeCalls(e.target.checked)} disabled={!canEdit || busy}
+                 className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#0F1B3D]" data-testid="clear-include-calls" />
+          <span className="text-sm text-slate-700"><b>Include calls</b> — clear revenue on all non-retained calls.</span>
+        </label>
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input type="checkbox" checked={retractFromGoogle} onChange={(e) => setRetractFromGoogle(e.target.checked)} disabled={!canEdit || busy}
+                 className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#0F1B3D]" data-testid="clear-retract-google" />
+          <span className="text-sm text-slate-700"><b>Retract from Google Ads</b> — recommended. Removes each conversion from Google Ads reporting &amp; Smart Bidding via Data Manager API.</span>
+        </label>
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input type="checkbox" checked={onlyBulkBackfill} onChange={(e) => setOnlyBulkBackfill(e.target.checked)} disabled={!canEdit || busy}
+                 className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#0F1B3D]" data-testid="clear-only-bulk-backfill" />
+          <span className="text-sm text-slate-700"><b>Only touch records tagged <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">bulk_backfill</code></b> — safest. Prevents wiping revenue that was entered manually per-lead by your team.</span>
+        </label>
+
+        <div className="flex flex-wrap items-center gap-3 pt-3">
+          <Button variant="outline" onClick={runPreview} disabled={!canEdit || busy || (!includeLeads && !includeCalls)}
+                  data-testid="clear-preview-btn" className="gap-1.5">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Info className="h-4 w-4" />}
+            Preview counts (dry-run)
+          </Button>
+          <Button onClick={() => setConfirmOpen(true)} disabled={!canEdit || busy || (!includeLeads && !includeCalls)}
+                  className="bg-slate-800 hover:bg-slate-900 text-white gap-1.5" data-testid="clear-run-btn">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
+            Run clear
+          </Button>
+        </div>
+      </div>
+
+      {(preview || result) && (
+        <div className="grid gap-3 md:grid-cols-2" data-testid="clear-panel">
+          <ClearResultCard title="Leads" data={(result || preview).leads} />
+          <ClearResultCard title="Calls" data={(result || preview).calls} />
+          {(result && result.error_count > 0) && (
+            <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 p-4" data-testid="clear-error-list">
+              <div className="flex items-center gap-2 mb-2 text-rose-700 font-bold">
+                <XCircle className="h-4 w-4" /> {result.error_count} error{result.error_count === 1 ? '' : 's'}
+              </div>
+              <ul className="text-xs text-rose-800 space-y-1 max-h-40 overflow-auto">
+                {(result.errors || []).map((e, i) => <li key={i} className="font-mono">{e}</li>)}
+              </ul>
+            </div>
+          )}
+          {result && result.error_count === 0 && (
+            <p className="md:col-span-2 text-sm text-emerald-700 flex items-center gap-1.5" data-testid="clear-success-note">
+              <CheckCircle2 className="h-4 w-4" /> Completed in {(result.took_ms / 1000).toFixed(1)}s with no retraction errors.
+            </p>
+          )}
+          {preview && !result && (
+            <p className="md:col-span-2 text-xs text-slate-500 flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5" /> This was a dry-run — nothing was cleared and nothing was sent to Google.
+            </p>
+          )}
+        </div>
+      )}
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent data-testid="clear-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-900">
+              <Undo2 className="h-5 w-5 text-slate-600" /> Confirm clear
+            </DialogTitle>
+            <DialogDescription>
+              You are about to reverse the bulk backfill for non-retained records.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 text-sm">
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+              <span className="text-slate-600">Clear leads?</span>
+              <span className="font-bold text-slate-900">{includeLeads ? 'Yes' : 'No'}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+              <span className="text-slate-600">Clear calls?</span>
+              <span className="font-bold text-slate-900">{includeCalls ? 'Yes' : 'No'}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+              <span className="text-slate-600">Retract from Google Ads?</span>
+              <span className={`font-bold ${retractFromGoogle ? 'text-rose-700' : 'text-slate-900'}`}>{retractFromGoogle ? 'Yes — retractions sent' : 'No — local only'}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+              <span className="text-slate-600">Only bulk_backfill records?</span>
+              <span className="font-bold text-slate-900">{onlyBulkBackfill ? 'Yes (safest)' : 'No — will also clear manual entries'}</span>
+            </div>
+          </div>
+          <p className="text-[12px] text-slate-500 mt-2">
+            Retained records will be <b>skipped automatically</b> — their revenue stays intact.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} data-testid="clear-confirm-cancel">Cancel</Button>
+            <Button className="bg-slate-800 hover:bg-slate-900 text-white" onClick={runReal} data-testid="clear-confirm-run">
+              Yes, clear now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+const ClearResultCard = ({ title, data }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4" data-testid={`clear-result-${title.toLowerCase()}`}>
+    <div className="font-slab font-bold text-slate-900 mb-3">{title}</div>
+    <div className="grid grid-cols-2 gap-2">
+      <Stat label="Matched (non-retained)" value={data.matched} testid={`clear-${title.toLowerCase()}-matched`} />
+      <Stat label="Cleared locally" value={data.cleared} tone="good" testid={`clear-${title.toLowerCase()}-cleared`} />
+      <Stat label="Retracted from Google" value={data.retracted} tone={data.retracted ? 'good' : 'default'} testid={`clear-${title.toLowerCase()}-retracted`} />
+      <Stat label="Retract errors" value={data.retract_errors} tone={data.retract_errors ? 'bad' : 'default'} testid={`clear-${title.toLowerCase()}-errors`} />
+      <Stat label="Skipped (retained — kept)" value={data.skipped_retained} tone="warn" testid={`clear-${title.toLowerCase()}-kept`} />
+    </div>
+  </div>
+);

@@ -4313,6 +4313,144 @@ async def bulk_assign_conversion_value(body: BulkValueBody, _: dict = Depends(re
 
 
 
+async def _retract_lead_conversion(lead: dict) -> dict:
+    """Send a RETRACTION event to Google Ads to remove a previously-uploaded
+    lead conversion. Uses the same transaction_id (lead.id) + gclid pair that
+    the original upload used, so Google can match & remove it."""
+    return await asyncio.to_thread(
+        dm.retract_offline_conversion,
+        lead=lead,
+        sale_datetime=lead.get("sale_datetime") or lead.get("created_at"),
+        order_id=lead.get("id"),
+    )
+
+
+async def _retract_call_conversion(call: dict) -> dict:
+    lead_like = {
+        "id": call.get("id"),
+        "email": "",
+        "phone": call.get("caller_number", ""),
+        "gclid": call.get("gclid", ""),
+    }
+    return await asyncio.to_thread(
+        dm.retract_offline_conversion,
+        lead=lead_like,
+        sale_datetime=call.get("sale_datetime") or call.get("called_at") or call.get("created_at"),
+        order_id=call.get("id"),
+    )
+
+
+class ClearNonRetainedBody(BaseModel):
+    """Reverses the bulk backfill for records that are NOT marked as retained.
+    Retained clients keep their revenue; everyone else has both the local sale
+    fields cleared and (optionally) a RETRACTION uploaded to Google Ads to
+    remove them from Smart Bidding & reporting."""
+    include_leads: bool = True
+    include_calls: bool = True
+    retract_from_google: bool = True
+    only_bulk_backfill: bool = True  # If true, only clear rows tagged sale_source=bulk_backfill (safest)
+    dry_run: bool = False
+
+
+@api_router.post("/admin/conversions/clear-non-retained")
+async def clear_non_retained_conversions(body: ClearNonRetainedBody, _: dict = Depends(require_editor)):
+    """For every lead/call where retained != true AND sale_status == sold:
+      1. (optionally) send a RETRACTION to Google Ads (Data Manager API)
+      2. Clear sale_status / sale_value / sold_at / conversion_* fields locally
+      3. Tag the record with sale_source = 'backfill_cleared' + cleared_at
+
+    By default operates only on records tagged 'bulk_backfill' — this prevents
+    accidentally wiping manually-entered revenue on individual clients."""
+    started = datetime.now(timezone.utc)
+    lead_stats = {"matched": 0, "cleared": 0, "retracted": 0, "retract_errors": 0, "skipped_retained": 0}
+    call_stats = {"matched": 0, "cleared": 0, "retracted": 0, "retract_errors": 0, "skipped_retained": 0}
+    errors: list[str] = []
+
+    # Base query: sold records that are NOT retained. Optionally further
+    # restrict to only records that came from the bulk backfill (safest).
+    def _base_q():
+        q: dict = {"sale_status": "sold", "retained": {"$ne": True}}
+        if body.only_bulk_backfill:
+            q["sale_source"] = "bulk_backfill"
+        return q
+
+    clear_fields = {
+        "sale_status": "",
+        "sale_value": None,
+        "sale_currency": None,
+        "sale_datetime": None,
+        "sold_at": None,
+        "sale_source": "backfill_cleared",
+        "cleared_at": _now_iso(),
+        "conversion_uploaded": False,
+        "conversion_status": None,
+        "conversion_detail": None,
+    }
+
+    if body.include_leads:
+        leads = await db.leads.find(_base_q(), {"_id": 0}).to_list(100000)
+        # Also count retained sold ones for reporting only
+        lead_stats["skipped_retained"] = await db.leads.count_documents(
+            {"sale_status": "sold", "retained": True}
+        )
+        lead_stats["matched"] = len(leads)
+        for lead in leads:
+            if body.dry_run:
+                lead_stats["cleared"] += 1
+                continue
+            if body.retract_from_google:
+                try:
+                    result = await _retract_lead_conversion(lead)
+                    if result.get("ok"):
+                        lead_stats["retracted"] += 1
+                    else:
+                        lead_stats["retract_errors"] += 1
+                        errors.append(f"lead {lead.get('id')}: {str(result.get('detail'))[:120]}")
+                except Exception as exc:
+                    lead_stats["retract_errors"] += 1
+                    errors.append(f"lead {lead.get('id')}: {str(exc)[:120]}")
+            await db.leads.update_one({"id": lead.get("id")}, {"$set": clear_fields})
+            lead_stats["cleared"] += 1
+
+    if body.include_calls:
+        calls = await db.calls.find({**_base_q(), "is_test": {"$ne": True}}, {"_id": 0}).to_list(100000)
+        call_stats["skipped_retained"] = await db.calls.count_documents(
+            {"sale_status": "sold", "retained": True, "is_test": {"$ne": True}}
+        )
+        call_stats["matched"] = len(calls)
+        for call in calls:
+            if body.dry_run:
+                call_stats["cleared"] += 1
+                continue
+            if body.retract_from_google:
+                try:
+                    result = await _retract_call_conversion(call)
+                    if result.get("ok"):
+                        call_stats["retracted"] += 1
+                    else:
+                        call_stats["retract_errors"] += 1
+                        errors.append(f"call {call.get('id')}: {str(result.get('detail'))[:120]}")
+                except Exception as exc:
+                    call_stats["retract_errors"] += 1
+                    errors.append(f"call {call.get('id')}: {str(exc)[:120]}")
+            await db.calls.update_one({"id": call.get("id")}, {"$set": clear_fields})
+            call_stats["cleared"] += 1
+
+    took_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+    return {
+        "success": True,
+        "dry_run": body.dry_run,
+        "leads": lead_stats,
+        "calls": call_stats,
+        "errors": errors[:20],
+        "error_count": len(errors),
+        "took_ms": took_ms,
+    }
+
+
+
+
+
 
 
 @api_router.get("/admin/stats")

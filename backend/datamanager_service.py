@@ -200,3 +200,76 @@ def upload_offline_conversion(lead: dict, value: float, currency: str = "USD",
     except Exception as e:
         return {"ok": False, "status": "error", "validate_only": validate_only,
                 "detail": str(e)}
+
+
+
+def retract_offline_conversion(lead: dict, sale_datetime=None, order_id: str = None,
+                                conversion_action_id: str = None) -> dict:
+    """Send a RETRACTION adjustment event via Data Manager API to remove a
+    previously-uploaded offline conversion from Google Ads reporting & bidding.
+    Matches on transactionId (order_id) — must be the same value used when the
+    original conversion was ingested, plus the same conversion action."""
+    if not is_configured():
+        return {"ok": False, "status": "not_configured",
+                "detail": "Data Manager credentials are not set.",
+                "missing": missing_keys()}
+
+    validate_only = is_validate_only()
+    customer_id = _digits(os.environ["GOOGLE_ADS_CUSTOMER_ID"])
+    conversion_action_id = _digits(conversion_action_id) if conversion_action_id \
+        else _digits(os.environ["GOOGLE_ADS_CONVERSION_ACTION_ID"])
+    gclid = (lead.get("gclid") or "").strip()
+    transaction_id = str(order_id or lead.get("id") or lead.get("_id") or "")
+
+    # A retraction needs either the original transactionId OR the gclid+timestamp
+    # combo to identify which conversion to remove.
+    if not transaction_id and not gclid:
+        return {"ok": False, "status": "no_identifier",
+                "detail": "Cannot retract without transactionId or gclid."}
+
+    event = {
+        "eventType": "RETRACTION",
+        "eventTimestamp": _iso_rfc3339(sale_datetime),
+        "transactionId": transaction_id,
+        "eventSource": "WEB",
+    }
+    if gclid:
+        event["adIdentifiers"] = {"gclid": gclid}
+
+    body = {
+        "destinations": [{
+            "operatingAccount": {"accountType": "GOOGLE_ADS", "accountId": customer_id},
+            "productDestinationId": conversion_action_id,
+        }],
+        "events": [event],
+        "consent": {"adUserData": "CONSENT_GRANTED", "adPersonalization": "CONSENT_GRANTED"},
+        "encoding": "HEX",
+        "validateOnly": validate_only,
+    }
+
+    try:
+        token = _access_token()
+        with httpx.Client(timeout=20.0) as c:
+            r = c.post(INGEST_URL, json=body,
+                       headers={"Authorization": f"Bearer {token}",
+                                "Content-Type": "application/json"})
+        if r.status_code >= 400:
+            detail = r.text
+            try:
+                detail = r.json().get("error", {}).get("message", detail)
+            except Exception:
+                pass
+            return {"ok": False, "status": "rejected", "http": r.status_code,
+                    "validate_only": validate_only, "detail": detail,
+                    "gclid_used": bool(gclid)}
+        resp = r.json() if r.text else {}
+        return {"ok": True,
+                "status": "validated" if validate_only else "retracted",
+                "validate_only": validate_only,
+                "detail": ("Retraction validated (test mode — not recorded)."
+                           if validate_only else "Retraction sent to Google Ads."),
+                "request_id": resp.get("requestId"),
+                "gclid_used": bool(gclid)}
+    except Exception as e:
+        return {"ok": False, "status": "error", "validate_only": validate_only,
+                "detail": str(e)}
