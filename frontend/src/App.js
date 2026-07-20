@@ -21,6 +21,7 @@ const MockupFunnel = lazy(() => import('@/pages/MockupFunnel'));
 const MockupTabs = lazy(() => import('@/pages/MockupTabs'));
 const PresellPA = lazy(() => import('@/pages/PresellPA'));
 const PresellSPA = lazy(() => import('@/pages/PresellSPA'));
+const PresellAdvertorial = lazy(() => import('@/pages/PresellAdvertorial'));
 const TeamLandingPages = lazy(() => import('@/pages/TeamLanding'));
 const SplitEntry = lazy(() => import('@/pages/SplitEntry'));
 const CreatorPortal = lazy(() => import('@/pages/CreatorPortal'));
@@ -67,6 +68,7 @@ function App() {
           <Route path="/mockup/funnel" element={L(<MockupFunnel />)} />
           <Route path="/mockup/tabs" element={L(<MockupTabs />)} />
           <Route path="/pa" element={L(<PresellPA />)} />
+          <Route path="/pa-mockup" element={L(<PresellAdvertorial sourcePage="lapa" />)} />
           <Route path="/spa" element={L(<PresellSPA />)} />
           <Route path="/tm" element={<TeamRoute variant="overlay" />} />
           <Route path="/tm2" element={<TeamRoute variant="split" />} />
