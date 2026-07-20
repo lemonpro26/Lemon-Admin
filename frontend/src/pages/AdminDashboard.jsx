@@ -128,6 +128,18 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [matchedCalls, setMatchedCalls] = useState([]);
+  // Horizontal scroll position of the Leads table — persisted across data
+  // reloads so clicking the date arrows (or a segment/campaign chip) doesn't
+  // snap the table back to the left, hiding the Date column the user was
+  // looking at. Restored in a useLayoutEffect below whenever `leads` changes.
+  const leadsScrollRef = React.useRef(null);
+  const leadsScrollLeftRef = React.useRef(0);
+  React.useLayoutEffect(() => {
+    const el = leadsScrollRef.current;
+    if (el && leadsScrollLeftRef.current) {
+      el.scrollLeft = leadsScrollLeftRef.current;
+    }
+  }, [leads]);
   const [openedCall, setOpenedCall] = useState(null);
   const [leadSeg, setLeadSeg] = useState('all');
   const [leadCampaign, setLeadCampaign] = useState('all');
@@ -651,65 +663,83 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Source segment filters (matches the Calls layout) */}
-            <div className="flex items-center gap-2 flex-wrap mb-3" data-testid="lead-segment-filters">
-              {LEAD_SEGMENTS.map((seg) => (
-                <button
-                  key={seg.key}
-                  onClick={() => selectLeadSeg(seg.key)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadSeg === seg.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                  data-testid={`lead-seg-${seg.key}`}
-                >
-                  {seg.label}
-                  <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{leadCounts[seg.key] ?? 0}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Campaign filter chips — auto-populated (matches the Calls layout) */}
-            {leadCampaignOptions.length > 0 && (
-              <div className="mb-4">
-                <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Campaign</div>
-                <div className="flex items-center gap-2 flex-wrap" data-testid="lead-campaign-filters">
-                  <button
-                    onClick={() => setLeadCampaign('all')}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadCampaign === 'all' ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
-                    data-testid="lead-campaign-all"
-                  >
-                    All <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadCampaign === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{segLeads.length}</span>
-                  </button>
-                  {leadCampaignOptions.map((c) => (
+            {/* Filter groups — grouped into distinct panels so segment / campaign
+                / network filters are visually separated instead of stacking as
+                a wall of chips. */}
+            <div className="space-y-3 mb-4">
+              {/* Source segment filters — one row per source_page ("the different pages") */}
+              <div className="rounded-2xl border border-slate-200 bg-white/60 px-4 py-3 shadow-sm">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Landing page</div>
+                <div className="flex items-center gap-2 flex-wrap" data-testid="lead-segment-filters">
+                  {LEAD_SEGMENTS.map((seg) => (
                     <button
-                      key={c.key}
-                      onClick={() => setLeadCampaign(leadCampaign === c.key ? 'all' : c.key)}
-                      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadCampaign === c.key ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
-                      data-testid={`lead-campaign-chip-${c.key}`}
+                      key={seg.key}
+                      onClick={() => selectLeadSeg(seg.key)}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadSeg === seg.key ? 'bg-[#0F1B3D] text-white border-[#0F1B3D]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+                      data-testid={`lead-seg-${seg.key}`}
                     >
-                      {c.label} <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadCampaign === c.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{c.count}</span>
+                      {seg.label}
+                      <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadSeg === seg.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`} data-testid={`lead-seg-count-${seg.key}`}>{leadCounts[seg.key] ?? 0}</span>
                     </button>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* Network filter (mockup) — separate a lead by traffic source */}
-            <div className="mb-4 -mt-1">
-              <NetworkChips items={segLeads} value={leadNetwork} onChange={setLeadNetwork} testidPrefix="lead-network" />
+              {/* Campaign filter chips — auto-populated (matches the Calls layout) */}
+              {leadCampaignOptions.length > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-white/60 px-4 py-3 shadow-sm">
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Campaign</div>
+                  <div className="flex items-center gap-2 flex-wrap" data-testid="lead-campaign-filters">
+                    <button
+                      onClick={() => setLeadCampaign('all')}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadCampaign === 'all' ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
+                      data-testid="lead-campaign-all"
+                    >
+                      All <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadCampaign === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{segLeads.length}</span>
+                    </button>
+                    {leadCampaignOptions.map((c) => (
+                      <button
+                        key={c.key}
+                        onClick={() => setLeadCampaign(leadCampaign === c.key ? 'all' : c.key)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${leadCampaign === c.key ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'}`}
+                        data-testid={`lead-campaign-chip-${c.key}`}
+                      >
+                        {c.label} <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${leadCampaign === c.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{c.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Network filter (mockup) — separate a lead by traffic source */}
+              <div className="rounded-2xl border border-slate-200 bg-white/60 px-4 py-3 shadow-sm">
+                <NetworkChips items={segLeads} value={leadNetwork} onChange={setLeadNetwork} testidPrefix="lead-network" />
+              </div>
             </div>
 
+            {/* Leads table. The overflow-x-auto scroll container is ALWAYS
+                mounted (loading / empty states render *inside* it) so its
+                horizontal scroll position survives every data reload — clicking
+                the date arrows no longer resets the scroll back to the left
+                (which hid the Date column that lived on the right). */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              {loading ? (
-                <div className="p-12 text-center text-slate-500" data-testid="admin-leads-loading">Loading leads…</div>
-              ) : leads.length === 0 ? (
-                <div className="p-12 text-center text-slate-500" data-testid="admin-leads-empty">
-                  No leads in this date range. Adjust the date filter or submit a test lead.
-                </div>
-              ) : shownLeads.length === 0 ? (
-                <div className="p-12 text-center text-slate-500" data-testid="admin-leads-seg-empty">
-                  No {activeSegLabel} leads in this range.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
+              <div
+                ref={leadsScrollRef}
+                onScroll={(e) => { leadsScrollLeftRef.current = e.currentTarget.scrollLeft; }}
+                className="overflow-x-auto"
+                data-testid="admin-leads-scroll"
+              >
+                {loading ? (
+                  <div className="p-12 text-center text-slate-500" data-testid="admin-leads-loading">Loading leads…</div>
+                ) : leads.length === 0 ? (
+                  <div className="p-12 text-center text-slate-500" data-testid="admin-leads-empty">
+                    No leads in this date range. Adjust the date filter or submit a test lead.
+                  </div>
+                ) : shownLeads.length === 0 ? (
+                  <div className="p-12 text-center text-slate-500" data-testid="admin-leads-seg-empty">
+                    No {activeSegLabel} leads in this range.
+                  </div>
+                ) : (
                   <Table data-testid="admin-leads-table">
                     <TableHeader>
                       <TableRow>
@@ -816,8 +846,8 @@ export default function AdminDashboard() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Matching CALLS — surfaced when searching so leads + calls are searchable together */}
