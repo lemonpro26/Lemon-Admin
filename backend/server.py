@@ -4920,6 +4920,24 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     # allocating each campaign's spend across the pages its clicks landed on.
     spend_by_campaign = await asyncio.to_thread(gnames.fetch_spend_by_campaign, start, end)
     spend_by_adgroup = await asyncio.to_thread(gnames.fetch_spend_by_adgroup, start, end)
+    # Authoritative ad_group -> campaign mapping from Google Ads. Ad-group IDs
+    # are globally unique so this is the source of truth for which campaign
+    # each ad group belongs to. Corrects leads that arrived with mismatched
+    # tracking params (e.g. campaign_id from a Search campaign but adgroup_id
+    # that actually lives in a Display campaign — a common tracking-template
+    # issue that mislabels Display leads as Search revenue).
+    ag_to_camp = await asyncio.to_thread(gnames.fetch_adgroup_to_campaign)
+
+    def _fix_cid(cid, agid):
+        """If Google's truth says this ad group lives in a different campaign
+        than the lead recorded, use Google's answer. Never invent an ad group
+        binding (only correct existing ones)."""
+        if agid:
+            truth = ag_to_camp.get(str(agid))
+            if truth and truth.get("campaign_id"):
+                return truth["campaign_id"]
+        return cid
+
     lead_docs = await db.leads.find(
         {"created_at": {"$gte": s_iso, "$lte": e_iso}},
         {"_id": 0, "campaign_id": 1, "adgroup_id": 1, "ad_id": 1, "source_page": 1, "sale_status": 1, "sale_value": 1, "retained": 1},
@@ -4941,21 +4959,25 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
             d[k] = d.get(k, 0) + v
 
     for l in lead_docs:
-        cid, pg = l.get("campaign_id") or "", _canon_page(l.get("source_page"))
+        agid = l.get("adgroup_id") or ""
+        cid = _fix_cid(l.get("campaign_id") or "", agid)
+        pg = _canon_page(l.get("source_page"))
         if l.get("sale_status") == "sold":
             v = float(l.get("sale_value") or 0)
             _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
             if cid:
-                _acc(rev_ag, (cid, l.get("adgroup_id") or ""), v)
-                _acc(rev_ad3, (cid, l.get("adgroup_id") or "", l.get("ad_id") or ""), v)
+                _acc(rev_ag, (cid, agid), v)
+                _acc(rev_ad3, (cid, agid, l.get("ad_id") or ""), v)
     for c in _enriched_calls:
-        cid, pg = c.get("campaign_id") or "", _page_of_call(c)
+        agid = c.get("adgroup_id") or ""
+        cid = _fix_cid(c.get("campaign_id") or "", agid)
+        pg = _page_of_call(c)
         if c.get("sale_status") == "sold":
             v = float(c.get("sale_value") or 0)
             _acc(rev_camp, cid, v); _acc(rev_page, pg, v)
             if cid:
-                _acc(rev_ag, (cid, c.get("adgroup_id") or ""), v)
-                _acc(rev_ad3, (cid, c.get("adgroup_id") or "", c.get("ad_id") or ""), v)
+                _acc(rev_ag, (cid, agid), v)
+                _acc(rev_ad3, (cid, agid, c.get("ad_id") or ""), v)
 
     # Retained clients are counted by retained_at (exactly like the Retained tab) so
     # the "Retained" column reconciles with it. Attribute each to its campaign /
@@ -4971,23 +4993,27 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
          "ad_id": 1, "keyword": 1, "source_page": 1}).to_list(length=20000))
     ret_unattr = 0
     for r in ret_lead_docs:
-        cid, pg = r.get("campaign_id") or "", _canon_page(r.get("source_page"))
+        agid = r.get("adgroup_id") or ""
+        cid = _fix_cid(r.get("campaign_id") or "", agid)
+        pg = _canon_page(r.get("source_page"))
         if cid:
             ret_camp[cid] = ret_camp.get(cid, 0) + 1
-            k = (cid, r.get("adgroup_id") or "")
+            k = (cid, agid)
             ret_ag[k] = ret_ag.get(k, 0) + 1
-            k3 = (cid, r.get("adgroup_id") or "", r.get("ad_id") or "")
+            k3 = (cid, agid, r.get("ad_id") or "")
             ret_ad3[k3] = ret_ad3.get(k3, 0) + 1
         else:
             ret_unattr += 1
         _acc(ret_page, pg)
     for r in ret_call_docs:
-        cid, pg = r.get("campaign_id") or "", _page_of_call(r)
+        agid = r.get("adgroup_id") or ""
+        cid = _fix_cid(r.get("campaign_id") or "", agid)
+        pg = _page_of_call(r)
         if cid:
             ret_camp[cid] = ret_camp.get(cid, 0) + 1
-            k = (cid, r.get("adgroup_id") or "")
+            k = (cid, agid)
             ret_ag[k] = ret_ag.get(k, 0) + 1
-            k3 = (cid, r.get("adgroup_id") or "", r.get("ad_id") or "")
+            k3 = (cid, agid, r.get("ad_id") or "")
             ret_ad3[k3] = ret_ad3.get(k3, 0) + 1
         else:
             ret_unattr += 1
@@ -5086,7 +5112,23 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
         })
 
     # ---- Per-ad-group financials (spend from Google, revenue/retained from DB) ----
-    by_adgroup = await breakdown(["campaign_id", "adgroup_id"])
+    # Remap each ad group row to its TRUE parent campaign per Google Ads. This
+    # fixes cases like a Display ad group showing under a Search campaign due
+    # to mismatched tracking-template params. Rows with the same corrected
+    # (campaign_id, adgroup_id) key are merged.
+    raw_by_adgroup = await breakdown(["campaign_id", "adgroup_id"])
+    merged = {}
+    for r in raw_by_adgroup:
+        agid = r.get("adgroup_id") or ""
+        true_cid = _fix_cid(r.get("campaign_id") or "", agid)
+        key = (true_cid, agid)
+        # Add numeric metrics; keep the corrected campaign_id.
+        if key not in merged:
+            merged[key] = {**r, "campaign_id": true_cid}
+        else:
+            for k in ("clicks", "leads", "calls", "bounced"):
+                merged[key][k] = (merged[key].get(k) or 0) + (r.get(k) or 0)
+    by_adgroup = list(merged.values())
     for r in by_adgroup:
         key = (r.get("campaign_id") or "", r.get("adgroup_id") or "")
         contacts = r.get("leads", 0) + r.get("calls", 0)
@@ -5107,7 +5149,20 @@ async def admin_analytics(_: dict = Depends(require_admin), start: str = Query("
     # Display & Demand Gen campaigns show a real per-creative breakdown even
     # though their clicks rarely carry first-party tracking. ----
     ad_stats = await asyncio.to_thread(gnames.fetch_ad_stats, start, end)
-    by_ad = await breakdown(["campaign_id", "adgroup_id", "ad_id"])
+    # Remap per-ad rows to the ad group's TRUE parent campaign (same reasoning
+    # as by_adgroup above). Rows with matching corrected 3-tuple keys are merged.
+    raw_by_ad = await breakdown(["campaign_id", "adgroup_id", "ad_id"])
+    merged_ad = {}
+    for r in raw_by_ad:
+        agid = r.get("adgroup_id") or ""
+        true_cid = _fix_cid(r.get("campaign_id") or "", agid)
+        key = (true_cid, agid, r.get("ad_id") or "")
+        if key not in merged_ad:
+            merged_ad[key] = {**r, "campaign_id": true_cid}
+        else:
+            for k in ("clicks", "leads", "calls", "bounced"):
+                merged_ad[key][k] = (merged_ad[key].get(k) or 0) + (r.get(k) or 0)
+    by_ad = list(merged_ad.values())
     for r in by_ad:
         k3 = (r.get("campaign_id") or "", r.get("adgroup_id") or "", r.get("ad_id") or "")
         st = ad_stats.get(k3, {})

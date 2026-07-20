@@ -562,6 +562,46 @@ def fetch_call_views(start_date: str, end_date: str) -> list:
     return out
 
 
+def fetch_adgroup_to_campaign() -> dict:
+    """Return the AUTHORITATIVE {ad_group_id: {campaign_id, campaign_name,
+    campaign_type}} mapping from Google Ads. Ad-group IDs are globally unique
+    inside an Ads account, so this is the source of truth for which campaign
+    an ad group belongs to. Used to correct leads/calls whose recorded
+    campaign_id disagrees with the ad group's real parent (a common symptom
+    when tracking template placeholders get set inconsistently).
+    Cached ~5 min. Pulls ENABLED, PAUSED, and REMOVED so historical leads still
+    resolve; a removed ad group in Google is still the correct parent."""
+    if not is_configured():
+        return {}
+    ck = ("adgroup_to_campaign",)
+    hit = _report_cache.get(ck)
+    if hit and (time.time() - hit[0]) < _REPORT_TTL:
+        return hit[1]
+    c = _cfg()
+    try:
+        token = _access_token(c)
+        # We don't filter by campaign.status here — we want the mapping even
+        # for paused/removed ad groups so old leads still map correctly.
+        q = ("SELECT ad_group.id, campaign.id, campaign.name, "
+             "campaign.advertising_channel_type FROM ad_group")
+        rows = _search(c, token, q)
+        out = {}
+        for r in rows:
+            agid = str(r.get("adGroup", {}).get("id", "") or "")
+            camp = r.get("campaign", {}) or {}
+            if agid:
+                out[agid] = {
+                    "campaign_id": str(camp.get("id") or ""),
+                    "campaign_name": camp.get("name") or "",
+                    "campaign_type": camp.get("advertisingChannelType") or "",
+                }
+        _report_cache[ck] = (time.time(), out)
+        return out
+    except Exception as e:
+        logger.info("Google ad_group->campaign mapping fetch failed: %s", e)
+        return {}
+
+
 def fetch_sitelink_metrics(start_date: str, end_date: str, campaign_ids=None) -> list:
     """Real sitelink (asset) performance pulled straight from Google Ads for the
     given date range (YYYY-MM-DD). Returns a list of
