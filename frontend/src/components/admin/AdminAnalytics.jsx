@@ -479,7 +479,7 @@ const VehicleBreakdown = ({ data, loading }) => {
           <span className="text-[11px] font-sans font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5">First-party leads</span>
         </div>
         <div className="p-8 text-center text-slate-500 text-sm" data-testid="analytics-by-vehicle-empty">
-          No leads with a vehicle year/make captured in this date range.
+          No leads with a vehicle year/make captured yet.
         </div>
       </div>
     );
@@ -522,6 +522,13 @@ const VehicleBreakdown = ({ data, loading }) => {
       <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3 flex-wrap">
         <span className="font-slab font-bold text-slate-900">Vehicle breakdown</span>
         <span className="text-[11px] font-sans font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5">First-party leads</span>
+        <span
+          className="text-[11px] font-sans font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5"
+          title="This card shows every lead & retained client ever captured — the date filter above does not apply here."
+          data-testid="vehicle-alltime-badge"
+        >
+          All-time · not date-filtered
+        </span>
         <div className="ml-auto flex items-center gap-3 text-xs font-medium text-slate-500">
           <span data-testid="vehicle-total-with-info">{withVehicle} leads w/ vehicle</span>
           <span className="text-slate-300">•</span>
@@ -655,14 +662,17 @@ export const AdminAnalytics = () => {
   const loadVehicles = useCallback(async () => {
     setVehiclesLoading(true);
     try {
-      const res = await api.get('/admin/analytics/vehicles', { params: { start: range.start, end: range.end } });
+      // Vehicle breakdown is intentionally ALL-TIME (backend ignores the
+      // range param) — retention patterns take months to materialize, and
+      // scoping to a 7- or 30-day window hides the retention picture.
+      const res = await api.get('/admin/analytics/vehicles');
       setVehicles(res.data);
     } catch (e) {
       setVehicles({ total_leads: 0, total_retained: 0, with_vehicle: 0, by_year: [], by_make: [], matrix: [] });
     } finally {
       setVehiclesLoading(false);
     }
-  }, [range]);
+  }, []);
 
   const editLabel = async (type, id, e) => {
     if (e) e.stopPropagation();

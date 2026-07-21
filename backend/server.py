@@ -3274,12 +3274,20 @@ async def admin_analytics_vehicles(start: str = "", end: str = "", _: dict = Dep
     """Year × Make breakdown for leads whose intake form captured the vehicle.
     Calls from CallTrackingMetrics don't carry car_year/car_make, so this card is
     lead-form-driven. Quickbase is NOT queried here — this is 100% first-party
-    data from our own leads collection."""
-    s_iso, e_iso, _d = _date_range(start, end)
+    data from our own leads collection.
+
+    This card is intentionally ALL-TIME (the date range from the URL is
+    ignored). Vehicle retention patterns take months to materialize, so
+    scoping to a 7- or 30-day window would hide the picture — a Toyota
+    Camry retained 4 months ago is still evidence that Camrys retain well.
+    The response echoes back {range_scoped: False} so the UI can label it
+    "All-time" and stop wiring the top-bar date filter through.
+    """
+    # No date filter: pull every lead we've ever captured.
     leads = await db.leads.find(
-        {"created_at": {"$gte": s_iso, "$lte": e_iso}},
+        {},
         {"car_year": 1, "car_make": 1, "retained": 1},
-    ).to_list(50000)
+    ).to_list(200000)
 
     def _norm_year(v):
         s = str(v or "").strip()
@@ -3325,6 +3333,7 @@ async def admin_analytics_vehicles(start: str = "", end: str = "", _: dict = Dep
             if ret: b["retained"] += 1
 
     return {
+        "range_scoped": False,  # this card is intentionally all-time
         "total_leads": total_leads,
         "total_retained": total_retained,
         "with_vehicle": with_vehicle,
