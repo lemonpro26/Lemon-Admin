@@ -69,6 +69,17 @@ function App() {
           <Route path="/mockup/tabs" element={L(<MockupTabs />)} />
           <Route path="/pa" element={L(<PresellPA />)} />
           <Route path="/pa-mockup" element={L(<PresellAdvertorial sourcePage="lapa" />)} />
+          <Route
+            path="/pa-mockup-text"
+            element={L(
+              <PresellPA
+                textPhone="(844) 335-8911"
+                textPhoneHref="sms:+18443358911"
+                textMessage="Hi, I'd like to check if my car qualifies for California Lemon Law."
+                rootTestId="presell-pa-text-page"
+              />,
+            )}
+          />
           <Route path="/spa" element={L(<PresellSPA />)} />
           <Route path="/tm" element={<TeamRoute variant="overlay" />} />
           <Route path="/tm2" element={<TeamRoute variant="split" />} />

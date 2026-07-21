@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, ShieldCheck, CheckCircle2, Scale, Clock, ArrowRight, Star, Award, GraduationCap } from 'lucide-react';
+import { Phone, ShieldCheck, CheckCircle2, Scale, Clock, ArrowRight, Star, Award, GraduationCap, MessageSquare } from 'lucide-react';
 import { api } from '@/lib/api';
 import { captureTracking, getSessionId } from '@/lib/tracking';
 import { useFunnel } from '@/context/FunnelContext';
@@ -79,12 +79,26 @@ export default function PresellPA({
   sourcePage = 'lapa',
   phone = COMPANY.phone,
   phoneHref = COMPANY.phoneHref,
+  // Optional Text-us CTA. Pass `textPhone` (display) + `textPhoneHref`
+  // (sms: link, typically the same number as `phone`) to enable Text buttons
+  // in the header, below the hero, and in a sticky mobile footer bar.
+  // Leaving them undefined keeps the classic /pa page (call-only) untouched.
+  textPhone = '',
+  textPhoneHref = '',
+  textMessage = 'Hi, I would like to check if my car qualifies for Lemon Law.',
   rootTestId = 'presell-pa-page',
 } = {}) {
   const navigate = useNavigate();
   const { setAnswer, resetAnswers } = useFunnel();
   const goLegal = (to) => navigate(to);
   const [c, setC] = useState(PA_DEFAULTS);
+
+  // Prebuilt sms: href with pre-filled body. iOS/Android both accept
+  // `sms:<number>?body=<encoded>`; older iOS versions accept `?&body=` as
+  // fallback but modern devices are fine with the standard `?body=`.
+  const smsHref = textPhoneHref
+    ? `${textPhoneHref}${textPhoneHref.includes('?') ? '&' : '?'}body=${encodeURIComponent(textMessage)}`
+    : '';
 
   useEffect(() => {
     api.get(contentPath)
@@ -132,21 +146,38 @@ export default function PresellPA({
     <div className="min-h-[100dvh] bg-white font-sans text-slate-800" data-testid={rootTestId}>
       {/* Top brand bar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between gap-2">
           <Logo size="sm" />
-          <a
-            href={phoneHref}
-            onClick={trackPhoneCallConversion}
-            data-testid="pa-header-call"
-            className="flex flex-col items-center justify-center leading-none rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white px-2.5 py-1.5 sm:px-5 sm:py-2 transition-colors shadow-sm"
-          >
-            <span className="flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-xl font-extrabold whitespace-nowrap">
-              <Phone className="h-4 w-4 sm:h-5 sm:w-5" /> {phone}
-            </span>
-            <span className="mt-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.15em] text-white/90">
-              Call Now
-            </span>
-          </a>
+          <div className="flex items-center gap-2">
+            {smsHref && (
+              <a
+                href={smsHref}
+                data-testid="pa-header-text"
+                className="flex flex-col items-center justify-center leading-none rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1.5 sm:px-4 sm:py-2 transition-colors shadow-sm"
+                title="Text us — faster than a call"
+              >
+                <span className="flex items-center gap-1.5 text-[13px] sm:text-lg font-extrabold whitespace-nowrap">
+                  <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> Text
+                </span>
+                <span className="mt-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.15em] text-white/90">
+                  {textPhone}
+                </span>
+              </a>
+            )}
+            <a
+              href={phoneHref}
+              onClick={trackPhoneCallConversion}
+              data-testid="pa-header-call"
+              className="flex flex-col items-center justify-center leading-none rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white px-2.5 py-1.5 sm:px-5 sm:py-2 transition-colors shadow-sm"
+            >
+              <span className="flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-xl font-extrabold whitespace-nowrap">
+                <Phone className="h-4 w-4 sm:h-5 sm:w-5" /> {phone}
+              </span>
+              <span className="mt-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.15em] text-white/90">
+                Call Now
+              </span>
+            </a>
+          </div>
         </div>
       </header>
 
@@ -230,6 +261,29 @@ export default function PresellPA({
             className="w-full h-56 sm:h-80 object-cover transition-transform duration-500 group-hover:scale-105"
           />
         </button>
+
+        {/* Call + Text CTA row — shown only when a text number is configured.
+            Positioned right under the hero so the "reach us however you
+            like" choice sits at the top of the read. */}
+        {smsHref && (
+          <div className="mt-5 grid grid-cols-2 gap-3" data-testid="pa-cta-row">
+            <a
+              href={phoneHref}
+              onClick={trackPhoneCallConversion}
+              className="flex items-center justify-center gap-2 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-extrabold py-3.5 text-base shadow-md transition-colors"
+              data-testid="pa-cta-row-call"
+            >
+              <Phone className="h-5 w-5" /> Call Us
+            </a>
+            <a
+              href={smsHref}
+              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3.5 text-base shadow-md transition-colors"
+              data-testid="pa-cta-row-text"
+            >
+              <MessageSquare className="h-5 w-5" /> Text Us
+            </a>
+          </div>
+        )}
 
         {/* Body */}
         <div className="mt-8 space-y-5 text-[17px] leading-relaxed text-slate-700">
@@ -340,6 +394,35 @@ export default function PresellPA({
           <span className="ml-2 text-sm text-slate-500">Trusted by drivers nationwide</span>
         </div>
       </article>
+
+      {/* Sticky mobile-only Call / Text bar — always visible while scrolling
+          so the user is never more than one tap from reaching us. Desktop
+          keeps the header CTAs (no sticky needed). */}
+      {smsHref && (
+        <div
+          className="fixed bottom-0 inset-x-0 z-40 sm:hidden border-t border-slate-200 bg-white/95 backdrop-blur shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
+          data-testid="pa-sticky-cta"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <div className="max-w-3xl mx-auto px-3 py-2.5 grid grid-cols-2 gap-2">
+            <a
+              href={phoneHref}
+              onClick={trackPhoneCallConversion}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-[#EF4444] hover:bg-[#dc2f2f] text-white font-extrabold py-3 text-sm shadow-sm transition-colors"
+              data-testid="pa-sticky-call"
+            >
+              <Phone className="h-4 w-4" /> Call {phone}
+            </a>
+            <a
+              href={smsHref}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3 text-sm shadow-sm transition-colors"
+              data-testid="pa-sticky-text"
+            >
+              <MessageSquare className="h-4 w-4" /> Text Us
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-[#0B2545] text-slate-300 mt-6">
