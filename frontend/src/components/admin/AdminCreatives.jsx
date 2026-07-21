@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Film, Image as ImageIcon, Clock, CheckCircle2, XCircle, User, Palette, Calendar as CalendarIcon,
+  Film, Image as ImageIcon, Clock, CheckCircle2, XCircle, User, Palette,
   StickyNote, Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,8 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { DateRangeFilter, todayRange } from '@/components/admin/DateRangeFilter';
 
 export const DISPLAY_SIZES = ['300x250', '728x90', '160x600', '300x600', '320x50', '970x250', '336x280'];
 
@@ -161,46 +160,9 @@ function Grid({ items, empty, canEdit, onStatus, onNotesSaved }) {
 
 // Compact date-picker pill — opens a shadcn Calendar in a popover. The user
 // can pick any day; "All dates" clears the filter.
-function DateFilter({ value, onChange }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-slate-300"
-          data-testid="admin-creatives-date-trigger"
-        >
-          <CalendarIcon className="h-4 w-4 text-indigo-600" />
-          {value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'All dates'}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-2" data-testid="admin-creatives-date-popover">
-        <Calendar
-          mode="single"
-          selected={value ? new Date(`${value}T12:00:00`) : undefined}
-          onSelect={(d) => { onChange(d ? ymd(d) : ''); setOpen(false); }}
-          initialFocus
-        />
-        <div className="flex items-center justify-between mt-2 px-1 pb-1">
-          <button
-            onClick={() => { onChange(''); setOpen(false); }}
-            className="text-[11px] font-semibold text-slate-500 hover:text-slate-900"
-            data-testid="admin-creatives-date-clear"
-          >
-            Clear
-          </button>
-          <button
-            onClick={() => { onChange(ymd(new Date())); setOpen(false); }}
-            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
-            data-testid="admin-creatives-date-today"
-          >
-            Today
-          </button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
+// (Replaced with the shared DateRangeFilter used across the rest of the
+//  admin — with ◀ ▶ arrows, presets, and range selection — so Creatives
+//  behaves identically to Leads / Calls / Analytics / Retained.)
 
 export function AdminCreatives() {
   const canEdit = canEditFn();
@@ -208,10 +170,12 @@ export function AdminCreatives() {
   const [sizeFilter, setSizeFilter] = useState('all');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Default to today's date so the view is scoped to "today's uploads" out of
-  // the box (per the user's request "only show me by date"). Cleared string
-  // means "no date filter — show all".
-  const [dateFilter, setDateFilter] = useState(ymd(new Date()));
+  // Default to today's range so the view is scoped to "today's uploads" out
+  // of the box. Uses the shared {start,end} shape so we can drop in the same
+  // DateRangeFilter component used by every other admin tab (Leads / Calls /
+  // Analytics / Retained). Users can pick a preset (Last 7 days, This week,
+  // All time, …) or a custom range from the calendar just like elsewhere.
+  const [range, setRange] = useState(todayRange());
   const [creatorFilter, setCreatorFilter] = useState('all');
 
   const load = useCallback(async () => {
@@ -252,12 +216,17 @@ export function AdminCreatives() {
     return Array.from(set.keys()).sort((a, b) => a.localeCompare(b));
   }, [items]);
 
-  // Apply the date + creator filters ONCE — then split by type + size below.
+  // Apply the date-range + creator filters ONCE — then split by type + size
+  // below. `range` is {start,end} YYYY-MM-DD; a creative uploaded any time
+  // during those local days (inclusive on both ends) is kept.
   const filtered = useMemo(() => items.filter((s) => {
-    if (dateFilter && ymd(s.created_at) !== dateFilter) return false;
+    if (range?.start && range?.end) {
+      const d = ymd(s.created_at);
+      if (!d || d < range.start || d > range.end) return false;
+    }
     if (creatorFilter !== 'all' && (s.creator_name || '').trim() !== creatorFilter) return false;
     return true;
-  }), [items, dateFilter, creatorFilter]);
+  }), [items, range, creatorFilter]);
 
   const videos = filtered.filter((s) => s.type === 'video');
   const allDisplays = filtered.filter((s) => s.type === 'display');
@@ -284,10 +253,13 @@ export function AdminCreatives() {
         </div>
       </div>
 
-      {/* Global filters — date & creator. Apply to both tabs. */}
+      {/* Global filters — date range & creator. Apply to both tabs. Uses
+          the same DateRangeFilter component (with ◀ ▶ arrows + presets +
+          calendar range picker) as Leads / Calls / Analytics / Retained
+          so the filter behavior is identical everywhere. */}
       <div className="flex items-center gap-3 flex-wrap" data-testid="admin-creatives-global-filters">
-        <DateFilter value={dateFilter} onChange={setDateFilter} />
-        <div className="inline-flex items-center gap-2 h-9 px-3 rounded-full border border-slate-200 bg-white text-sm">
+        <DateRangeFilter value={range} onChange={setRange} />
+        <div className="inline-flex items-center gap-2 h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm">
           <User className="h-4 w-4 text-slate-400" />
           <select
             value={creatorFilter}
@@ -299,13 +271,13 @@ export function AdminCreatives() {
             {creators.map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
-        {(dateFilter || creatorFilter !== 'all') && (
+        {creatorFilter !== 'all' && (
           <button
-            onClick={() => { setDateFilter(''); setCreatorFilter('all'); }}
+            onClick={() => setCreatorFilter('all')}
             className="text-xs font-semibold text-slate-500 hover:text-slate-900 underline underline-offset-2"
             data-testid="admin-creatives-clear-filters"
           >
-            Clear filters
+            Clear creator
           </button>
         )}
         <span className="ml-auto text-xs text-slate-500 tabular-nums" data-testid="admin-creatives-total">
@@ -323,7 +295,7 @@ export function AdminCreatives() {
           </TabsList>
 
           <TabsContent value="videos" className="mt-5">
-            <Grid items={videos} empty={dateFilter ? 'No video submissions on this date.' : 'No video submissions yet.'} canEdit={canEdit} onStatus={onStatus} onNotesSaved={onNotesSaved} />
+            <Grid items={videos} empty={range?.start ? 'No video submissions in this date range.' : 'No video submissions yet.'} canEdit={canEdit} onStatus={onStatus} onNotesSaved={onNotesSaved} />
           </TabsContent>
 
           <TabsContent value="display" className="mt-5">
@@ -352,7 +324,7 @@ export function AdminCreatives() {
                 );
               })}
             </div>
-            <Grid items={displays} empty={dateFilter ? 'No display ads on this date for this size.' : 'No display ads for this size.'} canEdit={canEdit} onStatus={onStatus} onNotesSaved={onNotesSaved} />
+            <Grid items={displays} empty={range?.start ? 'No display ads in this date range for this size.' : 'No display ads for this size.'} canEdit={canEdit} onStatus={onStatus} onNotesSaved={onNotesSaved} />
           </TabsContent>
         </Tabs>
       )}
